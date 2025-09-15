@@ -96,3 +96,29 @@ class RMSNorm(nn.Module):
         rms = torch.sqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
         y = x / rms
         return y * self.weight
+
+
+class SwiGLU(nn.Module):
+    """
+    SwiGLU feed-forward block:
+      out = W2( SiLU(W1(x)) * W3(x) )
+    Shapes:
+      - W1: (d_ff, d_model)
+      - W3: (d_ff, d_model)
+      - W2: (d_model, d_ff)
+    """
+
+    def __init__(self, d_model: int, d_ff: int) -> None:
+        super().__init__()
+        self.d_model = int(d_model)
+        self.d_ff = int(d_ff)
+        # Use our minimal Linear layers without bias
+        self.w1 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
+        self.w2 = Linear(in_features=self.d_ff, out_features=self.d_model, bias=False)
+        self.w3 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
+
+    def forward(self, in_features: Tensor) -> Tensor:
+        a = self.w1(in_features)
+        b = self.w3(in_features)
+        gated = silu(a) * b
+        return self.w2(gated)
