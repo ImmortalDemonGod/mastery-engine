@@ -11,6 +11,7 @@ from torch import Tensor
 from cs336_basics.utils import (
     softmax as _softmax_impl,
     cross_entropy as _cross_entropy_impl,
+    gradient_clipping as _grad_clip_impl,
 )
 
 
@@ -464,7 +465,7 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    _grad_clip_impl(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
