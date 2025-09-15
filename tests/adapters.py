@@ -18,7 +18,13 @@ from cs336_basics.utils import (
     load_checkpoint as _load_ckpt_impl,
 )
 from cs336_basics.optimizer import AdamW as _AdamW
-from cs336_basics.layers import Linear as _Linear, Embedding as _Embedding, RMSNorm as _RMSNorm, silu as _silu_impl
+from cs336_basics.layers import (
+    Linear as _Linear,
+    Embedding as _Embedding,
+    RMSNorm as _RMSNorm,
+    silu as _silu_impl,
+    SwiGLU as _SwiGLU,
+)
 
 
 def run_linear(
@@ -94,9 +100,11 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    layer = _RMSNorm(d_model=d_model, eps=eps)
+    layer = _SwiGLU(d_model=d_model, d_ff=d_ff)
     with torch.no_grad():
-        layer.weight.copy_(weights)
+        layer.w1.weight.copy_(w1_weight)
+        layer.w2.weight.copy_(w2_weight)
+        layer.w3.weight.copy_(w3_weight)
     return layer(in_features)
 
 
