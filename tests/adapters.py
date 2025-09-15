@@ -18,6 +18,7 @@ from cs336_basics.utils import (
     load_checkpoint as _load_ckpt_impl,
 )
 from cs336_basics.optimizer import AdamW as _AdamW
+from cs336_basics.layers import Linear as _Linear
 
 
 def run_linear(
@@ -36,10 +37,15 @@ def run_linear(
         in_features (Float[Tensor, "... d_in"]): The output tensor to apply the function to
 
     Returns:
-        Float[Tensor, "... d_out"]: The transformed output of your linear module.
+        Float[Tensor, " ... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    # Instantiate our Linear layer without bias for parity with provided weights
+    layer = _Linear(in_features=d_in, out_features=d_out, bias=False)
+    # Load provided weights
+    with torch.no_grad():
+        layer.weight.copy_(weights)
+    # Forward pass
+    return layer(in_features)
 
 
 def run_embedding(
