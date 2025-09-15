@@ -65,6 +65,75 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 18:47**
+
+**Objective:**
+*   Implement a from-scratch `SwiGLU` module and wire the `run_swiglu` adapter. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Extended `cs336_basics/layers.py` with `SwiGLU` composing three `Linear` layers (bias=False) with SiLU gating: `out = W2( SiLU(W1(x)) * W3(x) )`.
+2.  Wired `tests/adapters.py::run_swiglu` to instantiate `_SwiGLU`, copy `w1`, `w2`, `w3` weights, and forward `in_features`.
+3.  Ran targeted test: `uv run pytest tests/test_model.py::test_swiglu -q`
+
+**Observations & Results:**
+*   Test passed. Output matched snapshot (tolerances per test).
+
+**Analysis & Decisions:**
+*   `SwiGLU` matches reference semantics and shapes. Next: proceed to attention components or checkpoint adapters.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_model.py::test_swiglu -q`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 18:40**
+
+**Objective:**
+*   Implement `RMSNorm` and wire `run_rmsnorm`. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Implemented `RMSNorm(d_model, eps)` with affine weight (no bias): `y = (x / sqrt(mean(x^2) + eps)) * weight` over last dim in `cs336_basics/layers.py`.
+2.  Wired `tests/adapters.py::run_rmsnorm` to instantiate `_RMSNorm`, copy `weights`, and forward inputs.
+3.  Ran targeted test: `uv run pytest tests/test_model.py::test_rmsnorm -q`
+
+**Observations & Results:**
+*   Test passed; snapshot match for RMSNorm.
+
+**Analysis & Decisions:**
+*   Normalization primitive verified; proceed to activation (SiLU) next.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_model.py::test_rmsnorm -q`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 18:45**
+
+**Objective:**
+*   Implement `SiLU` activation and wire `run_silu`. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Added `silu(x) = x * sigmoid(x)` in `cs336_basics/layers.py`.
+2.  Wired `tests/adapters.py::run_silu` to call `_silu_impl`.
+3.  Ran targeted test: `uv run pytest tests/test_model.py::test_silu_matches_pytorch -q`
+
+**Observations & Results:**
+*   Test passed with parity against `torch.nn.functional.silu`.
+
+**Analysis & Decisions:**
+*   Activation verified; proceed to RMSNorm next.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_model.py::test_silu_matches_pytorch -q`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 ### **2025-09-15 18:38**
 
 **Objective:**
