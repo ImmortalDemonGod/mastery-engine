@@ -30,7 +30,7 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
 
-    return _softmax_impl(in_features, dim)
+    raise NotImplementedError
 
 
 def run_embedding(
@@ -432,7 +432,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    return _softmax_impl(in_features, dim)
 
 
 def run_cross_entropy(
