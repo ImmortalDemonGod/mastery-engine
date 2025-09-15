@@ -24,6 +24,7 @@ from cs336_basics.layers import (
     RMSNorm as _RMSNorm,
     silu as _silu_impl,
     SwiGLU as _SwiGLU,
+    scaled_dot_product_attention as _sdpa_impl,
 )
 
 
@@ -126,7 +127,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    return _sdpa_impl(Q=Q, K=K, V=V, mask=mask)
 
 
 def run_multihead_self_attention(
