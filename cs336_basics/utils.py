@@ -137,3 +137,26 @@ def get_batch(dataset, batch_size: int, context_length: int, device: str):
     x = x.to(device)
     y = y.to(device)
     return x, y
+
+
+def save_checkpoint(model, optimizer, iteration, out):
+    """
+    Serialize model/optimizer state dicts and iteration to a path or file-like.
+    """
+    payload = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "iteration": int(iteration),
+    }
+    torch.save(payload, out)
+
+
+def load_checkpoint(src, model, optimizer) -> int:
+    """
+    Load a checkpoint from path or file-like, restore state, and return iteration.
+    Always loads onto CPU to avoid device mismatches in tests.
+    """
+    checkpoint = torch.load(src, map_location="cpu")
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    return int(checkpoint["iteration"])
