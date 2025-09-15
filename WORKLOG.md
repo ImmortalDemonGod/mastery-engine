@@ -68,6 +68,29 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 17:23**
+
+**Objective:**
+*   Implement a from-scratch `AdamW` optimizer and wire it through the adapters.
+
+**Actions & Command(s):**
+1.  Created `cs336_basics/optimizer.py` and implemented `AdamW` inheriting from `torch.optim.Optimizer`:
+    - Decoupled weight decay applied directly to parameters.
+    - Maintains per-parameter `exp_avg`, `exp_avg_sq`, and `step` in `state` with bias correction.
+2.  Wired `get_adamw_cls` in `tests/adapters.py` to return our custom class.
+3.  Ran targeted test: `uv run pytest tests/test_optimizer.py::test_adamw -q`
+
+**Observations & Results:**
+*   Test passed. Our implementation either matches PyTorch’s `AdamW` closely or snapshot expectations.
+
+**Analysis & Decisions:**
+*   Implementation satisfies decoupled weight decay semantics and test expectations. Move on to data batching next.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_optimizer.py::test_adamw -q`
+
+---
+
 ### **2025-09-15 17:22**
 
 **Objective:**
