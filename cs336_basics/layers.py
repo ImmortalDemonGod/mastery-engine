@@ -3,6 +3,7 @@ import math
 import torch
 from torch import Tensor, nn
 from jaxtyping import Float
+from cs336_basics.utils import softmax as _softmax
 
 
 class Linear(nn.Module):
@@ -122,3 +123,35 @@ class SwiGLU(nn.Module):
         b = self.w3(in_features)
         gated = silu(a) * b
         return self.w2(gated)
+
+
+def scaled_dot_product_attention(
+    Q: Float[Tensor, " ... queries d_k"],
+    K: Float[Tensor, " ... keys d_k"],
+    V: Float[Tensor, " ... values d_v"],
+    mask: torch.Tensor | None = None,
+) -> Float[Tensor, " ... queries d_v"]:
+    """
+    Compute scaled dot-product attention.
+
+    Args:
+        Q: Query tensor of shape (..., queries, d_k)
+        K: Key tensor of shape   (..., keys,   d_k)
+        V: Value tensor of shape (..., values, d_v) with values == keys
+        mask: Optional boolean mask of shape (..., queries, keys). True indicates keep; False indicates mask out.
+
+    Returns:
+        Tensor of shape (..., queries, d_v)
+    """
+    q = Q.float()
+    k = K.float()
+    v = V.float()
+    d_k = q.shape[-1]
+    scale = 1.0 / math.sqrt(max(1, d_k))
+    # (..., queries, keys)
+    scores = torch.matmul(q, k.transpose(-1, -2)) * scale
+    if mask is not None:
+        scores = scores.masked_fill(~mask, float('-inf'))
+    attn = _softmax(scores, dim=-1)
+    out = torch.matmul(attn, v)
+    return out.to(V.dtype)
