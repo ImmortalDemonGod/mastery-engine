@@ -12,6 +12,7 @@ from cs336_basics.utils import (
     softmax as _softmax_impl,
     cross_entropy as _cross_entropy_impl,
     gradient_clipping as _grad_clip_impl,
+    get_lr_cosine_schedule as _get_lr_cosine_schedule_impl,
 )
 
 
@@ -33,7 +34,13 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    raise NotImplementedError
+    return _get_lr_cosine_schedule_impl(
+        it=it,
+        max_learning_rate=max_learning_rate,
+        min_learning_rate=min_learning_rate,
+        warmup_iters=warmup_iters,
+        cosine_cycle_iters=cosine_cycle_iters,
+    )
 
 
 def run_embedding(

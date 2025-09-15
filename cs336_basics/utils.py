@@ -70,3 +70,42 @@ def gradient_clipping(parameters, max_l2_norm: float) -> None:
         clip_coef = max_l2_norm / (total_norm + 1e-6)
         for g in grads:
             g.mul_(clip_coef)
+
+
+def get_lr_cosine_schedule(
+    it: int,
+    max_learning_rate: float,
+    min_learning_rate: float,
+    warmup_iters: int,
+    cosine_cycle_iters: int,
+) -> float:
+    """
+    Cosine learning rate with linear warmup.
+
+    Behavior matches tests:
+    - Linear warmup from 0 to max_learning_rate over [0, warmup_iters).
+    - Cosine decay from max to min over the interval [warmup_iters, cosine_cycle_iters].
+      Progress is computed as (it - warmup_iters) / (cosine_cycle_iters - warmup_iters) and
+      clamped to [0, 1]. The cosine formula is: min + 0.5*(max-min)*(1 + cos(pi * progress)).
+    - For it > cosine_cycle_iters, hold at min_learning_rate.
+    """
+    # Warmup
+    if it < warmup_iters:
+        if warmup_iters <= 0:
+            return float(max_learning_rate)
+        return float(max_learning_rate * (it / warmup_iters))
+
+    # Cosine decay window
+    if it <= cosine_cycle_iters:
+        # Handle degenerate case where window length is zero
+        denom = max(1, cosine_cycle_iters - warmup_iters)
+        progress = (it - warmup_iters) / denom
+        from math import cos, pi
+
+        return float(
+            min_learning_rate
+            + 0.5 * (max_learning_rate - min_learning_rate) * (1.0 + cos(pi * progress))
+        )
+
+    # After cycle: clamp to min
+    return float(min_learning_rate)
