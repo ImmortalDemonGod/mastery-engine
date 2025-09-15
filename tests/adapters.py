@@ -18,7 +18,7 @@ from cs336_basics.utils import (
     load_checkpoint as _load_ckpt_impl,
 )
 from cs336_basics.optimizer import AdamW as _AdamW
-from cs336_basics.layers import Linear as _Linear
+from cs336_basics.layers import Linear as _Linear, Embedding as _Embedding, RMSNorm as _RMSNorm, silu as _silu_impl
 
 
 def run_linear(
@@ -66,7 +66,10 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-    raise NotImplementedError
+    layer = _Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
+    with torch.no_grad():
+        layer.weight.copy_(weights)
+    return layer(token_ids)
 
 
 def run_swiglu(
@@ -91,7 +94,10 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    raise NotImplementedError
+    layer = _RMSNorm(d_model=d_model, eps=eps)
+    with torch.no_grad():
+        layer.weight.copy_(weights)
+    return layer(in_features)
 
 
 def run_scaled_dot_product_attention(
