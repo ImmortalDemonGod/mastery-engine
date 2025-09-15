@@ -1,7 +1,4 @@
 
-
-
-
 ---
 
 # Project Worklog: `cs336-basics`
@@ -65,6 +62,30 @@ Each entry in this log should adhere to the following principles. They are desig
 *   **Diff File(s):** `[Optional: path/to/relevant/diff.txt]`
 ---
 ```
+
+---
+
+### **2025-09-15 17:36**
+
+**Objective:**
+*   Implement `get_batch` to sample uniform LM sequences and wire the adapter.
+
+**Actions & Command(s):**
+1.  Implemented `get_batch(dataset, batch_size, context_length, device)` in `cs336_basics/utils.py`:
+    - Uses PyTorch RNG (`torch.randint`) for uniform start indices.
+    - Builds `x` and `y` where `y = x + 1`.
+    - Moves tensors to the requested device, letting PyTorch surface invalid-device errors.
+2.  Wired `run_get_batch` in `tests/adapters.py` to delegate to the implementation.
+3.  Ran targeted test: `uv run pytest tests/test_data.py::test_get_batch -q`
+
+**Observations & Results:**
+*   Test passed. Shapes correct, `y = x+1` verified, sampling distribution within expected statistical bounds, invalid device path raises.
+
+**Analysis & Decisions:**
+*   Confirms uniform sampling and device handling. Next: checkpointing save/load.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_data.py::test_get_batch -q`
 
 ---
 
