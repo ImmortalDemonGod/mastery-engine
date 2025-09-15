@@ -68,6 +68,30 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 17:22**
+
+**Objective:**
+*   Implement `get_lr_cosine_schedule` (linear warmup + cosine decay) and wire the adapter.
+
+**Actions & Command(s):**
+1.  Implemented `get_lr_cosine_schedule` in `cs336_basics/utils.py` with:
+    - Linear warmup from 0→max across `warmup_iters`.
+    - Cosine decay from max→min over `[warmup_iters, cosine_cycle_iters]` using `min + 0.5*(max-min)*(1+cos(pi*progress))` with clamped progress.
+    - Truncate to `min` beyond cycle end; safeguarded degenerate cases.
+2.  Wired `run_get_lr_cosine_schedule` in `tests/adapters.py` to call the implementation.
+3.  Ran targeted test: `uv run pytest tests/test_optimizer.py::test_get_lr_cosine_schedule -q`
+
+**Observations & Results:**
+*   Test passed, matching the exact expected LR sequence in the unit test.
+
+**Analysis & Decisions:**
+*   The schedule matches spec and unit expectations. Next: implement custom AdamW.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_optimizer.py::test_get_lr_cosine_schedule -q`
+
+---
+
 ### **2025-09-15 17:18**
 
 **Objective:**
