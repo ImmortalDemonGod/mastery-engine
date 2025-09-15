@@ -44,3 +44,55 @@ class Linear(nn.Module):
         if self.bias is not None:
             y = y + self.bias
         return y
+
+
+class Embedding(nn.Module):
+    """
+    Simple token embedding layer.
+
+    - Weight shape: (num_embeddings, embedding_dim)
+    - Forward performs table lookup: weight[token_ids]
+    - Initialization: truncated normal N(0, 1) clipped to [-3, 3]
+    """
+
+    def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
+        super().__init__()
+        self.num_embeddings = int(num_embeddings)
+        self.embedding_dim = int(embedding_dim)
+
+        self.weight = nn.Parameter(torch.empty((num_embeddings, embedding_dim)))
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        # Truncated normal with mean=0, std=1, a=-3, b=3
+        nn.init.trunc_normal_(self.weight, mean=0.0, std=1.0, a=-3.0, b=3.0)
+
+    def forward(self, token_ids: Tensor) -> Float[Tensor, " ... embedding_dim"]:
+        return self.weight[token_ids]
+
+
+def silu(in_features: Tensor) -> Tensor:
+    """SiLU activation: x * sigmoid(x)."""
+    return in_features * torch.sigmoid(in_features)
+
+
+class RMSNorm(nn.Module):
+    """
+    Root Mean Square Layer Normalization without bias.
+
+    y = (x / sqrt(mean(x^2) + eps)) * weight
+    where reduction is over the last dimension (feature dimension).
+    """
+
+    def __init__(self, d_model: int, eps: float = 1e-5) -> None:
+        super().__init__()
+        self.d_model = int(d_model)
+        self.eps = float(eps)
+        self.weight = nn.Parameter(torch.ones(self.d_model))
+
+    def forward(self, in_features: Tensor) -> Tensor:
+        x = in_features
+        # Compute rms over last dim
+        rms = torch.sqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
+        y = x / rms
+        return y * self.weight
