@@ -14,6 +14,8 @@ from cs336_basics.utils import (
     gradient_clipping as _grad_clip_impl,
     get_lr_cosine_schedule as _get_lr_cosine_schedule_impl,
     get_batch as _get_batch_impl,
+    save_checkpoint as _save_ckpt_impl,
+    load_checkpoint as _load_ckpt_impl,
 )
 from cs336_basics.optimizer import AdamW as _AdamW
 
@@ -58,12 +60,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    return _get_batch_impl(
-        dataset=dataset,
-        batch_size=batch_size,
-        context_length=context_length,
-        device=device,
-    )
+    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_swiglu(
@@ -116,7 +113,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_multihead_self_attention(
