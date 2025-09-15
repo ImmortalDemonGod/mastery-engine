@@ -38,7 +38,7 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_embedding(
@@ -59,7 +59,7 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_swiglu(
@@ -84,7 +84,7 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_scaled_dot_product_attention(
@@ -105,7 +105,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_multihead_self_attention(
@@ -139,7 +139,7 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_multihead_self_attention_with_rope(
@@ -179,7 +179,7 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
+    raise NotImplementedError
 
 
 def run_rope(
@@ -379,7 +379,7 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
@@ -424,10 +424,12 @@ def run_get_batch(
     )
 
 
-def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
-    """
-    Given a tensor of inputs, return the output of softmaxing the given `dim`
-    of the input.
+def run_softmax(
+    in_features: Float[Tensor, "..."],
+    dim: int,
+) -> Float[Tensor, "..."]:
+    """Given a tensor of inputs, return the output of applying softmax
+    to the specified dimension.
 
     Args:
         in_features (Float[Tensor, "..."]): Input features to softmax. Shape is arbitrary.
