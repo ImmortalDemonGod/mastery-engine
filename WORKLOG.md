@@ -65,6 +65,29 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 18:54**
+
+**Objective:**
+*   Implement Scaled Dot-Product Attention (SDPA) and wire the adapter. Validate via targeted tests.
+
+**Actions & Command(s):**
+1.  Implemented `scaled_dot_product_attention(Q, K, V, mask)` in `cs336_basics/layers.py` using numerically stable softmax (delegates to `cs336_basics.utils.softmax`) and boolean mask support via `masked_fill(~mask, -inf)`.
+2.  Wired `tests/adapters.py::run_scaled_dot_product_attention` to delegate to our implementation.
+3.  Ran targeted tests: `uv run pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
+
+**Observations & Results:**
+*   Both SDPA tests passed for 3D and 4D inputs.
+
+**Analysis & Decisions:**
+*   SDPA verified for batched and multi-head-shaped inputs. Next: implement Multi-Head Self-Attention (without RoPE).
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 ### **2025-09-15 18:47**
 
 **Objective:**
