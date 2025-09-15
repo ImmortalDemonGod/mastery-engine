@@ -68,6 +68,29 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 17:08**
+
+**Objective:**
+*   Implement a numerically stable `cross_entropy` and wire it through `tests/adapters.py`, validating parity with PyTorch.
+
+**Actions & Command(s):**
+1.  Implemented `cross_entropy` in `cs336_basics/utils.py` using the log-sum-exp trick with float32 upcasting for stability.
+2.  Wired `run_cross_entropy` in `tests/adapters.py` to call `cs336_basics.utils.cross_entropy`.
+3.  Corrected earlier accidental adapter edits to keep `run_linear` and `run_embedding` as `NotImplementedError`.
+4.  Ran targeted test: `uv run pytest tests/test_nn_utils.py::test_cross_entropy -q`
+
+**Observations & Results:**
+*   Test passed and matched `torch.nn.functional.cross_entropy` results, including for large-magnitude logits.
+
+**Analysis & Decisions:**
+*   The log-sum-exp formulation with float32 intermediates is robust and deterministic under strict tolerances.
+*   Next: implement `gradient_clipping` and validate via `tests/test_nn_utils.py::test_gradient_clipping`.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_nn_utils.py::test_cross_entropy -q`
+
+---
+
 ### **2025-09-15 16:56**
 
 **Objective:**
@@ -89,7 +112,6 @@ Each entry in this log should adhere to the following principles. They are desig
 *   Next: implement `cross_entropy` using the log-sum-exp trick (float32 intermediates) and wire `run_cross_entropy`.
 
 **Artifacts:**
-*   **Commit:** `[pending]`
 *   **Command:** `uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -q`
 ---
 
