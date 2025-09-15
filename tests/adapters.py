@@ -8,7 +8,10 @@ import numpy.typing as npt
 import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
-from cs336_basics.utils import softmax as _softmax_impl
+from cs336_basics.utils import (
+    softmax as _softmax_impl,
+    cross_entropy as _cross_entropy_impl,
+)
 
 
 def run_linear(
@@ -29,7 +32,6 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
     raise NotImplementedError
 
 
@@ -52,7 +54,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    raise NotImplementedError
+    return _cross_entropy_impl(inputs, targets)
 
 
 def run_swiglu(
