@@ -32,7 +32,7 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    raise NotImplementedError
+    return _cross_entropy_impl(inputs, targets)
 
 
 def run_embedding(
@@ -54,7 +54,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    return _cross_entropy_impl(inputs, targets)
+    raise NotImplementedError
 
 
 def run_swiglu(
