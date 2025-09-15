@@ -68,6 +68,28 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 17:18**
+
+**Objective:**
+*   Implement in-place global L2 `gradient_clipping` and wire it through `tests/adapters.py`.
+
+**Actions & Command(s):**
+1.  Implemented `gradient_clipping(parameters, max_l2_norm)` in `cs336_basics/utils.py`:
+    - Skip `None` grads, compute global L2 norm across all grads, scale in-place if exceeding `max_l2_norm` (epsilon 1e-6 in denominator).
+2.  Wired `run_gradient_clipping` in `tests/adapters.py` to call `cs336_basics.utils.gradient_clipping`.
+3.  Ran targeted test: `uv run pytest tests/test_nn_utils.py::test_gradient_clipping -q`
+
+**Observations & Results:**
+*   Test passed and matched `torch.nn.utils.clip_grad.clip_grad_norm_` behavior across parameters, skipping frozen ones.
+
+**Analysis & Decisions:**
+*   Implementation meets the global-norm requirement and in-place semantics. Proceed to LR schedule next.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_nn_utils.py::test_gradient_clipping -q`
+
+---
+
 ### **2025-09-15 17:08**
 
 **Objective:**
