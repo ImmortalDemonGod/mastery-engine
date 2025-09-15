@@ -14,6 +14,7 @@ from cs336_basics.utils import (
     gradient_clipping as _grad_clip_impl,
     get_lr_cosine_schedule as _get_lr_cosine_schedule_impl,
 )
+from cs336_basics.optimizer import AdamW as _AdamW
 
 
 def run_linear(
@@ -479,7 +480,7 @@ def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return _AdamW
 
 
 def run_get_lr_cosine_schedule(
