@@ -65,6 +65,25 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 18:22**
+
+**Objective:**
+*   Implement the `save_checkpoint` and `load_checkpoint` utility functions in preparation for testing.
+
+**Actions & Command(s):**
+1.  Implemented `save_checkpoint` in `cs336_basics/utils.py` to serialize a dictionary containing the model state, optimizer state, and iteration number using `torch.save`.
+2.  Implemented `load_checkpoint` in `cs336_basics/utils.py` to restore the state to a given model and optimizer, ensuring the checkpoint is loaded to the CPU via `map_location="cpu"` for portability.
+
+**Observations & Results:**
+*   The core logic for serialization and deserialization is now complete in the `cs336_basics` package.
+*   The corresponding adapters (`run_save_checkpoint`, `run_load_checkpoint`) have not yet been wired up, and the validation test has not been run.
+
+**Analysis & Decisions:**
+*   The utility functions are ready for integration. The next immediate step is to wire them up in `tests/adapters.py` and run the `test_serialization.py` suite to validate their correctness in a full round-trip.
+
+
+---
+
 ### **2025-09-15 17:36**
 
 **Objective:**
