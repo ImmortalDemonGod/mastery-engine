@@ -65,6 +65,58 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 18:38**
+
+**Objective:**
+*   Implement a from-scratch `Embedding` module and wire the `run_embedding` adapter. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Extended `cs336_basics/layers.py` with `Embedding`:
+    - Weight shape `(vocab_size, d_model)`.
+    - Forward performs table lookup `weight[token_ids]`.
+    - Initialization: `trunc_normal_(mean=0.0, std=1.0, a=-3.0, b=3.0)`.
+2.  Wired `tests/adapters.py::run_embedding` to instantiate `Embedding`, copy provided weights, and forward `token_ids`.
+3.  Ran targeted test: `uv run pytest tests/test_model.py::test_embedding -q`
+
+**Observations & Results:**
+*   Test passed. Output matched snapshot exactly.
+
+**Analysis & Decisions:**
+*   Embedding semantics and initialization align with the reference. Next, continue with simple `layers` components (e.g., `SiLU`, `RMSNorm`) before circling back to checkpoint adapters.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_model.py::test_embedding -q`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 18:27**
+
+**Objective:**
+*   Implement a from-scratch `Linear` module and wire the `run_linear` adapter. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Created `cs336_basics/layers.py` and implemented `Linear`:
+    - Weight shape `(d_out, d_in)`, optional bias (disabled by default for snapshot parity).
+    - Initialization: uniform in `[-1/sqrt(fan_in), 1/sqrt(fan_in)]`.
+2.  Wired `tests/adapters.py::run_linear` to instantiate our `Linear`, copy provided weights, and forward the input.
+3.  Ran targeted test: `uv run pytest tests/test_model.py::test_linear -q`
+
+**Observations & Results:**
+*   Test passed. Output matched snapshot exactly.
+
+**Analysis & Decisions:**
+*   The `Linear` implementation matches the reference orientation and initialization.
+*   Next: proceed to the next core building block (e.g., `Embedding`) and/or wire checkpoint adapters for serialization tests.
+
+**Artifacts:**
+*   **Command:** `uv run pytest tests/test_model.py::test_linear -q`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 ### **2025-09-15 18:22**
 
 **Objective:**
