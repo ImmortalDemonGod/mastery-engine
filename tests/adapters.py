@@ -13,6 +13,7 @@ from cs336_basics.utils import (
     cross_entropy as _cross_entropy_impl,
     gradient_clipping as _grad_clip_impl,
     get_lr_cosine_schedule as _get_lr_cosine_schedule_impl,
+    get_batch as _get_batch_impl,
 )
 from cs336_basics.optimizer import AdamW as _AdamW
 
@@ -35,13 +36,7 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    return _get_lr_cosine_schedule_impl(
-        it=it,
-        max_learning_rate=max_learning_rate,
-        min_learning_rate=min_learning_rate,
-        warmup_iters=warmup_iters,
-        cosine_cycle_iters=cosine_cycle_iters,
-    )
+    raise NotImplementedError
 
 
 def run_embedding(
@@ -63,7 +58,12 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    raise NotImplementedError
+    return _get_batch_impl(
+        dataset=dataset,
+        batch_size=batch_size,
+        context_length=context_length,
+        device=device,
+    )
 
 
 def run_swiglu(
