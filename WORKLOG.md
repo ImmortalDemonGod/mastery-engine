@@ -68,42 +68,28 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
-### **2025-09-17 11:45**
+### **2025-09-15 16:56**
 
 **Objective:**
-*   Implement and pass tests for the `RMSNorm` layer, paying close attention to the numerical stability requirements.
+*   Implement a numerically stable `softmax` and wire it through `tests/adapters.py`, establishing the TDD loop.
 
 **Actions & Command(s):**
-1.  Created a new `RMSNorm` class inheriting from `nn.Module` in `cs336_basics/layers.py`.
-2.  Implemented the forward pass according to the formula in the PDF, including the `float32` upcasting for the variance calculation.
-3.  Wired the `run_rmsnorm` adapter in `tests/adapters.py`.
-4.  `uv run pytest tests/test_model.py::test_rmsnorm`
+1.  Created `cs336_basics/utils.py` for stateless utilities.
+2.  Implemented `softmax` with float32 upcasting and the subtract-max trick for numerical stability.
+3.  Wired `run_softmax` in `tests/adapters.py` to call `cs336_basics.utils.softmax`.
+4.  Ran targeted test: `uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -q`
 
 **Observations & Results:**
-*   The test passed successfully on the first attempt.
-*   Confirmed that using `.to(torch.float32)` for the intermediate mean-square calculation and then casting back to the original dtype worked as expected. Without this, tests might have failed on a `bfloat16` setup.
+*   First attempt using `logsumexp` produced tiny discrepancies beyond `atol=1e-6` for the `x+100` case.
+*   Switched to the subtract-max formulation; the test passed.
 
 **Analysis & Decisions:**
-*   The implementation is correct and numerically stable. The upcasting strategy noted in the `IMPLEMENTATION_PLAN.md` was critical. The foundational layers (`Linear`, `Embedding`, `RMSNorm`) are now complete. The next step is to begin the attention mechanism, starting with `scaled_dot_product_attention`.
+*   Both formulations are stable; the subtract-max version matched PyTorch closer under the strict tolerance in this test.
+*   Adopt project-wide policy to upcast intermediates to float32 for sensitive ops.
+*   Next: implement `cross_entropy` using the log-sum-exp trick (float32 intermediates) and wire `run_cross_entropy`.
 
 **Artifacts:**
-*   **Commit:** `c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4`
+*   **Commit:** `[pending]`
+*   **Command:** `uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -q`
 ---
-### **2025-09-17 10:30**
 
-**Objective:**
-*   Implement the `softmax` utility function and ensure it passes all tests, especially for numerical stability.
-
-**Actions & Command(s):**
-1.  Created `cs336_basics/utils.py`.
-2.  Implemented a naive `softmax` function: `exp(x) / exp(x).sum(...)`.
-3.  Wired the adapter in `tests/adapters.py`.
-4.  `uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch`
-
-**Observations & Results:**
-*   The test failed. The basic case passed, but the high-magnitude input (`x + 100`) resulted in `tensor([[nan, nan, nan, nan, nan], ...])` due to `torch.exp()` returning `inf`.
-*   **Error Snippet:** `AssertionError: Mismatched elements: ...`
-
-**Analysis & Decisions:**
-*   **Analysis:** The naive implementation is numerically unstable, as predicted. The `inf` values from `torch.exp()` lead to `inf / inf`, which results in `nan`.
-*   **Decision:** Re-implemented the function using the **subtract-max trick**. The new implementation first calculates `stable_x = x - x.max(dim, keepdim=True).values`. This centers the largest value at 0, preventing overflow in the exponentiation while yielding the same final probabilities. After
