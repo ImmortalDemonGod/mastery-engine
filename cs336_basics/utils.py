@@ -109,3 +109,31 @@ def get_lr_cosine_schedule(
 
     # After cycle: clamp to min
     return float(min_learning_rate)
+
+
+def get_batch(dataset, batch_size: int, context_length: int, device: str):
+    """
+    Sample LM batches from a 1D numpy array of token IDs.
+
+    Args:
+        dataset: 1D numpy array of ints (token IDs).
+        batch_size: number of sequences.
+        context_length: sequence length per example.
+        device: torch device string (e.g., 'cpu', 'cuda:0').
+
+    Returns: x, y as LongTensors of shape (batch_size, context_length) on `device` where y = x shifted by 1.
+    """
+    data = torch.as_tensor(dataset, dtype=torch.long)
+    n = data.shape[0] - context_length
+    if n <= 0:
+        raise ValueError("context_length must be < len(dataset)")
+    starts = torch.randint(low=0, high=n, size=(batch_size,))
+    offsets = torch.arange(context_length).unsqueeze(0)
+    x_idx = starts.unsqueeze(1) + offsets
+    y_idx = x_idx + 1
+    x = data[x_idx]
+    y = data[y_idx]
+    # Move to device (will raise appropriate errors for invalid devices)
+    x = x.to(device)
+    y = y.to(device)
+    return x, y
