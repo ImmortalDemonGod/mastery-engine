@@ -29,6 +29,7 @@ from cs336_basics.layers import (
     rope as _rope_impl,
     multihead_self_attention_with_rope as _mha_rope_impl,
     transformer_block as _transformer_block_impl,
+    transformer_lm as _transformer_lm_impl,
 )
 
 
@@ -376,7 +377,17 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    return _transformer_lm_impl(
+        vocab_size=vocab_size,
+        context_length=context_length,
+        d_model=d_model,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        rope_theta=rope_theta,
+        weights=weights,
+        in_indices=in_indices,
+    )
 
 
 def run_rmsnorm(
