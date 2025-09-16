@@ -212,3 +212,106 @@ def multihead_self_attention(
     out = context.matmul(o_proj_weight.t())  # (B, S, d_model)
 
     return out.reshape(*orig_leading, seq_len, d_model)
+
+
+def rope(
+    d_k: int,
+    theta: float,
+    max_seq_len: int,
+    in_query_or_key: Tensor,
+    token_positions: Tensor,
+) -> Tensor:
+    """
+    Apply Rotary Positional Embedding (RoPE) to queries or keys.
+
+    Args:
+        d_k: embedding dimension (must be even)
+        theta: RoPE base (e.g., 10000.0)
+        max_seq_len: maximum sequence length (unused at runtime; kept for API parity)
+        in_query_or_key: tensor of shape (..., seq_len, d_k)
+        token_positions: tensor of positions of shape (..., seq_len) or (seq_len,)
+
+    Returns:
+        Tensor of same shape as in_query_or_key with RoPE applied along the last dim.
+    """
+    x = in_query_or_key
+    assert d_k % 2 == 0, "RoPE requires even embedding dimension"
+    half = d_k // 2
+
+    # Prepare inverse frequencies
+    i = torch.arange(0, half, device=x.device, dtype=x.dtype)
+    inv_freq = 1.0 / (torch.tensor(theta, dtype=x.dtype, device=x.device) ** (i / half))
+
+    # Broadcast positions
+    pos = token_positions.to(device=x.device, dtype=x.dtype)
+    if pos.dim() == 1:
+        pos = pos.view(1, -1)
+    # Align pos to have trailing seq_len dimension
+    while pos.dim() < x.dim() - 1:
+        pos = pos.unsqueeze(0)
+
+    # Compute angles and trig
+    angles = pos.unsqueeze(-1) * inv_freq  # (..., seq_len, half)
+    cos = torch.cos(angles)
+    sin = torch.sin(angles)
+
+    # Split even/odd components
+    x_even = x[..., 0::2]
+    x_odd = x[..., 1::2]
+
+    x_rot_even = x_even * cos - x_odd * sin
+    x_rot_odd = x_odd * cos + x_even * sin
+
+    out = torch.empty_like(x)
+    out[..., 0::2] = x_rot_even
+    out[..., 1::2] = x_rot_odd
+    return out
+
+
+def multihead_self_attention_with_rope(
+    d_model: int,
+    num_heads: int,
+    max_seq_len: int,
+    theta: float,
+    q_proj_weight: Tensor,
+    k_proj_weight: Tensor,
+    v_proj_weight: Tensor,
+    o_proj_weight: Tensor,
+    in_features: Tensor,
+    token_positions: Tensor,
+) -> Tensor:
+    """
+    Batched Multi-Head Self-Attention with RoPE (causal, no dropout).
+    """
+    head_dim = d_model // num_heads
+    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+
+    orig_leading = in_features.shape[:-2]
+    seq_len = in_features.shape[-2]
+
+    x = in_features.reshape(-1, seq_len, d_model)
+
+    # Projections
+    q_all = x.matmul(q_proj_weight.t())
+    k_all = x.matmul(k_proj_weight.t())
+    v_all = x.matmul(v_proj_weight.t())
+
+    def to_heads(t: Tensor) -> Tensor:
+        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
+
+    q = to_heads(q_all)
+    k = to_heads(k_all)
+    v = to_heads(v_all)
+
+    # Apply RoPE to Q and K per head
+    q = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=q, token_positions=token_positions)
+    k = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=k, token_positions=token_positions)
+
+    # Causal mask and attention
+    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
+    context = scaled_dot_product_attention(q, k, v, mask=causal)
+
+    # Merge heads
+    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
+    out = context.matmul(o_proj_weight.t())
+    return out.reshape(*orig_leading, seq_len, d_model)
