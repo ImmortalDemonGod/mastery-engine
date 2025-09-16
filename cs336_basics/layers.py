@@ -214,6 +214,68 @@ def multihead_self_attention(
     return out.reshape(*orig_leading, seq_len, d_model)
 
 
+def transformer_block(
+    d_model: int,
+    num_heads: int,
+    d_ff: int,
+    max_seq_len: int,
+    theta: float,
+    weights: dict,
+    in_features: Tensor,
+) -> Tensor:
+    """
+    Pre-norm Transformer block with RoPE:
+      x = x + MHA(RMSNorm(x))
+      x = x + FFN(RMSNorm(x))
+    """
+    x = in_features
+    seq_len = x.shape[-2]
+    device = x.device
+
+    # First RMSNorm
+    ln1 = RMSNorm(d_model=d_model, eps=1e-5)
+    with torch.no_grad():
+        ln1.weight.copy_(weights["ln1.weight"])  # (d_model,)
+    x_norm = ln1(x)
+
+    # Positions for RoPE
+    pos = torch.arange(seq_len, device=device).view(1, -1)
+
+    # Multi-head self-attention with RoPE
+    attn_out = multihead_self_attention_with_rope(
+        d_model=d_model,
+        num_heads=num_heads,
+        max_seq_len=max_seq_len,
+        theta=theta,
+        q_proj_weight=weights["attn.q_proj.weight"],
+        k_proj_weight=weights["attn.k_proj.weight"],
+        v_proj_weight=weights["attn.v_proj.weight"],
+        o_proj_weight=weights["attn.output_proj.weight"],
+        in_features=x_norm,
+        token_positions=pos,
+    )
+    x = x + attn_out
+
+    # Second RMSNorm
+    ln2 = RMSNorm(d_model=d_model, eps=1e-5)
+    with torch.no_grad():
+        ln2.weight.copy_(weights["ln2.weight"])  # (d_model,)
+    x_norm2 = ln2(x)
+
+    # SwiGLU FFN using provided weights
+    W1 = weights["ffn.w1.weight"]  # (d_ff, d_model)
+    W2 = weights["ffn.w2.weight"]  # (d_model, d_ff)
+    W3 = weights["ffn.w3.weight"]  # (d_ff, d_model)
+
+    a = x_norm2.matmul(W1.t())
+    b = x_norm2.matmul(W3.t())
+    gated = silu(a) * b
+    ffn_out = gated.matmul(W2.t())
+
+    x = x + ffn_out
+    return x
+
+
 def rope(
     d_k: int,
     theta: float,
