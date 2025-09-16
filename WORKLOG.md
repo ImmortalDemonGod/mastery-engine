@@ -63,6 +63,57 @@ Each entry in this log should adhere to the following principles. They are desig
 ---
 ```
 
+
+
+
+---
+
+### **2025-09-15 18:56**
+
+**Objective:**
+*   Implement Multi-Head Self-Attention (no RoPE), wire adapter, and validate via targeted test.
+
+**Actions & Command(s):**
+1.  Implemented `multihead_self_attention` in `cs336_basics/layers.py` using single-matmul projections per Q/K/V and per-head SDPA, then output projection.
+2.  Wired `tests/adapters.py::run_multihead_self_attention` to delegate to our implementation.
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+
+**Observations & Results:**
+*   Test FAILED. Snapshot mismatch with large absolute differences.
+
+**Analysis & Decisions:**
+*   Likely projection weight orientation mismatch (W vs W^T) in attention projections compared to reference snapshot.
+*   Next: Flip projection and output matmul orientation (use `x @ W` and `context @ W_out`) and re-run test.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 19:05**
+
+**Objective:**
+*   Fix Multi-Head Self-Attention (no RoPE) to match snapshot, adhering to the debugging workflow and one-change/one-verification discipline.
+
+**Actions & Command(s):**
+1.  Implemented causal masking in `multihead_self_attention` by passing a lower-triangular boolean mask to `scaled_dot_product_attention` in `cs336_basics/layers.py`.
+2.  Kept projections using `W^T` and head-splitting as `(B,S,H*D)->(B,H,S,D)` consistent with stacked-head row ordering.
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+
+**Observations & Results:**
+*   Test passed; output matches snapshot to atol=1e-6.
+
+**Analysis & Decisions:**
+*   Root cause was missing causal mask (defect). Orientation/head split were confirmed via micro-experiments; mask corrected the infection prior to softmax.
+*   Next: implement RoPE and MHA with RoPE, following the same one-change/one-verification process.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
 ---
 
 ### **2025-09-15 18:54**
@@ -70,19 +121,7 @@ Each entry in this log should adhere to the following principles. They are desig
 **Objective:**
 *   Implement Scaled Dot-Product Attention (SDPA) and wire the adapter. Validate via targeted tests.
 
-**Actions & Command(s):**
-1.  Implemented `scaled_dot_product_attention(Q, K, V, mask)` in `cs336_basics/layers.py` using numerically stable softmax (delegates to `cs336_basics.utils.softmax`) and boolean mask support via `masked_fill(~mask, -inf)`.
-2.  Wired `tests/adapters.py::run_scaled_dot_product_attention` to delegate to our implementation.
-3.  Ran targeted tests: `uv run pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
-
-**Observations & Results:**
-*   Both SDPA tests passed for 3D and 4D inputs.
-
-**Analysis & Decisions:**
-*   SDPA verified for batched and multi-head-shaped inputs. Next: implement Multi-Head Self-Attention (without RoPE).
-
-**Artifacts:**
-*   **Command:** `uv run pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
+**Actions & Command(s):**pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
 *   **Commit:** `[Paste the full commit hash here]`
 ---
 
