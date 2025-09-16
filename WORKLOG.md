@@ -1,6 +1,64 @@
 
 ---
 
+### **2025-09-16 00:29**
+
+**Objective:**
+*   Adapt the 1D Reversal diagnostic probe to our decoder-only model via prefix-LM formatting and verify learnability.
+
+**Actions & Command(s):**
+1.  Implemented a minimal decoder-only LM (PyTorch `TransformerEncoder`) using sinusoidal positional encodings and causal masking. Formatted data as `[BOS] X [SEP] Y` and trained with next-token loss restricted to the `Y` segment.
+2.  Ran the diagnostic training loop (256 outer epochs, AdamW lr=1e-3, grad clip=1.0) and evaluated by greedy generation of `Y` tokens.
+3.  Command:
+    ```sh
+    uv run python - << 'PY'
+    # (DecoderOnlyLM with sinusoidal pos enc; prefix-LM; reversal)
+    # See console history for full script body used in-session
+    PY
+    ```
+
+**Observations & Results:**
+*   Reversal: `train_acc=1.000`, `test_acc=1.000` (exact-sequence match on the 13-sample holdout).
+
+**Analysis & Decisions:**
+*   Decoder-only prefix-LM setup successfully learns the permutation `t -> L-1-t` with 100% generalization at L=9. Confirms the model stack’s 1D sequence capability.
+
+**Artifacts:**
+*   **Command:** embedded one-off `uv run python` script (see Actions).
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-16 00:28**
+
+**Objective:**
+*   Adapt the 1D Inversion diagnostic probe to our decoder-only model via prefix-LM formatting and verify learnability.
+
+**Actions & Command(s):**
+1.  Implemented a minimal decoder-only LM (PyTorch `TransformerEncoder`) using sinusoidal positional encodings and causal masking. Formatted data as `[BOS] X [SEP] Y` and trained with next-token loss restricted to the `Y` segment.
+2.  Ran the diagnostic training loop (256 outer epochs, AdamW lr=1e-3, grad clip=1.0) and evaluated by greedy generation of `Y` tokens.
+3.  Command:
+    ```sh
+    uv run python - << 'PY'
+    # (DecoderOnlyLM with sinusoidal pos enc; prefix-LM; inversion)
+    # See console history for full script body used in-session
+    PY
+    ```
+
+**Observations & Results:**
+*   Inversion: `train_acc=1.000`, `test_acc=1.000` (exact-sequence match on the 13-sample holdout).
+
+**Analysis & Decisions:**
+*   Confirms the stack readily learns content-based tokenwise mapping under the prefix-LM setup. Proceeded to reversal (see next entry).
+
+**Artifacts:**
+*   **Command:** embedded one-off `uv run python` script (see Actions).
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 ### **2025-09-15 19:44**
 
 **Objective:**
