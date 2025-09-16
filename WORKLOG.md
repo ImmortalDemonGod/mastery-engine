@@ -1,6 +1,29 @@
 
 ---
 
+### **2025-09-15 19:24**
+
+**Objective:**
+*   Implement `TransformerLM` forward pass and wire `run_transformer_lm`. Validate via targeted tests.
+
+**Actions & Command(s):**
+1.  Added `transformer_lm(...)` in `cs336_basics/layers.py`: token embeddings -> N pre-norm blocks (with RoPE-attn + SwiGLU FFN) -> final RMSNorm -> LM head.
+2.  Wired `tests/adapters.py::run_transformer_lm` to delegate to our implementation.
+3.  Ran targeted tests: `uv run pytest -q tests/test_model.py::test_transformer_lm tests/test_model.py::test_transformer_lm_truncated_input`
+
+**Observations & Results:**
+*   Both tests passed.
+
+**Analysis & Decisions:**
+*   End-to-end LM path verified against snapshots including truncated-input behavior. Next: finalize serialization adapters if needed.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_transformer_lm tests/test_model.py::test_transformer_lm_truncated_input`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 # Project Worklog: `cs336-basics`
 
 This document is the single source of truth for the development process of this project. It is a living document, updated incrementally to chronicle objectives, actions taken, decisions made, bugs encountered, and discoveries found.
@@ -122,6 +145,34 @@ Each entry in this log should adhere to the following principles. They are desig
 *   Implement Scaled Dot-Product Attention (SDPA) and wire the adapter. Validate via targeted tests.
 
 **Actions & Command(s):**pytest -q tests/test_model.py::test_scaled_dot_product_attention tests/test_model.py::test_4d_scaled_dot_product_attention`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 19:07**
+
+### **2025-09-15 19:22**
+
+**Objective:**
+*   Implement `TransformerBlock` (pre-norm, with RoPE) and wire `run_transformer_block`. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Added `transformer_block(d_model, num_heads, d_ff, max_seq_len, theta, weights, in_features)` to `cs336_basics/layers.py`:
+    - Pre-norm: `x = x + MHA(RMSNorm(x))`, then `x = x + FFN(RMSNorm(x))`.
+    - MHA uses `multihead_self_attention_with_rope` with causal mask.
+    - FFN uses SwiGLU with provided weights.
+2.  Wired adapter `tests/adapters.py::run_transformer_block` to delegate to our implementation.
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_transformer_block`
+
+**Observations & Results:**
+*   Test passed.
+
+**Analysis & Decisions:**
+*   Composition and residual structure match the pre-norm architecture. Proceed next to LM wiring or checkpoint adapters as needed.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_transformer_block`
 *   **Commit:** `[Paste the full commit hash here]`
 ---
 
