@@ -155,3 +155,60 @@ def scaled_dot_product_attention(
     attn = _softmax(scores, dim=-1)
     out = torch.matmul(attn, v)
     return out.to(V.dtype)
+
+
+def multihead_self_attention(
+    d_model: int,
+    num_heads: int,
+    q_proj_weight: Tensor,
+    k_proj_weight: Tensor,
+    v_proj_weight: Tensor,
+    o_proj_weight: Tensor,
+    in_features: Tensor,
+) -> Tensor:
+    """
+    Optimized batched Multi-Head Self-Attention (no RoPE).
+
+    Args:
+        d_model: embedding dimension
+        num_heads: number of attention heads (divides d_model)
+        *_proj_weight: concatenated projection weights for all heads, shape (d_model, d_model)
+        in_features: tensor of shape (..., seq_len, d_model)
+
+    Returns:
+        Tensor of shape (..., seq_len, d_model)
+    """
+    head_dim = d_model // num_heads
+    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+
+    orig_leading = in_features.shape[:-2]
+    seq_len = in_features.shape[-2]
+
+    x = in_features.reshape(-1, seq_len, d_model)
+
+    # Projections for all heads in single matmuls
+    q_all = x.matmul(q_proj_weight.t())  # (B, S, d_model)
+    k_all = x.matmul(k_proj_weight.t())  # (B, S, d_model)
+    v_all = x.matmul(v_proj_weight.t())  # (B, S, d_model)
+
+    # Reshape to heads: (B, H, S, D)
+    def to_heads(t: Tensor) -> Tensor:
+        # Weights are stacked by heads along the output rows: (H*D, d_model).
+        # After projecting to (B, S, H*D), split into heads then move heads before seq.
+        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
+
+    q = to_heads(q_all)
+    k = to_heads(k_all)
+    v = to_heads(v_all)
+
+    # Scaled dot-product attention per head with causal mask
+    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
+    context = scaled_dot_product_attention(q, k, v, mask=causal)  # (B, H, S, D)
+
+    # Combine heads: (B, S, H*D=d_model)
+    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
+
+    # Output projection
+    out = context.matmul(o_proj_weight.t())  # (B, S, d_model)
+
+    return out.reshape(*orig_leading, seq_len, d_model)
