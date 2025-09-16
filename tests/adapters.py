@@ -17,6 +17,8 @@ from cs336_basics.utils import (
     save_checkpoint as _save_ckpt_impl,
     load_checkpoint as _load_ckpt_impl,
 )
+from cs336_basics.tokenizer import Tokenizer as _Tokenizer
+from cs336_basics.bpe import train_bpe as _train_bpe_impl
 from cs336_basics.optimizer import AdamW as _AdamW
 from cs336_basics.layers import (
     Linear as _Linear,
@@ -563,7 +565,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    _save_ckpt_impl(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_load_checkpoint(
@@ -584,7 +586,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return _load_ckpt_impl(src=src, model=model, optimizer=optimizer)
 
 
 def get_tokenizer(
@@ -607,7 +609,7 @@ def get_tokenizer(
     Returns:
         A BPE tokenizer that uses the provided vocab, merges, and special tokens.
     """
-    raise NotImplementedError
+    return _Tokenizer(vocab=vocab, merges=merges, special_tokens=special_tokens)
 
 
 def run_train_bpe(
@@ -637,4 +639,9 @@ def run_train_bpe(
                 representing that <token1> was merged with <token2>.
                 Merges are ordered by order of creation.
     """
-    raise NotImplementedError
+    return _train_bpe_impl(
+        input_path=input_path,
+        vocab_size=vocab_size,
+        special_tokens=special_tokens,
+        **kwargs,
+    )
