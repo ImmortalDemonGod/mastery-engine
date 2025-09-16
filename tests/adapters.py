@@ -26,6 +26,8 @@ from cs336_basics.layers import (
     SwiGLU as _SwiGLU,
     scaled_dot_product_attention as _sdpa_impl,
     multihead_self_attention as _mha_impl,
+    rope as _rope_impl,
+    multihead_self_attention_with_rope as _mha_rope_impl,
 )
 
 
@@ -210,7 +212,18 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    return _mha_rope_impl(
+        d_model=d_model,
+        num_heads=num_heads,
+        max_seq_len=max_seq_len,
+        theta=theta,
+        q_proj_weight=q_proj_weight,
+        k_proj_weight=k_proj_weight,
+        v_proj_weight=v_proj_weight,
+        o_proj_weight=o_proj_weight,
+        in_features=in_features,
+        token_positions=token_positions if token_positions is not None else torch.arange(in_features.shape[-2]).view(1, -1),
+    )
 
 
 def run_rope(
@@ -232,7 +245,13 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    return _rope_impl(
+        d_k=d_k,
+        theta=theta,
+        max_seq_len=max_seq_len,
+        in_query_or_key=in_query_or_key,
+        token_positions=token_positions,
+    )
 
 
 def run_transformer_block(
