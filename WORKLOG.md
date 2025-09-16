@@ -127,6 +127,53 @@ Each entry in this log should adhere to the following principles. They are desig
 
 ---
 
+### **2025-09-15 19:07**
+
+**Objective:**
+*   Implement Multi-Head Self-Attention with RoPE (causal) and wire adapter. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Added `multihead_self_attention_with_rope` in `cs336_basics/layers.py`:
+    - Projections with `W^T`, reshape to `(B,H,S,D)`, apply `rope()` to Q and K, causal mask, SDPA, merge heads, output proj with `W_out^T`.
+2.  Wired `tests/adapters.py::run_multihead_self_attention_with_rope` to delegate to our implementation (fixed prior miswire).
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_multihead_self_attention_with_rope`
+
+**Observations & Results:**
+*   Test passed.
+
+**Analysis & Decisions:**
+*   RoPE is applied after Q/K projections per head and before dot-product. Next: proceed to TransformerBlock.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_multihead_self_attention_with_rope`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
+### **2025-09-15 19:06**
+
+**Objective:**
+*   Implement RoPE function and wire adapter. Validate via targeted test.
+
+**Actions & Command(s):**
+1.  Implemented `rope(d_k, theta, max_seq_len, in_query_or_key, token_positions)` in `cs336_basics/layers.py` using even/odd pair rotation with broadcasted cos/sin.
+2.  Wired `tests/adapters.py::run_rope` to call our implementation.
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_rope`
+
+**Observations & Results:**
+*   Test passed.
+
+**Analysis & Decisions:**
+*   Baseline RoPE verified; used as dependency for MHA-with-RoPE.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_rope`
+*   **Commit:** `[Paste the full commit hash here]`
+---
+
+---
+
 ### **2025-09-15 18:47**
 
 **Objective:**
