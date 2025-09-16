@@ -63,6 +63,29 @@ Each entry in this log should adhere to the following principles. They are desig
 ---
 ```
 
+---
+
+### **2025-09-15 19:05**
+
+**Objective:**
+*   Fix Multi-Head Self-Attention (no RoPE) to match snapshot, adhering to the debugging workflow and one-change/one-verification discipline.
+
+**Actions & Command(s):**
+1.  Implemented causal masking in `multihead_self_attention` by passing a lower-triangular boolean mask to `scaled_dot_product_attention` in `cs336_basics/layers.py`.
+2.  Kept projections using `W^T` and head-splitting as `(B,S,H*D)->(B,H,S,D)` consistent with stacked-head row ordering.
+3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+
+**Observations & Results:**
+*   Test passed; output matches snapshot to atol=1e-6.
+
+**Analysis & Decisions:**
+*   Root cause was missing causal mask (defect). Orientation/head split were confirmed via micro-experiments; mask corrected the infection prior to softmax.
+*   Next: implement RoPE and MHA with RoPE, following the same one-change/one-verification process.
+
+**Artifacts:**
+*   **Command:** `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
+*   **Commit:** `[Paste the full commit hash here]`
+---
 
 
 
@@ -90,29 +113,6 @@ Each entry in this log should adhere to the following principles. They are desig
 *   **Commit:** `[Paste the full commit hash here]`
 ---
 
----
-
-### **2025-09-15 19:05**
-
-**Objective:**
-*   Fix Multi-Head Self-Attention (no RoPE) to match snapshot, adhering to the debugging workflow and one-change/one-verification discipline.
-
-**Actions & Command(s):**
-1.  Implemented causal masking in `multihead_self_attention` by passing a lower-triangular boolean mask to `scaled_dot_product_attention` in `cs336_basics/layers.py`.
-2.  Kept projections using `W^T` and head-splitting as `(B,S,H*D)->(B,H,S,D)` consistent with stacked-head row ordering.
-3.  Ran targeted test: `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
-
-**Observations & Results:**
-*   Test passed; output matches snapshot to atol=1e-6.
-
-**Analysis & Decisions:**
-*   Root cause was missing causal mask (defect). Orientation/head split were confirmed via micro-experiments; mask corrected the infection prior to softmax.
-*   Next: implement RoPE and MHA with RoPE, following the same one-change/one-verification process.
-
-**Artifacts:**
-*   **Command:** `uv run pytest -q tests/test_model.py::test_multihead_self_attention`
-*   **Commit:** `[Paste the full commit hash here]`
----
 
 ---
 
