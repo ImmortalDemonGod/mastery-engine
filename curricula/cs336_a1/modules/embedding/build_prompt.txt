@@ -132,8 +132,8 @@ Where to Edit
 ─────────────
 FILE TO MODIFY: cs336_basics/layers.py
 
-You will implement the Embedding class as a nn.Module. This wraps PyTorch's
-nn.Embedding with our interface.
+You will implement the Embedding class as a nn.Module **from scratch** using
+nn.Parameter. Do NOT use nn.Embedding - this defeats the pedagogical purpose!
 
 Requirements
 ────────────
@@ -181,25 +181,25 @@ class Embedding(nn.Module):
 Implementation Constraints
 ──────────────────────────
 
-1. **Use nn.Embedding**:
-   - PyTorch provides nn.Embedding - use it!
-   - It handles efficient indexing and gradients
-   - Just wrap it with our interface
+1. **From Scratch with nn.Parameter**:
+   - Create embedding matrix as nn.Parameter(torch.empty(...))
+   - Do NOT use nn.Embedding!
+   - Must implement lookup manually
 
 2. **Initialization**:
-   - Default: nn.Embedding initializes from N(0, 1)
-   - Some models use custom initialization (e.g., N(0, 1/√d_model))
-   - We'll stick with PyTorch defaults for simplicity
+   - Use truncated normal: nn.init.trunc_normal_()
+   - Mean=0, std=1, clipped to [-3, 3]
+   - This prevents extreme initial values
 
 3. **Handle arbitrary batch dimensions**:
    - Input: (..., seq_len) - any leading batch dimensions
    - Output: (..., seq_len, embedding_dim)
-   - nn.Embedding handles this automatically!
+   - Simple indexing: self.weight[token_ids] handles this!
 
 4. **Bounds checking**:
    - Token IDs must be in [0, num_embeddings)
-   - Out-of-bounds causes indexing error
-   - nn.Embedding raises error automatically
+   - PyTorch tensor indexing handles this automatically
+   - Out-of-bounds raises IndexError
 
 Implementation Steps
 ────────────────────
@@ -208,27 +208,31 @@ Implementation Steps
 
 ```python
 super().__init__()
-self.embedding = nn.Embedding(
-    num_embeddings=num_embeddings,
-    embedding_dim=embedding_dim,
-    device=device,
-    dtype=dtype,
-)
-self.num_embeddings = num_embeddings
-self.embedding_dim = embedding_dim
+self.num_embeddings = int(num_embeddings)
+self.embedding_dim = int(embedding_dim)
+
+# Create embedding matrix as learnable parameter
+self.weight = nn.Parameter(torch.empty((num_embeddings, embedding_dim)))
+self.reset_parameters()
+
+def reset_parameters(self) -> None:
+    # Initialize with truncated normal
+    nn.init.trunc_normal_(self.weight, mean=0.0, std=1.0, a=-3.0, b=3.0)
 ```
 
-Store nn.Embedding as a submodule. PyTorch automatically registers it and its
-parameters.
+Create the embedding matrix as an nn.Parameter. PyTorch automatically:
+- Tracks it for gradient updates
+- Includes it in model.parameters()
+- Moves it with model.to(device)
 
 **In forward:**
 
 ```python
-return self.embedding(token_ids)
+return self.weight[token_ids]
 ```
 
-That's it! nn.Embedding handles everything:
-- Indexing into the embedding matrix
+Simple indexing! PyTorch handles:
+- Indexing into the parameter matrix
 - Broadcasting over batch dimensions
 - Gradient computation during backprop
 
@@ -293,20 +297,21 @@ For large vocabularies, embeddings are costly. This is why:
 Common Pitfalls
 ───────────────
 
-❌ **Forgetting nn.Embedding exists**:
-   Don't implement from scratch with nn.Parameter!
-   Use nn.Embedding - it's optimized.
+❌ **Using nn.Embedding**:
+   Do NOT use nn.Embedding - defeats the learning purpose!
+   Must implement from scratch with nn.Parameter.
 
 ❌ **Wrong dimension order**:
-   nn.Embedding expects (num_embeddings, embedding_dim), not reversed!
+   Weight shape is (num_embeddings, embedding_dim), not reversed!
+   token_ids → rows, embedding_dim → columns
 
 ❌ **Out-of-bounds token IDs**:
    If max token ID ≥ num_embeddings, PyTorch raises IndexError.
-   Always ensure tokenizer and embedding vocab sizes match!
+   Always ensure token_ids < num_embeddings!
 
-❌ **Not registering as submodule**:
-   Wrong: self.embedding_weights = torch.randn(...)  # Not tracked!
-   Right: self.embedding = nn.Embedding(...)  # Automatically tracked
+❌ **Not using nn.Parameter**:
+   Wrong: self.weight = torch.randn(...)  # Not tracked by optimizer!
+   Right: self.weight = nn.Parameter(torch.empty(...))  # Tracked!
 
 ❌ **Modifying embeddings in forward**:
    Embeddings are parameters, not computed. Just look up and return!
@@ -356,9 +361,10 @@ tokens become continuous representations.
 
 Hints
 ─────
-• This is one of the simplest modules - mainly a wrapper around nn.Embedding
-• Store the nn.Embedding instance as self.embedding
-• Forward pass is literally: return self.embedding(token_ids)
+• This is one of the simplest modules - just a parameter matrix with indexing
+• Create weight as nn.Parameter(torch.empty(num_embeddings, embedding_dim))
+• Initialize with nn.init.trunc_normal_(self.weight, mean=0, std=1, a=-3, b=3)
+• Forward pass is literally: return self.weight[token_ids]
 • The learning happens during training through backprop!
 
 Remember: This is where language enters the neural network! Every word, every
