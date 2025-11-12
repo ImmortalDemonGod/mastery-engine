@@ -32,6 +32,90 @@ This worklog follows the same principles as `WORKLOG.md`: reverse chronological 
 
 ---
 
+### **2025-11-11 22:45**
+
+**Objective:**
+*   Debug and fix critical HARDEN stage workflow bug where validation passes without user fixing the injected bug.
+
+**Problem Description:**
+User completed BUILD and JUSTIFY stages successfully, then proceeded to HARDEN stage:
+1.  Ran `engine next` (22:37:57) - system prepared harden challenge with buggy code
+2.  Ran `engine submit-fix` immediately (22:38:27) - validation PASSED without any fix
+3.  Expected: Validation should FAIL because buggy code was not fixed
+4.  Actual: Validation passed and user advanced to next module
+
+**Investigation:**
+1.  **Verified Bug Injection**: Inspected `.mastery_engine_worktree/workspace/harden/utils.py`
+    - Confirmed bug patch was applied correctly (line 17: missing subtract-max trick)
+    - File shows `# BUG: Removed subtract-max trick - causes overflow!`
+    
+2.  **Verified File States**: Compared harden workspace vs shadow worktree
+    ```bash
+    # Buggy version in harden workspace
+    .mastery_engine_worktree/workspace/harden/utils.py: Lines 17-18 have bug
+    
+    # Correct version in cs336_basics (should have been overwritten)
+    .mastery_engine_worktree/cs336_basics/utils.py: Lines 17-19 have correct implementation
+    ```
+    
+3.  **Tested Buggy Code**: Manually copied buggy version and ran tests
+    ```bash
+    cp .mastery_engine_worktree/workspace/harden/utils.py .mastery_engine_worktree/cs336_basics/utils.py
+    cd .mastery_engine_worktree && uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch
+    # Result: FAILED (as expected)
+    ```
+    - Confirms the buggy code causes test failure
+    - Therefore, validation must have tested against the CORRECT code
+    
+4.  **Traced Workflow**: Analyzed `engine/main.py::submit_fix()` (lines 719-742)
+    - Line 732: `shutil.copy2(harden_file, shadow_dest)` should copy buggy code
+    - Line 742: `validator_subsys.execute()` runs validator
+    - Copy appears correct, but buggy code never reached validator
+
+**Root Cause Hypothesis:**
+The validator script (`curricula/cs336_a1/modules/softmax/validator.sh`) may be incorrectly detecting the stage and copying from the wrong location. Lines 15-23:
+```bash
+if [ "$(pwd)" != "$SHADOW_WORKTREE" ]; then
+    # BUILD STAGE: Copy from main directory
+    cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
+    cd "$SHADOW_WORKTREE"
+else
+    # HARDEN STAGE: Use file already copied by submit-fix
+    true
+fi
+```
+
+Possible issues:
+- Path comparison may fail due to symlinks, trailing slashes, or resolution differences
+- If condition is TRUE in HARDEN stage, it copies from `pwd/cs336_basics/utils.py` (shadow worktree) to itself (no-op)
+- This would preserve the correct code from BUILD stage instead of using the buggy code
+
+**Actions Taken:**
+1.  Added debug logging to validator script:
+    - Log pwd and $SHADOW_WORKTREE values
+    - Log which branch (BUILD vs HARDEN) is taken
+    - Output to stderr to capture in validation logs
+    
+2.  Added debug logging to `submit_fix()`:
+    - Log file copy source and destination
+    - Verify files exist before and after copy
+    - Track file copy success
+
+**Next Steps:**
+1.  User will run `engine submit-fix` again with debug logs enabled
+2.  Analyze logs to determine exact cause of workflow failure
+3.  Implement fix based on findings
+4.  Add regression test to prevent recurrence
+
+**Status:** Investigation in progress, debug instrumentation added
+
+**Artifacts:**
+*   **Files Modified:**
+    - `engine/main.py`: Added debug logging to submit_fix (lines 733-739)
+    - `curricula/cs336_a1/modules/softmax/validator.sh`: Added debug logging (lines 15-28)
+
+---
+
 ### **2025-11-11 19:35 - Sprint 6: "Production-Ready MVP" - COMPLETE**
 
 **Objective:**

@@ -12,15 +12,20 @@ fi
 
 # Determine if we're already in shadow worktree (for harden stage)
 # or in main directory (for build stage)
+echo "DEBUG: pwd=$(pwd)" >&2
+echo "DEBUG: SHADOW_WORKTREE=$SHADOW_WORKTREE" >&2
 if [ "$(pwd)" != "$SHADOW_WORKTREE" ]; then
+    echo "DEBUG: BUILD STAGE - Copying from main directory" >&2
     # BUILD STAGE: Copy from main directory to shadow worktree
     cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
     cd "$SHADOW_WORKTREE"
 else
+    echo "DEBUG: HARDEN STAGE - Using file already copied by submit-fix" >&2
     # HARDEN STAGE: Already in shadow worktree, file was copied by submit-fix
     # Just stay here and run tests
     true
 fi
+echo "DEBUG: After check, pwd=$(pwd)" >&2
 
 # Record start time for performance measurement
 start_time=$(python3 -c 'import time; print(time.time())')

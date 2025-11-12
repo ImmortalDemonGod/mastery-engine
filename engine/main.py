@@ -24,8 +24,8 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (override shell to honor .env settings)
+load_dotenv(override=True)
 
 from engine.state import StateManager, StateFileCorruptedError
 from engine.curriculum import CurriculumManager, CurriculumNotFoundError, CurriculumInvalidError
@@ -729,7 +729,14 @@ def submit_fix():
         # Copy fixed file to shadow worktree for validation
         import shutil
         shadow_dest.parent.mkdir(parents=True, exist_ok=True)
+        
+        # DEBUG: Log file copy details
+        logger.info(f"HARDEN DEBUG: Copying from {harden_file} to {shadow_dest}")
+        logger.info(f"HARDEN DEBUG: Source exists: {harden_file.exists()}, Dest exists before copy: {shadow_dest.exists()}")
+        
         shutil.copy2(harden_file, shadow_dest)
+        
+        logger.info(f"HARDEN DEBUG: Copy complete. Dest exists after copy: {shadow_dest.exists()}")
         
         # Execute validator in shadow worktree
         result = validator_subsys.execute(validator_path, shadow_worktree)
