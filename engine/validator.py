@@ -87,12 +87,17 @@ class ValidationSubsystem:
         try:
             # Execute the validator script with environment variables
             import os
+            import sys
             env = os.environ.copy()
             
             # SHADOW_WORKTREE: Path to shadow worktree for isolated validation
             shadow_worktree = Path('.mastery_engine_worktree')
             if shadow_worktree.exists():
                 env['SHADOW_WORKTREE'] = str(shadow_worktree.resolve())
+            
+            # MASTERY_PYTHON: Path to current Python executable for validators to use
+            # This ensures validators use the same Python environment as the engine
+            env['MASTERY_PYTHON'] = sys.executable
             
             result = subprocess.run(
                 [str(validator_path.resolve())],

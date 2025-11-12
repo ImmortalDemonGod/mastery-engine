@@ -101,8 +101,12 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
     # Copy cs336_basics package (needed for validation)
     shutil.copytree(real_repo / "cs336_basics", test_repo / "cs336_basics")
     
-    # Copy tests (needed for validator)
-    shutil.copytree(real_repo / "tests", test_repo / "tests")
+    # Copy tests (needed for validator), but exclude e2e to avoid recursion
+    shutil.copytree(
+        real_repo / "tests",
+        test_repo / "tests",
+        ignore=shutil.ignore_patterns('e2e')
+    )
     
     # Copy pyproject.toml (needed for uv run)
     shutil.copy2(real_repo / "pyproject.toml", test_repo / "pyproject.toml")

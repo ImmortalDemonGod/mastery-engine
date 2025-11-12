@@ -25,8 +25,21 @@ fi
 # Record start time for performance measurement
 start_time=$(python3 -c 'import time; print(time.time())')
 
-# Run the softmax test
-uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -v
+# Smart pytest execution: use current Python environment if available, else uv
+# This allows the validator to work both in production (uv) and testing (active venv)
+if [ -n "$MASTERY_PYTHON" ]; then
+    # Engine provided its Python executable - use it (works in test and production)
+    # Add current directory to PYTHONPATH for imports
+    export PYTHONPATH="$(pwd):$PYTHONPATH"
+    "$MASTERY_PYTHON" -m pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -v --tb=short
+elif [ -n "$VIRTUAL_ENV" ]; then
+    # We're in an active virtual environment - use its Python explicitly
+    export PYTHONPATH="$(pwd):$PYTHONPATH"
+    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -v --tb=short
+else
+    # No active environment - use uv to create one
+    uv run pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -v --tb=short
+fi
 
 # Record end time
 end_time=$(python3 -c 'import time; print(time.time())')
