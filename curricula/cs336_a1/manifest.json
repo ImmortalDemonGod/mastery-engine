@@ -62,6 +62,12 @@
       "name": "Transformer Block (Complete Integration)",
       "path": "modules/transformer_block",
       "baseline_perf_seconds": 0.25
+    },
+    {
+      "id": "adamw",
+      "name": "AdamW Optimizer",
+      "path": "modules/adamw",
+      "baseline_perf_seconds": 0.15
     }
   ]
 }

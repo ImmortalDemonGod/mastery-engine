@@ -1,0 +1,428 @@
+Build Challenge: AdamW Optimizer
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement AdamW, the optimization algorithm used to train virtually all modern
+LLMs including GPT-3, LLaMA, and PaLM. You will learn why adaptive learning
+rates are crucial for deep learning, how momentum accelerates convergence, why
+weight decay prevents overfitting, and how AdamW improves upon the original
+Adam optimizer. This is how models actually LEARN!
+
+Background: The Optimization Problem
+─────────────────────────────────────
+Training a neural network means finding parameters θ that minimize loss L(θ):
+
+    θ* = argmin L(θ)
+         θ
+
+We use gradient descent: iteratively update parameters in the direction that
+reduces loss:
+
+    θ_{t+1} = θ_t - η ∇L(θ_t)
+
+Where η is the learning rate and ∇L is the gradient.
+
+**Problems with vanilla gradient descent:**
+1. **Learning rate sensitivity**: Too large → divergence, too small → slow
+2. **Same learning rate for all parameters**: Some need large steps, others small
+3. **Saddle points and plateaus**: Gradients become tiny, training stalls
+4. **No momentum**: Wastes information from previous gradients
+
+Modern optimizers solve these problems!
+
+Evolution of Optimizers
+───────────────────────
+
+**SGD (Stochastic Gradient Descent)**:
+    θ_{t+1} = θ_t - η g_t
+
+Simple but effective baseline. Still used for some tasks.
+
+**SGD + Momentum**:
+    m_t = β₁ m_{t-1} + g_t
+    θ_{t+1} = θ_t - η m_t
+
+Accumulates past gradients to smooth updates and accelerate through valleys.
+
+**RMSProp**:
+    v_t = β₂ v_{t-1} + (1-β₂) g_t²
+    θ_{t+1} = θ_t - η g_t / √(v_t + ε)
+
+Adapts learning rate per parameter based on gradient magnitude history.
+
+**Adam (Adaptive Moment Estimation, 2014)**:
+    m_t = β₁ m_{t-1} + (1-β₁) g_t          # First moment (momentum)
+    v_t = β₂ v_{t-1} + (1-β₂) g_t²          # Second moment (adaptive LR)
+    θ_{t+1} = θ_t - η m_t / √(v_t + ε)
+
+Combines momentum and adaptive learning rates. Became the standard optimizer.
+
+**AdamW (Adam with Weight Decay, 2017)**:
+    m_t = β₁ m_{t-1} + (1-β₁) g_t
+    v_t = β₂ v_{t-1} + (1-β₂) g_t²
+    θ_{t+1} = θ_t - η (m_t / √(v_t + ε) + λ θ_t)  # Added weight decay!
+
+Fixes Adam's weight decay implementation. Now the standard for LLM training.
+
+Mathematical Foundation: AdamW
+──────────────────────────────
+
+Given parameters θ and gradients g_t = ∇L(θ_t), AdamW updates:
+
+**Step 1: Compute biased first moment (momentum)**
+    m_t = β₁ m_{t-1} + (1-β₁) g_t
+
+This is an exponential moving average of gradients, providing momentum.
+
+**Step 2: Compute biased second moment (adaptive learning rate)**
+    v_t = β₂ v_{t-1} + (1-β₂) g_t²
+
+This is an exponential moving average of squared gradients, tracking gradient
+magnitude history.
+
+**Step 3: Bias correction**
+    m̂_t = m_t / (1 - β₁^t)
+    v̂_t = v_t / (1 - β₂^t)
+
+Early in training, m_t and v_t are biased toward zero (initialized to 0).
+Bias correction divides by (1 - β^t) to counteract this.
+
+**Step 4: Parameter update with weight decay**
+    θ_{t+1} = θ_t - η (m̂_t / √(v̂_t + ε) + λ θ_t)
+
+Where:
+- η: learning rate (typically 3e-4 for LLMs)
+- λ: weight decay coefficient (typically 0.1)
+- ε: numerical stability constant (typically 1e-8)
+
+Key Insight: Why Adaptive Learning Rates?
+──────────────────────────────────────────
+Different parameters need different learning rates:
+
+**Example**: Consider two parameters with different gradient scales:
+- Parameter A: gradients typically ~0.001
+- Parameter B: gradients typically ~100
+
+With fixed learning rate η = 0.01:
+- A gets tiny updates: 0.01 × 0.001 = 0.00001 (too small!)
+- B gets huge updates: 0.01 × 100 = 1.0 (too large, diverges!)
+
+AdamW solution: Divide by √v_t, which scales inversely with gradient magnitude:
+- A: Update scaled up (divided by small √v)
+- B: Update scaled down (divided by large √v)
+
+Each parameter gets an "effective learning rate" adapted to its gradient scale!
+
+Momentum: Why First Moment?
+────────────────────────────
+The first moment m_t accumulates past gradients with exponential decay:
+
+    m_t = β₁ m_{t-1} + (1-β₁) g_t
+    m_t = (1-β₁) Σ_{i=1}^t β₁^{t-i} g_i
+
+This gives recent gradients more weight (β₁^1) than older ones (β₁^{t-1}).
+
+**Benefits:**
+1. **Smooths noisy gradients**: Random fluctuations cancel out
+2. **Accelerates through valleys**: Momentum builds up in consistent directions
+3. **Escapes saddle points**: Accumulated momentum carries through flat regions
+4. **Reduces oscillations**: Dampens back-and-forth in narrow valleys
+
+Typical β₁ = 0.9 means 90% of previous momentum + 10% of current gradient.
+
+Second Moment: Why Square Gradients?
+─────────────────────────────────────
+The second moment v_t tracks squared gradients:
+
+    v_t = β₂ v_{t-1} + (1-β₂) g_t²
+
+Squaring removes sign, keeping only magnitude information. This measures:
+- **High variance parameters**: Large, fluctuating gradients → large v_t
+- **Low variance parameters**: Small, stable gradients → small v_t
+
+Dividing by √v_t gives:
+- High variance params: Large denominator → smaller updates (more cautious)
+- Low variance params: Small denominator → larger updates (more aggressive)
+
+This is like automatic learning rate tuning per parameter!
+
+Typical β₂ = 0.999 means very long history (999/1000 old + 1/1000 new).
+
+Bias Correction: Why Divide by (1-β^t)?
+────────────────────────────────────────
+m and v are initialized to zero: m_0 = 0, v_0 = 0.
+
+After one step with β₁ = 0.9:
+    m_1 = 0.9 × 0 + 0.1 × g_1 = 0.1 g_1
+
+But we want the average to be g_1, not 0.1 g_1! Bias toward zero.
+
+Bias correction:
+    m̂_1 = m_1 / (1 - 0.9^1) = 0.1 g_1 / 0.1 = g_1 ✓
+
+As t → ∞, (1 - β^t) → 1, so correction becomes negligible.
+This is only important in early training steps!
+
+Weight Decay: AdamW vs Adam
+────────────────────────────
+Weight decay adds L2 regularization: penalize large weights.
+
+**Adam (original, WRONG)**:
+    g_t = ∇L(θ_t) + λ θ_t  # Add weight decay to gradient
+    m_t = β₁ m_{t-1} + (1-β₁) g_t  # Momentum includes decay
+    θ_{t+1} = θ_t - η m̂_t / √(v̂_t + ε)
+
+Problem: Weight decay gets scaled by adaptive learning rate √v̂_t, making its
+effect inconsistent across parameters!
+
+**AdamW (correct)**:
+    m_t = β₁ m_{t-1} + (1-β₁) g_t  # Momentum WITHOUT decay
+    θ_{t+1} = θ_t - η (m̂_t / √(v̂_t + ε) + λ θ_t)  # Add decay directly
+
+Weight decay is applied AFTER adaptive scaling, giving consistent regularization
+across all parameters. This is why AdamW outperforms Adam!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/optimizer.py
+
+You will implement the AdamW class as a PyTorch optimizer. This is a nn.Module
+subclass that implements the AdamW algorithm.
+
+Requirements
+────────────
+Implement the class with the following specification:
+
+Class Signature
+───────────────
+
+class AdamW(torch.optim.Optimizer):
+    def __init__(
+        self,
+        params,
+        lr: float = 1e-3,
+        betas: tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 0.0,
+    ):
+        """
+        AdamW optimizer with weight decay fix.
+        
+        Args:
+            params: Iterable of parameters to optimize
+            lr: Learning rate (η)
+            betas: (β₁, β₂) for first and second moments
+            eps: Numerical stability constant (ε)
+            weight_decay: Weight decay coefficient (λ)
+        """
+    
+    def step(self, closure=None):
+        """
+        Perform a single optimization step.
+        
+        Updates all parameters based on their gradients using AdamW algorithm.
+        
+        Args:
+            closure: Optional closure that reevaluates the model and returns loss
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Inherit from torch.optim.Optimizer**:
+   - Provides parameter group management
+   - Handles defaults and state management
+   - Standard PyTorch optimizer interface
+
+2. **Initialize state in step()**:
+   - First time seeing a parameter: initialize m=0, v=0, t=0
+   - Use optimizer state dict: self.state[param]
+
+3. **In-place parameter updates**:
+   - Modify param.data directly
+   - Use torch.no_grad() to prevent tracking operations
+
+4. **Handle parameter groups**:
+   - Multiple parameter groups can have different hyperparameters
+   - Iterate: for group in self.param_groups
+
+5. **Skip parameters without gradients**:
+   - if param.grad is None: continue
+   - Some parameters might not have gradients (frozen layers)
+
+Implementation Steps
+────────────────────
+
+**In __init__:**
+
+```python
+defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+super().__init__(params, defaults)
+```
+
+This initializes the optimizer with parameter groups and default hyperparameters.
+
+**In step:**
+
+For each parameter group and each parameter:
+
+**Step 1: Get parameter and gradient**
+```python
+for group in self.param_groups:
+    for param in group['params']:
+        if param.grad is None:
+            continue
+        grad = param.grad.data
+```
+
+**Step 2: Get or initialize state**
+```python
+state = self.state[param]
+if len(state) == 0:
+    state['step'] = 0
+    state['exp_avg'] = torch.zeros_like(param.data)  # m_t
+    state['exp_avg_sq'] = torch.zeros_like(param.data)  # v_t
+```
+
+**Step 3: Increment step counter**
+```python
+state['step'] += 1
+```
+
+**Step 4: Get hyperparameters**
+```python
+lr = group['lr']
+beta1, beta2 = group['betas']
+eps = group['eps']
+weight_decay = group['weight_decay']
+```
+
+**Step 5: Update first moment (momentum)**
+```python
+exp_avg = state['exp_avg']
+exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+# This computes: exp_avg = beta1 * exp_avg + (1-beta1) * grad
+```
+
+**Step 6: Update second moment (adaptive LR)**
+```python
+exp_avg_sq = state['exp_avg_sq']
+exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+# This computes: exp_avg_sq = beta2 * exp_avg_sq + (1-beta2) * grad²
+```
+
+**Step 7: Bias correction**
+```python
+bias_correction1 = 1 - beta1 ** state['step']
+bias_correction2 = 1 - beta2 ** state['step']
+```
+
+**Step 8: Compute step size**
+```python
+step_size = lr / bias_correction1
+```
+
+**Step 9: Compute update (adaptive + weight decay)**
+```python
+denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
+param.data.addcdiv_(exp_avg, denom, value=-step_size)
+
+# Apply weight decay
+if weight_decay != 0:
+    param.data.add_(param.data, alpha=-lr * weight_decay)
+```
+
+Mathematical Insight: Why This Works
+─────────────────────────────────────
+AdamW combines three powerful ideas:
+
+1. **Momentum**: Smooths gradients and accelerates convergence
+2. **Adaptive learning rates**: Each parameter gets its own effective LR
+3. **Weight decay**: Prevents overfitting by penalizing large weights
+
+The magic is in the interaction: adaptive LR allows momentum to work well even
+when different parameters have vastly different gradient scales!
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting bias correction**:
+   Without it, early updates are biased toward zero, slowing initial training.
+
+❌ **Wrong weight decay position (Adam mistake)**:
+   Weight decay must be applied AFTER adaptive scaling, not in the gradient!
+
+❌ **Modifying param instead of param.data**:
+   Wrong: param = param - lr * grad  # Breaks computational graph!
+   Right: param.data.add_(update)    # In-place, no graph
+
+❌ **Not checking for None gradients**:
+   Frozen parameters have no gradients; skip them!
+
+❌ **Wrong in-place operations**:
+   Use .mul_(), .add_(), .addcmul_(), .addcdiv_() for in-place updates
+
+Testing
+───────
+Your implementation will be tested against:
+• Convergence on simple problems
+• Numerical accuracy vs torch.optim.AdamW
+• Correct handling of weight decay
+• Multiple parameter groups
+• Parameters without gradients
+
+The validator will run: pytest tests/test_optimizer.py::test_adamw
+
+Hyperparameter Tuning
+──────────────────────
+Typical values for LLM training:
+- lr: 3e-4 (GPT-3), 6e-4 (GPT-2), 1e-4 to 3e-4 (typical range)
+- β₁: 0.9 (standard, rarely changed)
+- β₂: 0.999 (GPT-3), 0.95 (some recent models), 0.999 is safe default
+- ε: 1e-8 (standard)
+- weight_decay: 0.1 (GPT-3), 0.01-0.1 typical range
+
+Learning rate is THE most important hyperparameter. Too high → divergence,
+too low → slow convergence.
+
+Integration with Training Loop
+───────────────────────────────
+```python
+model = TransformerLM(...)
+optimizer = AdamW(model.parameters(), lr=3e-4, weight_decay=0.1)
+
+for batch in dataloader:
+    # Forward pass
+    loss = model(batch)
+    
+    # Backward pass
+    loss.backward()  # Computes gradients
+    
+    # Optimizer step
+    optimizer.step()  # Updates parameters
+    optimizer.zero_grad()  # Clear gradients for next iteration
+```
+
+The optimizer.step() is where your AdamW logic runs!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your AdamW against reference implementations and verify
+all edge cases. You'll then answer conceptual questions about momentum, adaptive
+learning rates, weight decay, and why AdamW improves upon Adam.
+
+Hints
+─────
+• Use torch.no_grad() context for parameter updates
+• In-place operations: .mul_(), .add_(), etc.
+• Bias correction only affects first ~100 steps significantly
+• Test with simple quadratic: should converge to minimum
+
+Remember: This is how GPT-3, LLaMA, and every modern LLM learns! Getting
+optimization right is critical for training success! 🎯
