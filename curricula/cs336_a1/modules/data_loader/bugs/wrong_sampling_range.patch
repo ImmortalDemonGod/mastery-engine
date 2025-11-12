@@ -1,0 +1,15 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -10,8 +10,10 @@ def get_batch(dataset, batch_size, context_length, device):
+     if n <= 0:
+         raise ValueError("Dataset too short")
+     
+-    # Sample starting positions
+-    starts = torch.randint(low=0, high=n, size=(batch_size,))
++    # BUG: Wrong sampling range! Using high=n+1 instead of high=n
++    # This can sample position n-1+1=n, which needs tokens up to n+L (out of bounds!)
++    # Should be: high=n (exclusive), which gives valid range [0, n-1]
++    starts = torch.randint(low=0, high=n+1, size=(batch_size,))  # WRONG!
+     
+     # Create indices
+     offsets = torch.arange(context_length).unsqueeze(0)

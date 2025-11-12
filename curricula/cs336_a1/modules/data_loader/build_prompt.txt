@@ -1,0 +1,418 @@
+Build Challenge: Language Model Data Loader
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement the get_batch function that samples random subsequences from a
+tokenized dataset for language model training. You will learn why random
+sampling is essential, how to create input/target pairs for autoregressive
+modeling, why sequence length matters for training, and how data loading
+affects model convergence. This is the critical bridge between dataset and
+training loop!
+
+Background: From Tokens to Training Batches
+────────────────────────────────────────────
+After tokenization, you have:
+- **Dataset**: 1D array of token IDs [t₀, t₁, t₂, ..., t_N]
+  - Could be millions/billions of tokens
+  - Example: Wikipedia = ~2.5B tokens
+
+Training needs:
+- **Batches**: Multiple sequences processed simultaneously
+- **Fixed length**: All sequences same length (for GPU efficiency)
+- **Input/target pairs**: x and y where y is x shifted by 1
+
+**get_batch creates this structure!**
+
+Example:
+```python
+dataset = [15, 23, 45, 67, 89, 12, 34, 56, 78, 90, ...]  # Million tokens
+
+x, y = get_batch(
+    dataset=dataset,
+    batch_size=2,
+    context_length=4,
+    device='cuda'
+)
+
+# Result:
+x = [[23, 45, 67, 89],    # Random subsequence starting at position 1
+     [56, 78, 90, 12]]    # Random subsequence starting at position 7
+y = [[45, 67, 89, 12],    # Shifted by 1 (targets for x)
+     [78, 90, 12, 34]]    # Shifted by 1 (targets for x)
+```
+
+Each sequence is a training example!
+
+Why Random Sampling?
+────────────────────
+**Sequential processing** (don't do this):
+- Epoch 1: Process tokens [0:512], [512:1024], [1024:1536], ...
+- Epoch 2: Same order again
+- Problem: Model sees same contexts repeatedly
+- Overfits to specific sequence positions
+- Poor generalization
+
+**Random sampling** (correct approach):
+- Each batch: Sample random starting positions
+- Different context windows every iteration
+- Model sees diverse contexts for same tokens
+- Better generalization
+- Prevents position-specific overfitting
+
+**Empirical result**: Random sampling significantly improves generalization!
+
+Mathematical Foundation
+───────────────────────
+**Sampling algorithm**:
+
+Given:
+- dataset: 1D array of N token IDs
+- batch_size: B sequences per batch
+- context_length: L tokens per sequence
+
+Procedure:
+1. **Sample starting positions**: 
+   starts ~ Uniform(0, N - L - 1)  # Need room for L+1 tokens
+   Draw B independent samples
+
+2. **Extract sequences**:
+   For each start position s:
+     x[s] = dataset[s : s+L]     # Input: L tokens
+     y[s] = dataset[s+1 : s+L+1] # Target: same L tokens, shifted by 1
+
+3. **Stack into batch**:
+   X = stack([x[s₀], x[s₁], ..., x[s_{B-1}]])  # Shape: (B, L)
+   Y = stack([y[s₀], y[s₁], ..., y[s_{B-1}]])  # Shape: (B, L)
+
+4. **Move to device**:
+   X, Y = X.to(device), Y.to(device)
+
+**Output**: X, Y both shape (batch_size, context_length) on device
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/utils.py
+
+You will implement the get_batch function.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def get_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+):
+    """
+    Sample random subsequences from dataset for LM training.
+    
+    Args:
+        dataset: 1D numpy array or array-like of token IDs
+        batch_size: Number of sequences to sample
+        context_length: Length of each sequence
+        device: PyTorch device string (e.g., 'cpu', 'cuda:0')
+    
+    Returns:
+        x: Input tensor of shape (batch_size, context_length)
+        y: Target tensor of shape (batch_size, context_length)
+           where y[i, j] = x[i, j+1] (next token prediction)
+    
+    Both tensors are LongTensor on specified device.
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Random sampling**:
+   - Use torch.randint() for random starting positions
+   - Each sequence independently sampled
+   - Sampling with replacement (same position can be sampled multiple times)
+
+2. **Valid range**:
+   - Starting positions must be in [0, len(dataset) - context_length - 1]
+   - Need context_length + 1 tokens (for input + target)
+   - Validate dataset has sufficient length
+
+3. **Efficient indexing**:
+   - Use fancy indexing to extract all sequences at once
+   - Avoid Python loops over batch dimension
+   - Single tensor operation for all sequences
+
+4. **Correct dtype and device**:
+   - Convert dataset to LongTensor (token IDs are integers)
+   - Move to specified device
+   - Handle any device string (cpu, cuda, cuda:0, etc.)
+
+Implementation Steps
+────────────────────
+
+**Step 1: Validate and convert dataset**
+
+```python
+def get_batch(dataset, batch_size, context_length, device):
+    # Convert to tensor
+    data = torch.as_tensor(dataset, dtype=torch.long)
+    
+    # Validate sufficient length
+    n = data.shape[0] - context_length
+    if n <= 0:
+        raise ValueError(
+            f"Dataset too short: {data.shape[0]} tokens, "
+            f"need at least {context_length + 1}"
+        )
+```
+
+Must have at least context_length + 1 tokens to create one example!
+
+**Step 2: Sample random starting positions**
+
+```python
+    # Sample starting positions uniformly
+    starts = torch.randint(
+        low=0,
+        high=n,  # Exclusive upper bound
+        size=(batch_size,),
+    )
+```
+
+This gives B random integers in [0, n).
+
+**Step 3: Create index arrays for extraction**
+
+```python
+    # Create offset array [0, 1, 2, ..., context_length-1]
+    offsets = torch.arange(context_length).unsqueeze(0)  # (1, L)
+    
+    # Broadcast to get indices for all sequences
+    # starts: (B, 1), offsets: (1, L) → x_idx: (B, L)
+    x_idx = starts.unsqueeze(1) + offsets
+    
+    # Target indices: same but shifted by 1
+    y_idx = x_idx + 1
+```
+
+Broadcasting creates index matrix for all sequences!
+
+**Step 4: Extract and move to device**
+
+```python
+    # Index into dataset
+    x = data[x_idx]  # (B, L)
+    y = data[y_idx]  # (B, L)
+    
+    # Move to device
+    x = x.to(device)
+    y = y.to(device)
+    
+    return x, y
+```
+
+Fancy indexing extracts all sequences efficiently!
+
+Mathematical Insight: Why Shift by 1?
+──────────────────────────────────────
+Language modeling objective: Predict next token.
+
+Given sequence: [t₀, t₁, t₂, t₃, t₄]
+
+**Autoregressive predictions**:
+- See t₀ → predict t₁
+- See t₀,t₁ → predict t₂
+- See t₀,t₁,t₂ → predict t₃
+- See t₀,t₁,t₂,t₃ → predict t₄
+
+**Training setup**:
+- Input x = [t₀, t₁, t₂, t₃]  # What model sees
+- Target y = [t₁, t₂, t₃, t₄]  # What it should predict
+
+At each position i:
+- Model sees x[:i+1] (positions 0 through i)
+- Model predicts y[i] (which is x[i+1], the next token)
+
+This is why y = x shifted by 1!
+
+Common Pitfalls
+───────────────
+
+❌ **Wrong sampling range**:
+   ```python
+   starts = torch.randint(0, len(dataset), (batch_size,))  # WRONG!
+   ```
+   Can sample position N-1, but need N tokens for context + target.
+   Last valid start is N - context_length - 1.
+
+❌ **Not handling dataset length**:
+   If context_length >= len(dataset), can't create any examples!
+   Must validate and raise clear error.
+
+❌ **Inefficient extraction**:
+   ```python
+   # SLOW: Python loop
+   x = []
+   for start in starts:
+       x.append(dataset[start:start+context_length])
+   x = torch.stack(x)
+   ```
+   Use fancy indexing instead - much faster!
+
+❌ **Wrong dtype**:
+   Token IDs are integers, need LongTensor not FloatTensor.
+   Use dtype=torch.long explicitly.
+
+❌ **Device mismatch**:
+   Extracting on CPU then moving each sequence separately.
+   Extract all, then move batch at once - faster!
+
+❌ **Off-by-one in y**:
+   ```python
+   y_idx = x_idx  # WRONG! Same indices
+   ```
+   Target must be shifted: y_idx = x_idx + 1
+
+Testing
+───────
+Your implementation will be tested against:
+• Various dataset sizes (small to large)
+• Different batch sizes and context lengths
+• Edge cases (minimum dataset length)
+• Device handling (CPU and CUDA)
+• Correctness of x/y relationship
+
+The validator will run: pytest tests/test_training.py::test_get_batch -v
+
+Integration: Complete Training Pipeline
+────────────────────────────────────────
+**How get_batch fits into training**:
+
+```python
+# 1. Load and tokenize dataset
+with open('data/train.txt') as f:
+    text = f.read()
+tokenizer = Tokenizer(vocab, merges)
+dataset = np.array(tokenizer.encode(text))  # Shape: (N,)
+
+# 2. Training loop
+for iteration in range(num_iterations):
+    # Sample batch (THIS FUNCTION!)
+    x, y = get_batch(
+        dataset=dataset,
+        batch_size=32,
+        context_length=512,
+        device='cuda',
+    )
+    
+    # Forward pass
+    logits = model(x)  # (32, 512, vocab_size)
+    
+    # Compute loss
+    loss = F.cross_entropy(
+        logits[:, :-1, :].flatten(0, 1),
+        y[:, 1:].flatten(),
+    )
+    
+    # Backward and update
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+Every training iteration calls get_batch!
+
+**Validation set**:
+```python
+# Separate validation dataset
+val_dataset = np.array(tokenizer.encode(val_text))
+
+# Evaluation
+model.eval()
+with torch.no_grad():
+    x_val, y_val = get_batch(val_dataset, batch_size=32, ...)
+    val_logits = model(x_val)
+    val_loss = F.cross_entropy(...)
+```
+
+Same function for train and validation!
+
+Performance Considerations
+──────────────────────────
+**Sampling speed**:
+- Random sampling: O(batch_size) to generate starts
+- Fancy indexing: O(batch_size × context_length)
+- Very fast even for large datasets
+
+**Memory usage**:
+- Dataset in RAM: O(N) where N = dataset length
+- Batch: O(batch_size × context_length)
+- For billion-token datasets: Need ~4GB RAM (int32)
+
+**Optimization strategies**:
+1. **Memory-mapped files**: For huge datasets that don't fit in RAM
+   ```python
+   dataset = np.memmap('data.bin', dtype=np.int32, mode='r')
+   ```
+
+2. **Data loading workers**: PyTorch DataLoader with num_workers
+   ```python
+   dataloader = DataLoader(
+       dataset, batch_size=32, num_workers=4, shuffle=True
+   )
+   ```
+
+3. **Prefetching**: Load next batch while training current batch
+   - Overlaps I/O with compute
+   - Improves GPU utilization
+
+4. **Packed sequences**: Variable-length sequences packed efficiently
+   - Advanced technique for production systems
+
+Our simple implementation is sufficient for most use cases!
+
+Why Context Length Matters
+───────────────────────────
+**Short context** (context_length=128):
+- Model learns local patterns (grammar, syntax)
+- Can't learn long-range dependencies
+- Faster training (less computation per batch)
+- Less memory usage
+
+**Long context** (context_length=2048):
+- Model learns long-range dependencies
+- Better at tasks requiring context (e.g., answering questions about earlier text)
+- Slower training (quadratic attention cost)
+- More memory usage
+
+**Modern practice**:
+- Training: Start with shorter context (512), gradually increase
+- Inference: Use as long as possible (4K-32K+ for modern models)
+
+Context length is a critical hyperparameter!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your data loader. You'll then answer conceptual
+questions about random sampling, autoregressive data structure, context
+length trade-offs, and how data loading affects training dynamics.
+
+Hints
+─────
+• Validate: n = len(dataset) - context_length must be positive
+• Sample starts: torch.randint(0, n, (batch_size,))
+• Create offsets: torch.arange(context_length).unsqueeze(0)
+• Broadcast: starts.unsqueeze(1) + offsets
+• Shift targets: y_idx = x_idx + 1
+• Move to device after extraction (batch operation is faster)
+
+Remember: Every training step starts with get_batch. This function determines
+what data the model sees and how it learns. Random sampling is the key to
+generalization! 🎯
