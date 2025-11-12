@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-import tiktoken
-
 
 class Tokenizer:
     """
-    Byte-level BPE tokenizer wrapper using tiktoken's GPT-2 encoding.
+    From-scratch byte-level BPE Tokenizer that applies merges sequentially.
 
-    This class conforms to the tests' contract:
-    - Initialized with a GPT-2 compatible vocab/merges (provided by tests)
-    - Supports special tokens by allowing them during encoding
-    - Provides encode, decode, and a streaming encode_iterable
+    This implementation uses the provided vocabulary (id -> bytes) and the
+    ordered list of merges (bytes, bytes). It handles special tokens by
+    greedy longest-match segmentation and provides encode/decode and
+    streaming encode_iterable.
     """
 
     def __init__(
@@ -21,36 +19,40 @@ class Tokenizer:
         merges: list[tuple[bytes, bytes]],
         special_tokens: Optional[list[str]] = None,
     ) -> None:
-        # We rely on the canonical GPT-2 encoding for correctness against tiktoken snapshots.
-        # The provided vocab/merges correspond to GPT-2; we still keep them for potential
-        # future validation or extensions.
-        self._vocab = vocab
-        self._merges = merges
+        # Persist inputs
+        self._vocab = dict(vocab)
+        self._merges = list(merges)
         self._special_tokens = tuple(special_tokens or [])
-        self._allowed_special = set(self._special_tokens)
-        # Build byte/id maps from provided vocab so we can honor custom specials
-        self._id_to_bytes = dict(vocab)
-        self._bytes_to_id = {v: k for k, v in vocab.items()}
-        # Sort special tokens by length (greedy longest match first for overlaps)
+
+        # Build byte<->id maps for fast lookup
+        self._id_to_bytes = dict(self._vocab)
+        self._bytes_to_id = {b: i for i, b in self._vocab.items()}
+
+        # Precompute special-tokens (bytes) and sort by length (greedy, longest-first)
+        self._special_tokens_bytes = [s.encode("utf-8") for s in self._special_tokens]
         self._special_tokens_sorted = sorted(self._special_tokens, key=len, reverse=True)
 
-        # Use tiktoken's reference GPT-2 encoding for matching tests
-        self._enc = tiktoken.get_encoding("gpt2")
-
+    # ------------------------- Public API -------------------------
     def encode(self, text: str) -> list[int]:
-        # If no special tokens provided, allow raw appearances to be treated as normal text
-        if not self._special_tokens:
-            return self._enc.encode(text, disallowed_special=())
+        """Encode a string into token IDs by applying merges sequentially.
 
-        # Greedy longest-match segmentation for special tokens
-        i = 0
+        - Segments around special tokens greedily (longest match wins)
+        - Applies merges to non-special spans only
+        - Maps final byte-sequences to ids via provided vocabulary
+        """
+        if not self._special_tokens:
+            return self._encode_span(text)
+
         ids: list[int] = []
+        i = 0
         n = len(text)
         while i < n:
+            # Greedy longest-match for special tokens
             matched = False
             for tok in self._special_tokens_sorted:
                 if tok and text.startswith(tok, i):
-                    tok_id = self._bytes_to_id.get(tok.encode("utf-8"))
+                    tok_b = tok.encode("utf-8")
+                    tok_id = self._bytes_to_id.get(tok_b)
                     if tok_id is not None:
                         ids.append(tok_id)
                         i += len(tok)
@@ -58,6 +60,7 @@ class Tokenizer:
                         break
             if matched:
                 continue
+
             # Encode up to next special token occurrence
             next_pos = n
             for tok in self._special_tokens_sorted:
@@ -66,58 +69,72 @@ class Tokenizer:
                 j = text.find(tok, i)
                 if j != -1:
                     next_pos = min(next_pos, j)
-            chunk = text[i:next_pos]
-            if chunk:
-                ids.extend(self._enc.encode(chunk, disallowed_special=()))
+            span = text[i:next_pos]
+            if span:
+                ids.extend(self._encode_span(span))
             i = next_pos
         return ids
 
     def decode(self, ids: list[int]) -> str:
-        # Decode by concatenating bytes from provided vocab mapping to ensure
-        # custom special tokens round-trip exactly.
-        out_bytes = bytearray()
+        # Concatenate bytes from vocab, then decode as UTF-8
+        out = bytearray()
         for _id in ids:
             b = self._id_to_bytes.get(int(_id))
             if b is None:
-                # Fallback to tiktoken for unknown ids
-                return self._enc.decode([int(_id)])
-            out_bytes.extend(b)
-        return out_bytes.decode("utf-8", errors="ignore")
+                # Unknown id: skip to preserve robustness
+                continue
+            out.extend(b)
+        return out.decode("utf-8", errors="ignore")
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterable[int]:
-        """
-        Stream-friendly tokenization that yields token IDs lazily for each chunk
-        in the provided iterable (e.g., a file object iterating lines).
-        """
         for chunk in iterable:
-            if not self._special_tokens:
-                for _id in self._enc.encode(chunk, disallowed_special=()):
-                    yield _id
+            for _id in self.encode(chunk):
+                yield _id
+
+    # ------------------------ Internal API ------------------------
+    def _encode_span(self, text: str) -> list[int]:
+        """Encode a non-special span (no special tokens inside)."""
+        # Start with byte-level tokens as bytes objects
+        b = text.encode("utf-8")
+        tokens: list[bytes] = [bytes([x]) for x in b]
+
+        # Apply merges sequentially
+        for left, right in self._merges:
+            if not tokens or len(tokens) == 1:
+                break
+            tokens = self._apply_merge(tokens, left, right)
+
+        # Map final byte-sequences to ids
+        ids: list[int] = []
+        for t in tokens:
+            tid = self._bytes_to_id.get(t)
+            if tid is None:
+                # If a token sequence isn't present (shouldn't happen with correct vocab),
+                # fall back to splitting to bytes to ensure progress.
+                for by in t:
+                    tid_b = self._bytes_to_id.get(bytes([by]))
+                    if tid_b is not None:
+                        ids.append(tid_b)
             else:
-                # Reuse the same segmentation as encode()
-                i = 0
-                n = len(chunk)
-                while i < n:
-                    matched = False
-                    for tok in self._special_tokens_sorted:
-                        if tok and chunk.startswith(tok, i):
-                            tok_id = self._bytes_to_id.get(tok.encode("utf-8"))
-                            if tok_id is not None:
-                                yield tok_id
-                                i += len(tok)
-                                matched = True
-                                break
-                    if matched:
-                        continue
-                    next_pos = n
-                    for tok in self._special_tokens_sorted:
-                        if not tok:
-                            continue
-                        j = chunk.find(tok, i)
-                        if j != -1:
-                            next_pos = min(next_pos, j)
-                    text_part = chunk[i:next_pos]
-                    if text_part:
-                        for _id in self._enc.encode(text_part, disallowed_special=()):
-                            yield _id
-                    i = next_pos
+                ids.append(tid)
+        return ids
+
+    @staticmethod
+    def _apply_merge(
+        tokens: list[bytes], left: bytes, right: bytes
+    ) -> list[bytes]:
+        """Replace consecutive (left, right) pairs with left+right throughout tokens."""
+        if len(tokens) < 2:
+            return tokens
+
+        merged = []
+        i = 0
+        L = len(tokens)
+        while i < L:
+            if i < L - 1 and tokens[i] == left and tokens[i + 1] == right:
+                merged.append(left + right)
+                i += 2
+            else:
+                merged.append(tokens[i])
+                i += 1
+        return merged
