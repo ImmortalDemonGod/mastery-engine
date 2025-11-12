@@ -120,28 +120,34 @@ class RMSNorm(nn.Module):
 
 class SwiGLU(nn.Module):
     """
-    SwiGLU feed-forward block:
+    TODO: Implement SwiGLU feed-forward network.
+    
+    See the 'swiglu' curriculum module for detailed implementation guidance.
+    
+    SwiGLU applies gated activation:
       out = W2( SiLU(W1(x)) * W3(x) )
-    Shapes:
-      - W1: (d_ff, d_model)
-      - W3: (d_ff, d_model)
-      - W2: (d_model, d_ff)
+    
+    This is the modern FFN used in LLaMA and other state-of-the-art models.
+    
+    Args:
+        d_model: Model dimension (input/output size)
+        d_ff: Feed-forward hidden dimension (typically 4×d_model)
+    
+    Implementation requirements:
+    - Three Linear layers: W1, W2, W3 (all without bias)
+    - W1 and W3 project from d_model to d_ff
+    - W2 projects from d_ff back to d_model
+    - Forward: Compute SiLU(W1(x)) * W3(x), then apply W2
     """
 
     def __init__(self, d_model: int, d_ff: int) -> None:
         super().__init__()
-        self.d_model = int(d_model)
-        self.d_ff = int(d_ff)
-        # Use our minimal Linear layers without bias
-        self.w1 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
-        self.w2 = Linear(in_features=self.d_ff, out_features=self.d_model, bias=False)
-        self.w3 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
+        # TODO: Initialize three Linear layers (W1, W3, W2)
+        raise NotImplementedError("TODO: Implement SwiGLU.__init__")
 
     def forward(self, in_features: Tensor) -> Tensor:
-        a = self.w1(in_features)
-        b = self.w3(in_features)
-        gated = silu(a) * b
-        return self.w2(gated)
+        # TODO: Implement forward: W2(SiLU(W1(x)) * W3(x))
+        raise NotImplementedError("TODO: Implement SwiGLU.forward")
 
 
 def scaled_dot_product_attention(
@@ -151,29 +157,31 @@ def scaled_dot_product_attention(
     mask: torch.Tensor | None = None,
 ) -> Float[Tensor, " ... queries d_v"]:
     """
-    Compute scaled dot-product attention.
-
+    TODO: Implement scaled dot-product attention.
+    
+    See the 'attention' curriculum module for detailed implementation guidance.
+    
+    This is the core attention mechanism:
+      Attention(Q, K, V) = softmax(Q K^T / sqrt(d_k)) V
+    
     Args:
         Q: Query tensor of shape (..., queries, d_k)
-        K: Key tensor of shape   (..., keys,   d_k)
-        V: Value tensor of shape (..., values, d_v) with values == keys
-        mask: Optional boolean mask of shape (..., queries, keys). True indicates keep; False indicates mask out.
-
+        K: Key tensor of shape (..., keys, d_k)
+        V: Value tensor of shape (..., values, d_v), values == keys
+        mask: Optional boolean mask (..., queries, keys). True=keep, False=mask
+    
     Returns:
-        Tensor of shape (..., queries, d_v)
+        Output tensor of shape (..., queries, d_v)
+    
+    Implementation requirements:
+    - Compute scores: Q @ K^T  (transpose last two dims of K)
+    - Scale by 1/sqrt(d_k) for numerical stability
+    - Apply mask if provided: masked_fill with -inf where mask is False
+    - Apply softmax over keys dimension (dim=-1)
+    - Compute output: attention_weights @ V
+    - Handle mixed precision: upcast to float32, return in V's dtype
     """
-    q = Q.float()
-    k = K.float()
-    v = V.float()
-    d_k = q.shape[-1]
-    scale = 1.0 / math.sqrt(max(1, d_k))
-    # (..., queries, keys)
-    scores = torch.matmul(q, k.transpose(-1, -2)) * scale
-    if mask is not None:
-        scores = scores.masked_fill(~mask, float('-inf'))
-    attn = _softmax(scores, dim=-1)
-    out = torch.matmul(attn, v)
-    return out.to(V.dtype)
+    raise NotImplementedError("TODO: Implement scaled_dot_product_attention")
 
 
 def multihead_self_attention(
@@ -243,56 +251,37 @@ def transformer_block(
     in_features: Tensor,
 ) -> Tensor:
     """
-    Pre-norm Transformer block with RoPE:
-      x = x + MHA(RMSNorm(x))
-      x = x + FFN(RMSNorm(x))
+    TODO: Implement a pre-norm Transformer block with residual connections.
+    
+    See the 'transformer_block' curriculum module for detailed implementation guidance.
+    
+    Architecture (pre-norm with RoPE):
+      x = x + MultiHeadSelfAttentionWithRoPE(RMSNorm(x))
+      x = x + SwiGLU_FFN(RMSNorm(x))
+    
+    Args:
+        d_model: Model dimension
+        num_heads: Number of attention heads
+        d_ff: Feed-forward hidden dimension
+        max_seq_len: Maximum sequence length
+        theta: RoPE base frequency
+        weights: Dictionary containing layer weights:
+            - "ln1.weight": First RMSNorm weights
+            - "attn.q_proj.weight", "attn.k_proj.weight", etc.: Attention weights
+            - "ln2.weight": Second RMSNorm weights
+            - "ffn.w1.weight", "ffn.w2.weight", "ffn.w3.weight": FFN weights
+        in_features: Input tensor (..., seq_len, d_model)
+    
+    Returns:
+        Output tensor of same shape as input
+    
+    Implementation requirements:
+    - Apply RMSNorm, then multi-head attention with RoPE, then residual add
+    - Apply RMSNorm, then SwiGLU FFN, then residual add
+    - Use weights from dictionary (load with torch.no_grad())
+    - Generate position indices for RoPE
     """
-    x = in_features
-    seq_len = x.shape[-2]
-    device = x.device
-
-    # First RMSNorm
-    ln1 = RMSNorm(d_model=d_model, eps=1e-5)
-    with torch.no_grad():
-        ln1.weight.copy_(weights["ln1.weight"])  # (d_model,)
-    x_norm = ln1(x)
-
-    # Positions for RoPE
-    pos = torch.arange(seq_len, device=device).view(1, -1)
-
-    # Multi-head self-attention with RoPE
-    attn_out = multihead_self_attention_with_rope(
-        d_model=d_model,
-        num_heads=num_heads,
-        max_seq_len=max_seq_len,
-        theta=theta,
-        q_proj_weight=weights["attn.q_proj.weight"],
-        k_proj_weight=weights["attn.k_proj.weight"],
-        v_proj_weight=weights["attn.v_proj.weight"],
-        o_proj_weight=weights["attn.output_proj.weight"],
-        in_features=x_norm,
-        token_positions=pos,
-    )
-    x = x + attn_out
-
-    # Second RMSNorm
-    ln2 = RMSNorm(d_model=d_model, eps=1e-5)
-    with torch.no_grad():
-        ln2.weight.copy_(weights["ln2.weight"])  # (d_model,)
-    x_norm2 = ln2(x)
-
-    # SwiGLU FFN using provided weights
-    W1 = weights["ffn.w1.weight"]  # (d_ff, d_model)
-    W2 = weights["ffn.w2.weight"]  # (d_model, d_ff)
-    W3 = weights["ffn.w3.weight"]  # (d_ff, d_model)
-
-    a = x_norm2.matmul(W1.t())
-    b = x_norm2.matmul(W3.t())
-    gated = silu(a) * b
-    ffn_out = gated.matmul(W2.t())
-
-    x = x + ffn_out
-    return x
+    raise NotImplementedError("TODO: Implement transformer_block")
 
 
 def rope(
@@ -303,50 +292,32 @@ def rope(
     token_positions: Tensor,
 ) -> Tensor:
     """
-    Apply Rotary Positional Embedding (RoPE) to queries or keys.
-
+    TODO: Implement Rotary Positional Embedding (RoPE).
+    
+    See the 'rope' curriculum module for detailed implementation guidance.
+    
+    RoPE encodes position by rotating pairs of dimensions in complex space.
+    This enables relative position encoding without adding parameters.
+    
     Args:
-        d_k: embedding dimension (must be even)
-        theta: RoPE base (e.g., 10000.0)
-        max_seq_len: maximum sequence length (unused at runtime; kept for API parity)
-        in_query_or_key: tensor of shape (..., seq_len, d_k)
-        token_positions: tensor of positions of shape (..., seq_len) or (seq_len,)
-
+        d_k: Embedding dimension (must be even)
+        theta: RoPE base frequency (typically 10000.0)
+        max_seq_len: Maximum sequence length (for API compatibility)
+        in_query_or_key: Tensor of shape (..., seq_len, d_k)
+        token_positions: Position indices of shape (..., seq_len) or (seq_len,)
+    
     Returns:
-        Tensor of same shape as in_query_or_key with RoPE applied along the last dim.
+        Rotated tensor of same shape as input
+    
+    Implementation requirements:
+    - Compute inverse frequencies: inv_freq_i = 1 / (theta^(i/d_k)) for i in [0, d_k/2)
+    - Compute rotation angles: angles = positions * inv_freq
+    - Compute cos and sin of angles
+    - Split input into even/odd pairs: [x0, x1, x2, x3, ...] → [x0, x2, ...], [x1, x3, ...]
+    - Apply rotation: x_even' = x_even*cos - x_odd*sin, x_odd' = x_even*sin + x_odd*cos
+    - Interleave back: [x0', x1', x2', x3', ...]
     """
-    x = in_query_or_key
-    assert d_k % 2 == 0, "RoPE requires even embedding dimension"
-    half = d_k // 2
-
-    # Prepare inverse frequencies
-    i = torch.arange(0, half, device=x.device, dtype=x.dtype)
-    inv_freq = 1.0 / (torch.tensor(theta, dtype=x.dtype, device=x.device) ** (i / half))
-
-    # Broadcast positions
-    pos = token_positions.to(device=x.device, dtype=x.dtype)
-    if pos.dim() == 1:
-        pos = pos.view(1, -1)
-    # Align pos to have trailing seq_len dimension
-    while pos.dim() < x.dim() - 1:
-        pos = pos.unsqueeze(0)
-
-    # Compute angles and trig
-    angles = pos.unsqueeze(-1) * inv_freq  # (..., seq_len, half)
-    cos = torch.cos(angles)
-    sin = torch.sin(angles)
-
-    # Split even/odd components
-    x_even = x[..., 0::2]
-    x_odd = x[..., 1::2]
-
-    x_rot_even = x_even * cos - x_odd * sin
-    x_rot_odd = x_odd * cos + x_even * sin
-
-    out = torch.empty_like(x)
-    out[..., 0::2] = x_rot_even
-    out[..., 1::2] = x_rot_odd
-    return out
+    raise NotImplementedError("TODO: Implement RoPE")
 
 
 def transformer_lm(
@@ -421,37 +392,34 @@ def multihead_self_attention_with_rope(
     token_positions: Tensor,
 ) -> Tensor:
     """
-    Batched Multi-Head Self-Attention with RoPE (causal, no dropout).
+    TODO: Implement Multi-Head Self-Attention with RoPE.
+    
+    See the 'multihead_attention' curriculum module for detailed implementation guidance.
+    
+    This combines multiple attention heads with rotary positional embeddings.
+    
+    Args:
+        d_model: Model dimension
+        num_heads: Number of attention heads (must divide d_model)
+        max_seq_len: Maximum sequence length
+        theta: RoPE base frequency
+        q_proj_weight: Query projection weight (d_model, d_model)
+        k_proj_weight: Key projection weight (d_model, d_model)
+        v_proj_weight: Value projection weight (d_model, d_model)
+        o_proj_weight: Output projection weight (d_model, d_model)
+        in_features: Input tensor (..., seq_len, d_model)
+        token_positions: Position tensor (..., seq_len) or (seq_len,)
+    
+    Returns:
+        Output tensor of same shape as in_features
+    
+    Implementation requirements:
+    - Project input to Q, K, V using provided weights
+    - Split into num_heads: reshape to (..., num_heads, seq_len, head_dim)
+    - Apply RoPE to Q and K (per head)
+    - Create causal mask (lower triangular)
+    - Apply scaled_dot_product_attention with causal mask
+    - Concatenate heads back: reshape to (..., seq_len, d_model)
+    - Apply output projection
     """
-    head_dim = d_model // num_heads
-    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
-
-    orig_leading = in_features.shape[:-2]
-    seq_len = in_features.shape[-2]
-
-    x = in_features.reshape(-1, seq_len, d_model)
-
-    # Projections
-    q_all = x.matmul(q_proj_weight.t())
-    k_all = x.matmul(k_proj_weight.t())
-    v_all = x.matmul(v_proj_weight.t())
-
-    def to_heads(t: Tensor) -> Tensor:
-        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
-
-    q = to_heads(q_all)
-    k = to_heads(k_all)
-    v = to_heads(v_all)
-
-    # Apply RoPE to Q and K per head
-    q = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=q, token_positions=token_positions)
-    k = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=k, token_positions=token_positions)
-
-    # Causal mask and attention
-    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
-    context = scaled_dot_product_attention(q, k, v, mask=causal)
-
-    # Merge heads
-    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
-    out = context.matmul(o_proj_weight.t())
-    return out.reshape(*orig_leading, seq_len, d_model)
+    raise NotImplementedError("TODO: Implement multihead_self_attention_with_rope")
