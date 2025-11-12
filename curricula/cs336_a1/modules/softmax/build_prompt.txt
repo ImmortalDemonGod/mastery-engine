@@ -6,8 +6,15 @@ Implement a numerically stable softmax function that avoids overflow and underfl
 ## Background
 The softmax function is fundamental to neural networks, converting a vector of logits into a probability distribution. However, the naive implementation `softmax(x) = exp(x) / sum(exp(x))` is numerically unstable: exponentiating large positive values causes overflow (`inf`), and large negative values cause underflow (gradients vanish).
 
+## Where to Edit
+**FILE TO MODIFY:** `cs336_basics/utils.py`
+
+You will edit the `softmax` function **directly in this file** in your main working directory. The Mastery Engine will validate your implementation by running tests in an isolated environment.
+
+**IMPORTANT:** Other functions in `utils.py` (e.g., `cross_entropy`, `gradient_clipping`) are already implemented. Only modify the `softmax` function.
+
 ## Requirements
-Implement `softmax(in_features, dim)` in `cs336_basics/utils.py` with the following specifications:
+Implement `softmax(in_features, dim)` with the following specifications:
 
 ### Function Signature
 ```python

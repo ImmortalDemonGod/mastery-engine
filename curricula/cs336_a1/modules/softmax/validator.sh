@@ -1,15 +1,21 @@
 #!/bin/bash
 # Validator for softmax module
-# Runs pytest for softmax implementation and extracts performance metrics
+# Runs pytest for softmax implementation in shadow worktree
 
 set -e  # Exit on error
 
-# Copy implementation from workspace to actual location
-# The workspace is for user isolation, but tests expect code in cs336_basics/
-cp cs336_basics/utils.py "$REPO_ROOT/cs336_basics/utils.py" 2>/dev/null || true
+# SHADOW_WORKTREE environment variable is set by the ValidationSubsystem
+if [ -z "$SHADOW_WORKTREE" ]; then
+    echo "ERROR: SHADOW_WORKTREE environment variable not set"
+    exit 1
+fi
 
-# Change to repo root to run tests
-cd "$REPO_ROOT"
+# Copy user's implementation from main directory to shadow worktree
+# This allows validation in isolation without touching the user's working directory
+cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
+
+# Change to shadow worktree to run tests
+cd "$SHADOW_WORKTREE"
 
 # Record start time for performance measurement
 start_time=$(python3 -c 'import time; print(time.time())')

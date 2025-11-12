@@ -275,18 +275,20 @@ def submit_build():
         # Get current module
         current_module = manifest.modules[progress.current_module_index]
         
-        # Get validator and workspace paths
+        # Get validator path
         validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
-        workspace_path = workspace_mgr.get_workspace_path()
         
-        # Ensure workspace exists
-        workspace_mgr.ensure_workspace_exists()
+        # IN-PLACE EDITING MODEL:
+        # User edits files directly in their main directory (e.g., cs336_basics/utils.py)
+        # Validator runs from main directory and handles copying to shadow worktree
+        workspace_path = Path.cwd()
         
         console.print()
         console.print(f"[bold cyan]Running validator for {current_module.name}...[/bold cyan]")
         console.print()
         
-        # Execute validator
+        # Execute validator from current directory
+        # The validator script will copy files to shadow worktree for validation
         result = validator_subsys.execute(validator_path, workspace_path)
         
         if result.exit_code == 0:

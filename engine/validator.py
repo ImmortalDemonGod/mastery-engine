@@ -85,10 +85,14 @@ class ValidationSubsystem:
         logger.info(f"Executing validator: {validator_path} in workspace: {workspace_path}")
         
         try:
-            # Execute the validator script with REPO_ROOT environment variable
+            # Execute the validator script with environment variables
             import os
             env = os.environ.copy()
-            env['REPO_ROOT'] = str(Path.cwd().resolve())
+            
+            # SHADOW_WORKTREE: Path to shadow worktree for isolated validation
+            shadow_worktree = Path('.mastery_engine_worktree')
+            if shadow_worktree.exists():
+                env['SHADOW_WORKTREE'] = str(shadow_worktree.resolve())
             
             result = subprocess.run(
                 [str(validator_path.resolve())],
