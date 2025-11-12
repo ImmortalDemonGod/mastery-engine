@@ -1,0 +1,103 @@
+{
+  "curriculum_name": "cs336_a1",
+  "author": "CS336 Teaching Team (Adapted for Mastery Engine)",
+  "version": "1.0.0",
+  "modules": [
+    {
+      "id": "softmax",
+      "name": "Numerically Stable Softmax",
+      "path": "modules/softmax",
+      "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "cross_entropy",
+      "name": "Numerically Stable Cross-Entropy Loss",
+      "path": "modules/cross_entropy",
+      "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "gradient_clipping",
+      "name": "Global Gradient Clipping",
+      "path": "modules/gradient_clipping",
+      "baseline_perf_seconds": 0.10
+    },
+    {
+      "id": "rmsnorm",
+      "name": "Root Mean Square Layer Normalization",
+      "path": "modules/rmsnorm",
+      "baseline_perf_seconds": 0.12
+    },
+    {
+      "id": "silu",
+      "name": "SiLU (Sigmoid Linear Unit) Activation",
+      "path": "modules/silu",
+      "baseline_perf_seconds": 0.08
+    },
+    {
+      "id": "swiglu",
+      "name": "SwiGLU Gated Feed-Forward Network",
+      "path": "modules/swiglu",
+      "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "attention",
+      "name": "Scaled Dot-Product Attention",
+      "path": "modules/attention",
+      "baseline_perf_seconds": 0.18
+    },
+    {
+      "id": "rope",
+      "name": "RoPE (Rotary Position Embeddings)",
+      "path": "modules/rope",
+      "baseline_perf_seconds": 0.14
+    },
+    {
+      "id": "multihead_attention",
+      "name": "Multi-Head Self-Attention with RoPE",
+      "path": "modules/multihead_attention",
+      "baseline_perf_seconds": 0.22
+    },
+    {
+      "id": "transformer_block",
+      "name": "Transformer Block (Complete Integration)",
+      "path": "modules/transformer_block",
+      "baseline_perf_seconds": 0.25
+    },
+    {
+      "id": "adamw",
+      "name": "AdamW Optimizer",
+      "path": "modules/adamw",
+      "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "cosine_schedule",
+      "name": "Cosine Learning Rate Schedule with Warmup",
+      "path": "modules/cosine_schedule",
+      "baseline_perf_seconds": 0.08
+    },
+    {
+      "id": "embedding",
+      "name": "Token Embedding Layer",
+      "path": "modules/embedding",
+      "baseline_perf_seconds": 0.10
+    },
+    {
+      "id": "training_loop",
+      "name": "Training Loop (Complete Integration)",
+      "path": "modules/training_loop",
+      "baseline_perf_seconds": 0.20
+    },
+    {
+      "id": "bpe_tokenizer",
+      "name": "BPE Tokenizer Training",
+      "path": "modules/bpe_tokenizer",
+      "baseline_perf_seconds": 0.18
+    },
+    {
+      "id": "text_generation",
+      "name": "Text Generation with Sampling Strategies",
+      "path": "modules/text_generation",
+      "baseline_perf_seconds": 0.25
+    }
+  ]
+}

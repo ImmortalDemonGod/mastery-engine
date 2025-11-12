@@ -63,83 +63,99 @@ def get_lr_cosine_schedule(
     cosine_cycle_iters: int,
 ) -> float:
     """
-    Cosine learning rate with linear warmup.
-
-    Behavior matches tests:
-    - Linear warmup from 0 to max_learning_rate over [0, warmup_iters).
-    - Cosine decay from max to min over the interval [warmup_iters, cosine_cycle_iters].
-      Progress is computed as (it - warmup_iters) / (cosine_cycle_iters - warmup_iters) and
-      clamped to [0, 1]. The cosine formula is: min + 0.5*(max-min)*(1 + cos(pi * progress)).
-    - For it > cosine_cycle_iters, hold at min_learning_rate.
+    TODO: Implement cosine learning rate schedule with linear warmup.
+    
+    See the 'cosine_schedule' curriculum module for detailed implementation guidance.
+    
+    This schedule has three phases:
+    1. Linear warmup: [0, warmup_iters) - linearly increase from 0 to max_learning_rate
+    2. Cosine decay: [warmup_iters, cosine_cycle_iters] - smoothly decay using cosine
+    3. Minimum phase: (cosine_cycle_iters, ∞) - hold at min_learning_rate
+    
+    Args:
+        it: Current iteration (0-indexed)
+        max_learning_rate: Peak learning rate (reached after warmup)
+        min_learning_rate: Minimum learning rate (floor after decay)
+        warmup_iters: Number of warmup iterations
+        cosine_cycle_iters: Total iterations for warmup + decay
+    
+    Returns:
+        Learning rate for current iteration
+    
+    Implementation requirements:
+    - Warmup: lr = max_learning_rate * (it / warmup_iters) for it < warmup_iters
+    - Cosine: lr = min + 0.5*(max-min)*(1 + cos(π*progress)) where progress ∈ [0,1]
+    - After cycle: lr = min_learning_rate
     """
-    # Warmup
-    if it < warmup_iters:
-        if warmup_iters <= 0:
-            return float(max_learning_rate)
-        return float(max_learning_rate * (it / warmup_iters))
-
-    # Cosine decay window
-    if it <= cosine_cycle_iters:
-        # Handle degenerate case where window length is zero
-        denom = max(1, cosine_cycle_iters - warmup_iters)
-        progress = (it - warmup_iters) / denom
-        from math import cos, pi
-
-        return float(
-            min_learning_rate
-            + 0.5 * (max_learning_rate - min_learning_rate) * (1.0 + cos(pi * progress))
-        )
-
-    # After cycle: clamp to min
-    return float(min_learning_rate)
+    raise NotImplementedError("TODO: Implement cosine learning rate schedule with warmup")
 
 
 def get_batch(dataset, batch_size: int, context_length: int, device: str):
     """
-    Sample LM batches from a 1D numpy array of token IDs.
-
+    TODO: Implement language modeling batch sampling.
+    
+    This function creates training batches for autoregressive language modeling:
+    - Sample random starting positions from the dataset
+    - Extract sequences of length context_length
+    - Create inputs (x) and targets (y) where y is x shifted by 1 token
+    
     Args:
-        dataset: 1D numpy array of ints (token IDs).
-        batch_size: number of sequences.
-        context_length: sequence length per example.
-        device: torch device string (e.g., 'cpu', 'cuda:0').
-
-    Returns: x, y as LongTensors of shape (batch_size, context_length) on `device` where y = x shifted by 1.
+        dataset: 1D numpy array of token IDs (the full corpus)
+        batch_size: Number of sequences to sample
+        context_length: Length of each sequence
+        device: PyTorch device string (e.g., 'cpu', 'cuda:0')
+    
+    Returns:
+        x: Input tensor of shape (batch_size, context_length) on device
+        y: Target tensor of shape (batch_size, context_length) on device
+           where y[i, j] = x[i, j+1] (next token prediction targets)
+    
+    Implementation requirements:
+    - Randomly sample starting indices ensuring enough room for context_length+1
+    - For each start index, extract context_length tokens for x
+    - Extract context_length tokens starting from start+1 for y
+    - Move tensors to specified device
     """
-    data = torch.as_tensor(dataset, dtype=torch.long)
-    n = data.shape[0] - context_length
-    if n <= 0:
-        raise ValueError("context_length must be < len(dataset)")
-    starts = torch.randint(low=0, high=n, size=(batch_size,))
-    offsets = torch.arange(context_length).unsqueeze(0)
-    x_idx = starts.unsqueeze(1) + offsets
-    y_idx = x_idx + 1
-    x = data[x_idx]
-    y = data[y_idx]
-    # Move to device (will raise appropriate errors for invalid devices)
-    x = x.to(device)
-    y = y.to(device)
-    return x, y
+    raise NotImplementedError("TODO: Implement language modeling batch sampling")
 
 
 def save_checkpoint(model, optimizer, iteration, out):
     """
-    Serialize model/optimizer state dicts and iteration to a path or file-like.
+    TODO: Implement checkpoint saving.
+    
+    Save model and optimizer state for resuming training later.
+    
+    Args:
+        model: PyTorch model to save
+        optimizer: Optimizer to save
+        iteration: Current training iteration number
+        out: File path or file-like object to save to
+    
+    Implementation requirements:
+    - Create dictionary with 'model_state_dict', 'optimizer_state_dict', 'iteration'
+    - Use torch.save() to serialize to disk
     """
-    payload = {
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "iteration": int(iteration),
-    }
-    torch.save(payload, out)
+    raise NotImplementedError("TODO: Implement checkpoint saving")
 
 
 def load_checkpoint(src, model, optimizer) -> int:
     """
-    Load a checkpoint from path or file-like, restore state, and return iteration.
-    Always loads onto CPU to avoid device mismatches in tests.
+    TODO: Implement checkpoint loading.
+    
+    Restore model and optimizer state from a saved checkpoint.
+    
+    Args:
+        src: File path or file-like object to load from
+        model: Model to restore state into
+        optimizer: Optimizer to restore state into
+    
+    Returns:
+        iteration: The training iteration number from the checkpoint
+    
+    Implementation requirements:
+    - Use torch.load() with map_location='cpu' to avoid device issues
+    - Restore model state with model.load_state_dict()
+    - Restore optimizer state with optimizer.load_state_dict()
+    - Return the saved iteration number
     """
-    checkpoint = torch.load(src, map_location="cpu")
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    return int(checkpoint["iteration"])
+    raise NotImplementedError("TODO: Implement checkpoint loading")

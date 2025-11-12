@@ -8,11 +8,20 @@ from cs336_basics.utils import softmax as _softmax
 
 class Linear(nn.Module):
     """
-    Minimal from-scratch Linear layer implementing y = x @ W^T (+ b).
-
-    - Weight shape: (out_features, in_features)
-    - Bias is optional and disabled by default for parity with tests that only provide weights.
-    - Parameter initialization follows torch.nn.Linear: uniform(-1/sqrt(fan_in), 1/sqrt(fan_in)).
+    TODO: Implement a from-scratch Linear (fully-connected) layer: y = x @ W^T + b
+    
+    This is a foundational building block used by SwiGLU and other components.
+    
+    Args:
+        in_features: Size of each input sample
+        out_features: Size of each output sample
+        bias: If True, adds a learnable bias. Default: False
+    
+    Implementation requirements:
+    - Weight parameter shape: (out_features, in_features)
+    - Optional bias parameter shape: (out_features,)
+    - Initialize parameters with uniform(-bound, bound) where bound = 1/sqrt(in_features)
+    - Forward: y = x @ W^T + b (use matmul and transpose)
     """
 
     def __init__(
@@ -22,201 +31,149 @@ class Linear(nn.Module):
         bias: bool = False,
     ) -> None:
         super().__init__()
-        self.in_features = int(in_features)
-        self.out_features = int(out_features)
-        
-        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
-        if bias:
-            self.bias = nn.Parameter(torch.empty((out_features,)))
-        else:
-            self.register_parameter("bias", None)
-
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        fan_in = max(1, self.in_features)
-        bound = 1.0 / math.sqrt(fan_in)
-        nn.init.uniform_(self.weight, -bound, bound)
-        if self.bias is not None:
-            nn.init.uniform_(self.bias, -bound, bound)
+        # TODO: Initialize weight parameter and optional bias parameter
+        raise NotImplementedError("TODO: Implement Linear.__init__")
 
     def forward(self, in_features: Float[Tensor, " ... in_features"]) -> Float[Tensor, " ... out_features"]:
-        y = in_features.matmul(self.weight.t())
-        if self.bias is not None:
-            y = y + self.bias
-        return y
+        # TODO: Implement forward pass: y = x @ W^T + b
+        raise NotImplementedError("TODO: Implement Linear.forward")
 
 
 class Embedding(nn.Module):
     """
-    Simple token embedding layer.
-
-    - Weight shape: (num_embeddings, embedding_dim)
-    - Forward performs table lookup: weight[token_ids]
-    - Initialization: truncated normal N(0, 1) clipped to [-3, 3]
+    TODO: Implement a from-scratch token embedding layer.
+    
+    See the 'embedding' curriculum module for detailed implementation guidance.
+    
+    This layer maps discrete token IDs to continuous vector representations.
+    IMPORTANT: Do NOT use nn.Embedding - implement from scratch!
+    
+    Args:
+        num_embeddings: Size of vocabulary (number of possible tokens)
+        embedding_dim: Size of each embedding vector
+    
+    Implementation requirements:
+    - Create weight parameter of shape (num_embeddings, embedding_dim)
+    - Initialize with truncated normal: N(0,1) clipped to [-3, 3]
+    - Forward: simple table lookup using weight[token_ids]
     """
 
     def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
         super().__init__()
-        self.num_embeddings = int(num_embeddings)
-        self.embedding_dim = int(embedding_dim)
-
-        self.weight = nn.Parameter(torch.empty((num_embeddings, embedding_dim)))
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        # Truncated normal with mean=0, std=1, a=-3, b=3
-        nn.init.trunc_normal_(self.weight, mean=0.0, std=1.0, a=-3.0, b=3.0)
+        # TODO: Create weight parameter and initialize it
+        raise NotImplementedError("TODO: Implement Embedding.__init__")
 
     def forward(self, token_ids: Tensor) -> Float[Tensor, " ... embedding_dim"]:
-        return self.weight[token_ids]
+        # TODO: Implement forward pass: table lookup
+        raise NotImplementedError("TODO: Implement Embedding.forward")
 
 
 def silu(in_features: Tensor) -> Tensor:
     """
-    Apply SiLU (Sigmoid Linear Unit) activation function element-wise.
+    TODO: Implement SiLU (Swish) activation function.
     
-    SiLU(x) = x * sigmoid(x) = x / (1 + exp(-x))
+    See the 'silu' curriculum module for detailed implementation guidance.
     
-    Also known as Swish activation.
+    SiLU(x) = x * sigmoid(x)
+    
+    This is also known as the Swish activation and is used in modern architectures.
     
     Args:
         in_features: Input tensor of any shape
     
     Returns:
-        Tensor of same shape with SiLU applied element-wise
+        Output tensor of same shape as input
     """
-    # TODO: Implement SiLU activation
-    # SiLU(x) = x * σ(x) where σ is sigmoid
-    # Hint: Use torch.sigmoid() - it's numerically stable!
-    # This is a one-liner!
-    raise NotImplementedError("TODO: Implement silu activation")
+    raise NotImplementedError("TODO: Implement silu activation: x * sigmoid(x)")
 
 
 class RMSNorm(nn.Module):
     """
-    Root Mean Square Layer Normalization without bias.
-
-    y = (x / sqrt(mean(x^2) + eps)) * weight
-    where reduction is over the last dimension (feature dimension).
+    TODO: Implement Root Mean Square Layer Normalization (RMSNorm).
+    
+    See the 'rmsnorm' curriculum module for detailed implementation guidance.
+    
+    RMSNorm normalizes using RMS instead of mean/variance:
+    y = (x / RMS(x)) * weight
+    where RMS(x) = sqrt(mean(x^2) + eps)
+    
+    Args:
+        d_model: Model dimension (feature size)
+        eps: Small constant for numerical stability (default: 1e-5)
+    
+    Implementation requirements:
+    - Learnable weight parameter of shape (d_model,)
+    - Compute RMS over last dimension with keepdim=True
+    - Normalize: x / sqrt(mean(x^2) + eps)
+    - Scale by weight: normalized * weight
     """
 
-    def __init__(self, d_model: int, eps: float = 1e-6, device=None, dtype=None) -> None:
+    def __init__(self, d_model: int, eps: float = 1e-5) -> None:
         super().__init__()
-        # TODO: Initialize RMSNorm parameters
-        # - Store d_model and eps
-        # - Create learnable scale parameter (weight) of shape (d_model,)
-        # - Initialize weight to ones using torch.nn.init.ones_()
+        # TODO: Initialize weight parameter
         raise NotImplementedError("TODO: Implement RMSNorm.__init__")
 
     def forward(self, in_features: Tensor) -> Tensor:
-        # TODO: Implement RMSNorm forward pass
-        # 1. Save original dtype and upcast to float32 for numerical stability
-        # 2. Compute RMS over last dimension (use keepdim=True!)
-        #    RMS(x) = sqrt(mean(x^2))
-        # 3. Normalize: x / (RMS(x) + eps)
-        # 4. Scale by learned weight parameter
-        # 5. Convert back to original dtype
-        #
-        # Remember: Your implementation must handle arbitrary batch dimensions!
-        # Shape (..., d_model) → (..., d_model)
+        # TODO: Implement forward pass: normalize by RMS and scale by weight
         raise NotImplementedError("TODO: Implement RMSNorm.forward")
 
 
 class SwiGLU(nn.Module):
     """
-    SwiGLU gated feed-forward network.
-    
-    Implements: SwiGLU(x) = W₂(SiLU(W₁·x) ⊙ W₃·x)
-    
-    Where ⊙ denotes element-wise multiplication (Hadamard product).
-    This creates a gating mechanism where W₃ learns what to emphasize.
-    
+    SwiGLU feed-forward block:
+      out = W2( SiLU(W1(x)) * W3(x) )
     Shapes:
-      - W₁: (d_ff, d_model) - value projection  
-      - W₃: (d_ff, d_model) - gate projection
-      - W₂: (d_model, d_ff) - output projection
+      - W1: (d_ff, d_model)
+      - W3: (d_ff, d_model)
+      - W2: (d_model, d_ff)
     """
 
-    def __init__(self, d_model: int, d_ff: int, device=None, dtype=None) -> None:
+    def __init__(self, d_model: int, d_ff: int) -> None:
         super().__init__()
-        # TODO: Create three Linear layers for SwiGLU
-        # Use your custom Linear class (not nn.Linear)
-        # 
-        # self.w1: projects x from d_model → d_ff (value path)
-        # self.w2: projects from d_ff → d_model (output)
-        # self.w3: projects x from d_model → d_ff (gate path)
-        #
-        # IMPORTANT: Name them exactly w1, w2, w3 (lowercase) for validator!
-        # Pass device and dtype to each Linear constructor
-        raise NotImplementedError("TODO: Implement SwiGLU.__init__")
+        self.d_model = int(d_model)
+        self.d_ff = int(d_ff)
+        # Use our minimal Linear layers without bias
+        self.w1 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
+        self.w2 = Linear(in_features=self.d_ff, out_features=self.d_model, bias=False)
+        self.w3 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
 
-    def forward(self, x: Tensor) -> Tensor:
-        # TODO: Implement SwiGLU forward pass
-        # 1. Compute value path: w1_out = self.w1(x)
-        # 2. Apply SiLU activation: activated = silu(w1_out)
-        # 3. Compute gate path: gate = self.w3(x)  
-        # 4. Element-wise multiply: gated = activated * gate
-        # 5. Project to output: output = self.w2(gated)
-        #
-        # Formula: W₂(SiLU(W₁·x) ⊙ W₃·x)
-        # Shape: (..., d_model) → (..., d_model)
-        raise NotImplementedError("TODO: Implement SwiGLU.forward")
+    def forward(self, in_features: Tensor) -> Tensor:
+        a = self.w1(in_features)
+        b = self.w3(in_features)
+        gated = silu(a) * b
+        return self.w2(gated)
 
 
 def scaled_dot_product_attention(
     Q: Float[Tensor, " ... queries d_k"],
     K: Float[Tensor, " ... keys d_k"],
     V: Float[Tensor, " ... values d_v"],
-    mask: Bool[Tensor, " ... queries keys"] | None = None,
+    mask: torch.Tensor | None = None,
 ) -> Float[Tensor, " ... queries d_v"]:
     """
     Compute scaled dot-product attention.
-    
-    Attention(Q, K, V) = softmax(QK^T / √d_k) · V
-    
-    This is the core mechanism that enables Transformers to dynamically route
-    information. Each query position computes a weighted average over all value
-    positions, with weights determined by query-key similarity.
 
     Args:
-        Q: Query tensor of shape (..., n_queries, d_k)
-        K: Key tensor of shape (..., n_keys, d_k)
-        V: Value tensor of shape (..., n_keys, d_v)
-        mask: Optional boolean mask of shape (..., n_queries, n_keys)
-              True indicates positions that should be MASKED (set to -inf)
-              Used for causal masking in autoregressive generation
+        Q: Query tensor of shape (..., queries, d_k)
+        K: Key tensor of shape   (..., keys,   d_k)
+        V: Value tensor of shape (..., values, d_v) with values == keys
+        mask: Optional boolean mask of shape (..., queries, keys). True indicates keep; False indicates mask out.
 
     Returns:
-        Output tensor of shape (..., n_queries, d_v)
+        Tensor of shape (..., queries, d_v)
     """
-    # TODO: Implement scaled dot-product attention
-    # 
-    # Step 1: Compute attention scores
-    #   scores = Q @ K^T  (use K.transpose(-2, -1) for any rank)
-    #   Shape: (..., n_queries, d_k) @ (..., d_k, n_keys) = (..., n_queries, n_keys)
-    #
-    # Step 2: Scale by √d_k for stability
-    #   d_k = Q.shape[-1]
-    #   scaled_scores = scores / math.sqrt(d_k)
-    #   This prevents dot products from growing with dimensionality!
-    #
-    # Step 3: Apply causal mask if provided
-    #   if mask is not None:
-    #       scaled_scores = scaled_scores.masked_fill(mask, float('-inf'))
-    #   Masked positions get -inf so softmax makes them 0
-    #
-    # Step 4: Apply softmax over keys (dim=-1)
-    #   attn_weights = softmax(scaled_scores, dim=-1)
-    #   Use YOUR custom softmax from utils!
-    #   Each query gets a probability distribution over keys
-    #
-    # Step 5: Weighted sum of values
-    #   output = attn_weights @ V
-    #   Shape: (..., n_queries, n_keys) @ (..., n_keys, d_v) = (..., n_queries, d_v)
-    #
-    # Remember: Use @ for matrix multiply, it handles batch dimensions!
-    raise NotImplementedError("TODO: Implement scaled_dot_product_attention")
+    q = Q.float()
+    k = K.float()
+    v = V.float()
+    d_k = q.shape[-1]
+    scale = 1.0 / math.sqrt(max(1, d_k))
+    # (..., queries, keys)
+    scores = torch.matmul(q, k.transpose(-1, -2)) * scale
+    if mask is not None:
+        scores = scores.masked_fill(~mask, float('-inf'))
+    attn = _softmax(scores, dim=-1)
+    out = torch.matmul(attn, v)
+    return out.to(V.dtype)
 
 
 def multihead_self_attention(
@@ -342,73 +299,54 @@ def rope(
     d_k: int,
     theta: float,
     max_seq_len: int,
-    in_query_or_key: Float[Tensor, " ... sequence_length d_k"],
-    token_positions: Int[Tensor, " ... sequence_length"],
-) -> Float[Tensor, " ... sequence_length d_k"]:
+    in_query_or_key: Tensor,
+    token_positions: Tensor,
+) -> Tensor:
     """
-    Apply Rotary Position Embeddings (RoPE) to queries or keys.
-    
-    RoPE encodes position by rotating pairs of dimensions in complex space.
-    Each dimension pair rotates at a different frequency, creating multi-scale
-    position encoding that naturally captures relative position through the
-    rotation property: Rotation(m) ⊗ Rotation(n)* = Rotation(m-n).
+    Apply Rotary Positional Embedding (RoPE) to queries or keys.
 
     Args:
-        d_k: Dimension of queries/keys (must be even for pairing)
-        theta: Base angle θ (typically 10000.0, like original Transformer)
-        max_seq_len: Maximum sequence length to support
-        in_query_or_key: Input tensor of shape (..., seq_len, d_k)
-        token_positions: Position indices of shape (..., seq_len)
-                        Values in range [0, max_seq_len)
+        d_k: embedding dimension (must be even)
+        theta: RoPE base (e.g., 10000.0)
+        max_seq_len: maximum sequence length (unused at runtime; kept for API parity)
+        in_query_or_key: tensor of shape (..., seq_len, d_k)
+        token_positions: tensor of positions of shape (..., seq_len) or (seq_len,)
 
     Returns:
-        Rotated tensor of same shape as input
+        Tensor of same shape as in_query_or_key with RoPE applied along the last dim.
     """
-    # TODO: Implement RoPE (Rotary Position Embeddings)
-    #
-    # Step 1: Compute frequencies for each dimension pair
-    #   dim_pairs = torch.arange(0, d_k, 2, dtype=torch.float32, device=x.device)
-    #   freqs = 1.0 / (theta ** (dim_pairs / d_k))
-    #   Shape: (d_k/2,)
-    #
-    # Step 2: Create angles for all positions
-    #   positions = torch.arange(max_seq_len, dtype=torch.float32, device=x.device)
-    #   angles = torch.outer(positions, freqs)  # Outer product!
-    #   Shape: (max_seq_len, d_k/2)
-    #
-    # Step 3: Precompute cos and sin
-    #   cos_angles = torch.cos(angles)
-    #   sin_angles = torch.sin(angles)
-    #
-    # Step 4: Select angles for actual token positions
-    #   cos_selected = cos_angles[token_positions]  # Index with positions!
-    #   sin_selected = sin_angles[token_positions]
-    #   Shape: (..., seq_len, d_k/2)
-    #
-    # Step 5: Reshape input to pair dimensions
-    #   x_pairs = x.reshape(*x.shape[:-1], -1, 2)
-    #   x_even = x_pairs[..., 0]  # First of each pair
-    #   x_odd = x_pairs[..., 1]   # Second of each pair
-    #   Shape: (..., seq_len, d_k/2)
-    #
-    # Step 6: Apply 2D rotation formula
-    #   x_rotated_even = x_even * cos_selected - x_odd * sin_selected
-    #   x_rotated_odd = x_even * sin_selected + x_odd * cos_selected
-    #   CRITICAL: Note the minus sign in first equation!
-    #
-    # Step 7: Stack and reshape back
-    #   x_rotated = torch.stack([x_rotated_even, x_rotated_odd], dim=-1)
-    #   output = x_rotated.reshape(*x.shape)
-    #   Shape: (..., seq_len, d_k)
-    #
-    # Hints:
-    # - torch.outer(a, b) computes outer product (all pairs of products)
-    # - Indexing: cos_angles[token_positions] handles arbitrary positions
-    # - Reshape: reshape(..., -1, 2) pairs up dimensions automatically
-    # - Stack: stack([even, odd], dim=-1) interleaves them back
-    #
-    # This is the most mathematically elegant position encoding!
-    raise NotImplementedError("TODO: Implement rope")
+    x = in_query_or_key
+    assert d_k % 2 == 0, "RoPE requires even embedding dimension"
+    half = d_k // 2
+
+    # Prepare inverse frequencies
+    i = torch.arange(0, half, device=x.device, dtype=x.dtype)
+    inv_freq = 1.0 / (torch.tensor(theta, dtype=x.dtype, device=x.device) ** (i / half))
+
+    # Broadcast positions
+    pos = token_positions.to(device=x.device, dtype=x.dtype)
+    if pos.dim() == 1:
+        pos = pos.view(1, -1)
+    # Align pos to have trailing seq_len dimension
+    while pos.dim() < x.dim() - 1:
+        pos = pos.unsqueeze(0)
+
+    # Compute angles and trig
+    angles = pos.unsqueeze(-1) * inv_freq  # (..., seq_len, half)
+    cos = torch.cos(angles)
+    sin = torch.sin(angles)
+
+    # Split even/odd components
+    x_even = x[..., 0::2]
+    x_odd = x[..., 1::2]
+
+    x_rot_even = x_even * cos - x_odd * sin
+    x_rot_odd = x_odd * cos + x_even * sin
+
+    out = torch.empty_like(x)
+    out[..., 0::2] = x_rot_even
+    out[..., 1::2] = x_rot_odd
+    return out
 
 
 def transformer_lm(
@@ -475,88 +413,45 @@ def multihead_self_attention_with_rope(
     num_heads: int,
     max_seq_len: int,
     theta: float,
-    q_proj_weight: Float[Tensor, " d_k d_model"],
-    k_proj_weight: Float[Tensor, " d_k d_model"],
-    v_proj_weight: Float[Tensor, " d_v d_model"],
-    o_proj_weight: Float[Tensor, " d_model d_v"],
-    in_features: Float[Tensor, " ... sequence_length d_model"],
-    token_positions: Int[Tensor, " ... sequence_length"] | None = None,
-) -> Float[Tensor, " ... sequence_length d_model"]:
+    q_proj_weight: Tensor,
+    k_proj_weight: Tensor,
+    v_proj_weight: Tensor,
+    o_proj_weight: Tensor,
+    in_features: Tensor,
+    token_positions: Tensor,
+) -> Tensor:
     """
-    Multi-head self-attention with RoPE position encoding.
-    
-    Combines multiple attention heads operating in parallel, each with RoPE.
-    This is the complete attention mechanism used in LLaMA, PaLM, GPT-4.
-    
-    Args:
-        d_model: Model dimension (input/output size)
-        num_heads: Number of parallel attention heads
-        max_seq_len: Maximum sequence length for RoPE
-        theta: RoPE base parameter (typically 10000.0)
-        q_proj_weight: Query projection weights
-        k_proj_weight: Key projection weights
-        v_proj_weight: Value projection weights
-        o_proj_weight: Output projection weights
-        in_features: Input of shape (..., seq_len, d_model)
-        token_positions: Optional positions, defaults to [0,1,2,...]
-    
-    Returns:
-        Output of shape (..., seq_len, d_model)
+    Batched Multi-Head Self-Attention with RoPE (causal, no dropout).
     """
-    # TODO: Implement multi-head self-attention with RoPE
-    #
-    # Step 1: Calculate head dimension
-    #   d_head = d_model // num_heads
-    #   assert d_model % num_heads == 0
-    #
-    # Step 2: Project to Q, K, V
-    #   Q = in_features @ q_proj_weight.T  # (..., seq_len, d_model)
-    #   K = in_features @ k_proj_weight.T
-    #   V = in_features @ v_proj_weight.T
-    #
-    # Step 3: Reshape for multiple heads
-    #   batch_shape = Q.shape[:-2]
-    #   seq_len = Q.shape[-2]
-    #   Q = Q.view(*batch_shape, seq_len, num_heads, d_head)
-    #   # Now: (..., seq_len, num_heads, d_head)
-    #
-    # Step 4: Transpose to batch heads
-    #   Q = Q.transpose(-3, -2)  # Swap seq_len and num_heads
-    #   # Now: (..., num_heads, seq_len, d_head)
-    #   # Do same for K and V
-    #
-    # Step 5: Create default token_positions if None
-    #   if token_positions is None:
-    #       token_positions = torch.arange(seq_len, device=Q.device)
-    #
-    # Step 6: Apply RoPE to Q and K (NOT V!)
-    #   Q_rope = rope(d_head, theta, max_seq_len, Q, token_positions)
-    #   K_rope = rope(d_head, theta, max_seq_len, K, token_positions)
-    #   # V is NOT rotated!
-    #
-    # Step 7: Compute attention for all heads in parallel
-    #   attn_output = scaled_dot_product_attention(Q_rope, K_rope, V, mask=None)
-    #   # Shape: (..., num_heads, seq_len, d_head)
-    #
-    # Step 8: Transpose back
-    #   attn_output = attn_output.transpose(-3, -2)
-    #   # Now: (..., seq_len, num_heads, d_head)
-    #   CRITICAL: Must transpose back before reshaping!
-    #
-    # Step 9: Concatenate heads (reshape)
-    #   attn_output = attn_output.reshape(*batch_shape, seq_len, d_model)
-    #   # Now: (..., seq_len, d_model)
-    #
-    # Step 10: Output projection
-    #   output = attn_output @ o_proj_weight.T
-    #   return output
-    #
-    # Key insights:
-    # - transpose(-3, -2) swaps seq_len ↔ num_heads
-    # - This batches heads for parallel computation
-    # - Must transpose back before reshaping to concat
-    # - RoPE uses d_head, not d_model!
-    # - All heads computed simultaneously (NO loop!)
-    #
-    # The reshape-transpose-attention-transpose-reshape dance is essential!
-    raise NotImplementedError("TODO: Implement multihead_self_attention_with_rope")
+    head_dim = d_model // num_heads
+    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+
+    orig_leading = in_features.shape[:-2]
+    seq_len = in_features.shape[-2]
+
+    x = in_features.reshape(-1, seq_len, d_model)
+
+    # Projections
+    q_all = x.matmul(q_proj_weight.t())
+    k_all = x.matmul(k_proj_weight.t())
+    v_all = x.matmul(v_proj_weight.t())
+
+    def to_heads(t: Tensor) -> Tensor:
+        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
+
+    q = to_heads(q_all)
+    k = to_heads(k_all)
+    v = to_heads(v_all)
+
+    # Apply RoPE to Q and K per head
+    q = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=q, token_positions=token_positions)
+    k = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=k, token_positions=token_positions)
+
+    # Causal mask and attention
+    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
+    context = scaled_dot_product_attention(q, k, v, mask=causal)
+
+    # Merge heads
+    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
+    out = context.matmul(o_proj_weight.t())
+    return out.reshape(*orig_leading, seq_len, d_model)
