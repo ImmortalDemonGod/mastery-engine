@@ -192,13 +192,15 @@ Use this checklist to verify each new module systematically:
 
 The following modules reference papers not yet analyzed in the literature base:
 
-1. **rope** - Requires verification against Su et al. (2021) "RoFormer"
-   - Claims about relative position via rotation
-   - Length extrapolation properties
-
-2. **adamw** - Requires verification against Loshchilov & Hutter (2019)
+1. **adamw** - Requires verification against Loshchilov & Hutter (2019)
    - "Decoupled weight decay" as key innovation
    - Difference from Adam + L2 regularization
+
+### Recently Confirmed Sources
+
+- **rope** – Verified analysis available at:
+  `/Users/tomriddle1/Holistic-Performance-Enhancement/cultivation/docs/5_domain_knowledge_and_curricula/computer_science/architectures_and_models/transformer_paradigm/RoFormer_Analysis.md`
+  - Covers Su et al. (2021) "RoFormer" foundations, including rotational relative position encoding and extrapolation behavior.
 
 ### Modules with Strong Literature Coverage
 
