@@ -31,6 +31,8 @@ if [ -n "$MASTERY_PYTHON" ]; then
     # Engine provided its Python executable - use it (works in test and production)
     # Add current directory to PYTHONPATH for imports
     export PYTHONPATH="$(pwd):$PYTHONPATH"
+    # Debug: Check if we can import cs336_basics
+    "$MASTERY_PYTHON" -c "import sys; print('PYTHONPATH:', sys.path); import cs336_basics" 2>&1 || echo "Import failed"
     "$MASTERY_PYTHON" -m pytest tests/test_nn_utils.py::test_softmax_matches_pytorch -v --tb=short
 elif [ -n "$VIRTUAL_ENV" ]; then
     # We're in an active virtual environment - use its Python explicitly

@@ -118,12 +118,31 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
         # Create minimal README if it doesn't exist
         (test_repo / "README.md").write_text("# Test Repository\n")
     
+    # Copy .gitignore to prevent build artifacts from showing as uncommitted
+    if (real_repo / ".gitignore").exists():
+        shutil.copy2(real_repo / ".gitignore", test_repo / ".gitignore")
+    
     # Create initial commit (required for git worktree to work)
     subprocess.run(["git", "add", "-A"], cwd=test_repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit"],
         cwd=test_repo, check=True, capture_output=True
     )
+    
+    # Verify repo is clean after commit
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=test_repo,
+        capture_output=True,
+        text=True
+    )
+    if status.stdout.strip():
+        # If there are still uncommitted changes, commit them
+        subprocess.run(["git", "add", "-A"], cwd=test_repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Additional files"],
+            cwd=test_repo, check=True, capture_output=True
+        )
     
     yield test_repo
     
