@@ -62,6 +62,35 @@ SHADOW_WORKTREE_DIR = Path(".mastery_engine_worktree")
 logger = logging.getLogger(__name__)
 
 
+def require_shadow_worktree() -> Path:
+    """
+    Verify shadow worktree exists and return its path.
+    
+    This is a safety check to ensure users have run 'engine init' before
+    attempting to use the engine. Provides clear guidance if not initialized.
+    
+    Returns:
+        Path to shadow worktree
+        
+    Exits:
+        If shadow worktree not found, prints helpful error and exits
+    """
+    if not SHADOW_WORKTREE_DIR.exists():
+        console.print()
+        console.print(Panel(
+            "[bold yellow]Not Initialized[/bold yellow]\n\n"
+            "The Mastery Engine has not been initialized.\n\n"
+            "Please run [bold cyan]engine init <curriculum_id>[/bold cyan] first.\n\n"
+            "Example: [cyan]engine init cs336_a1[/cyan]",
+            title="INITIALIZATION REQUIRED",
+            border_style="yellow"
+        ))
+        console.print()
+        sys.exit(1)
+    
+    return SHADOW_WORKTREE_DIR
+
+
 @app.command()
 def next():
     """
@@ -71,6 +100,9 @@ def next():
     Only works when the user is in the "build" stage.
     """
     try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
@@ -183,7 +215,7 @@ def next():
             console.print(Panel(
                 f"[bold yellow]No Prompt Available[/bold yellow]\n\n"
                 f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
-                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                f"Run [bold cyan]engine status[/bold cyan] to see your current progress.",
                 title="Wrong Stage",
                 border_style="yellow"
             ))
@@ -246,6 +278,9 @@ def submit_build():
     and advances your progress if validation passes.
     """
     try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
@@ -274,7 +309,7 @@ def submit_build():
                 f"[bold yellow]Not in Build Stage[/bold yellow]\n\n"
                 f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
                 f"You can only submit build implementations when in the BUILD stage.\n\n"
-                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                f"Run [bold cyan]engine status[/bold cyan] to see your current progress.",
                 title="Wrong Stage",
                 border_style="yellow"
             ))
@@ -423,6 +458,9 @@ def submit_justification(answer: str):
     # For testing: allow dependency injection via internal mechanism
     llm_service = None  # Will be initialized when needed
     try:
+        # Ensure shadow worktree exists (needed for potential LLM calls)
+        require_shadow_worktree()
+        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
@@ -449,7 +487,7 @@ def submit_justification(answer: str):
                 f"[bold yellow]Not in Justify Stage[/bold yellow]\n\n"
                 f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
                 f"You can only submit justifications when in the JUSTIFY stage.\n\n"
-                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                f"Run [bold cyan]engine status[/bold cyan] to see your current progress.",
                 title="Wrong Stage",
                 border_style="yellow"
             ))
@@ -610,6 +648,9 @@ def submit_fix():
     and advances your progress if the fix is correct.
     """
     try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
@@ -638,7 +679,7 @@ def submit_fix():
                 f"[bold yellow]Not in Harden Stage[/bold yellow]\n\n"
                 f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
                 f"You can only submit bug fixes when in the HARDEN stage.\n\n"
-                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                f"Run [bold cyan]engine status[/bold cyan] to see your current progress.",
                 title="Wrong Stage",
                 border_style="yellow"
             ))
@@ -858,6 +899,19 @@ def init(curriculum_id: str):
                 border_style="yellow"
             ))
             sys.exit(1)
+        
+        # 3b. Prune any stale worktree registrations
+        # (in case worktree was deleted manually without git worktree remove)
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                capture_output=True,
+                check=True
+            )
+            logger.info("Pruned stale worktree registrations")
+        except subprocess.CalledProcessError:
+            # Non-critical - continue even if prune fails
+            pass
         
         # 4. Verify curriculum exists
         curr_mgr = CurriculumManager()
@@ -1095,6 +1149,9 @@ def status():
     and the list of completed modules.
     """
     try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
