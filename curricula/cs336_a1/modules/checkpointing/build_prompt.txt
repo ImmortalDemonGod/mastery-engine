@@ -1,0 +1,485 @@
+Build Challenge: Model Checkpointing
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement save_checkpoint and load_checkpoint functions for model persistence
+and training resumption. You will learn what state must be saved, why optimizer
+state is critical, how to handle device compatibility, and why checkpointing is
+essential for long training runs. This enables training models for days/weeks
+without starting from scratch each time!
+
+Background: Why Checkpointing Matters
+──────────────────────────────────────
+Training large models takes time:
+- GPT-2 small: ~1 day on 8 GPUs
+- GPT-3: ~1 month on thousands of GPUs
+- Modern LLMs: Months of training
+
+Without checkpointing:
+- Hardware failure → lose all progress
+- Need to stop training → lose all progress
+- Want to evaluate → can't save model
+- Experiment tracking → impossible
+
+**Checkpointing solves this!**
+
+What Must Be Saved
+──────────────────
+A complete checkpoint contains:
+
+1. **Model state**: All learnable parameters
+   - Embedding weights
+   - Transformer layer weights
+   - All nn.Parameter objects
+
+2. **Optimizer state**: Momentum buffers, variance estimates
+   - AdamW stores first moment (m) and second moment (v) for EVERY parameter
+   - Without this, training from checkpoint starts with cold optimizer
+   - Convergence suffers!
+
+3. **Training metadata**: Current iteration, epoch, learning rate
+   - Enables exact training resumption
+   - Crucial for reproducibility
+
+**Key insight**: Saving only model weights is insufficient!
+Optimizer state is often larger than model itself!
+
+Why Optimizer State Matters
+────────────────────────────
+**Without optimizer state** (only model weights):
+```python
+# Load model weights
+model.load_state_dict(checkpoint['model'])
+optimizer = AdamW(model.parameters())  # Fresh optimizer!
+```
+
+Problem:
+- AdamW momentum buffers initialized to zero
+- Learning rate schedule may be wrong (no iteration count)
+- Training behaves like starting from scratch
+- Convergence slows or fails
+
+**With optimizer state** (complete checkpoint):
+```python
+# Load everything
+model.load_state_dict(checkpoint['model'])
+optimizer.load_state_dict(checkpoint['optimizer'])
+start_iter = checkpoint['iteration']
+```
+
+Result:
+- Momentum buffers restored
+- Training continues seamlessly
+- Same convergence trajectory
+- Exact reproducibility
+
+**Empirical evidence**: Resuming without optimizer state can add 10-50%
+more training time!
+
+Mathematical Foundation
+───────────────────────
+**What torch.save actually does**:
+
+Given Python objects (model, optimizer, metadata):
+1. Collect all state: model.state_dict(), optimizer.state_dict()
+2. Serialize to bytes using pickle protocol
+3. Write to file (with optional compression)
+
+**state_dict structure**:
+```python
+model.state_dict() = {
+    'token_embeddings.weight': Tensor(50257, 768),
+    'layers.0.attn.q_proj.weight': Tensor(768, 768),
+    ...
+    'lm_head.weight': Tensor(50257, 768),
+}
+
+optimizer.state_dict() = {
+    'state': {
+        0: {'step': 1000, 'exp_avg': Tensor(...), 'exp_avg_sq': Tensor(...)},
+        1: {'step': 1000, 'exp_avg': Tensor(...), 'exp_avg_sq': Tensor(...)},
+        ...
+    },
+    'param_groups': [{'lr': 0.001, 'betas': (0.9, 0.999), ...}]
+}
+```
+
+**torch.load** reverses this:
+1. Read bytes from file
+2. Deserialize using pickle
+3. Return Python objects
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/utils.py
+
+You will implement save_checkpoint and load_checkpoint functions.
+
+Requirements
+────────────
+Implement the functions with the following specifications:
+
+Function Signatures
+───────────────────
+
+def save_checkpoint(
+    model: nn.Module,
+    optimizer,
+    iteration: int,
+    out: str | PathLike,
+) -> None:
+    """
+    Save model, optimizer, and iteration to checkpoint file.
+    
+    Args:
+        model: PyTorch model to save
+        optimizer: Optimizer to save (with state)
+        iteration: Current training iteration
+        out: File path or file-like object to save to
+    """
+
+def load_checkpoint(
+    src: str | PathLike,
+    model: nn.Module,
+    optimizer,
+) -> int:
+    """
+    Load checkpoint and restore model, optimizer state.
+    
+    Args:
+        src: File path or file-like object to load from
+        model: Model to load state into (modifies in-place)
+        optimizer: Optimizer to load state into (modifies in-place)
+    
+    Returns:
+        iteration: Training iteration from checkpoint
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Save complete state**:
+   - model.state_dict(): All model parameters
+   - optimizer.state_dict(): All optimizer state
+   - iteration: Integer training step
+   - Package in dictionary for easy access
+
+2. **Device handling**:
+   - Load to CPU by default (map_location='cpu')
+   - Prevents device mismatch errors
+   - User can move to GPU after loading if needed
+
+3. **In-place restoration**:
+   - load_state_dict modifies model/optimizer in-place
+   - Don't create new objects
+   - Existing references remain valid
+
+4. **Return iteration**:
+   - Caller needs iteration count to resume training
+   - Return as integer for convenience
+
+Implementation Steps
+────────────────────
+
+**save_checkpoint implementation**:
+
+```python
+def save_checkpoint(model, optimizer, iteration, out):
+    """Save complete training state."""
+    # Package everything in a dictionary
+    checkpoint = {
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'iteration': int(iteration),
+    }
+    
+    # Save to file
+    torch.save(checkpoint, out)
+```
+
+Simple! torch.save handles serialization.
+
+**load_checkpoint implementation**:
+
+```python
+def load_checkpoint(src, model, optimizer):
+    """Load and restore training state."""
+    # Load from file (to CPU for safety)
+    checkpoint = torch.load(src, map_location='cpu')
+    
+    # Restore model state
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # Restore optimizer state
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    
+    # Return iteration for training resumption
+    return int(checkpoint['iteration'])
+```
+
+map_location='cpu' is critical for device compatibility!
+
+Mathematical Insight: Why map_location='cpu'?
+──────────────────────────────────────────────
+**Problem without map_location**:
+
+Checkpoint saved on GPU 0:
+```python
+torch.save(checkpoint, 'model.pt')  # Tensors are cuda:0
+```
+
+Loading on machine without GPU:
+```python
+checkpoint = torch.load('model.pt')  # Error! cuda:0 not available
+```
+
+Or loading on machine with different GPU setup:
+```python
+# Saved on 8-GPU machine (cuda:7 exists)
+# Loading on 1-GPU machine (only cuda:0 exists)
+checkpoint = torch.load('model.pt')  # Error! cuda:7 not available
+```
+
+**Solution: map_location='cpu'**:
+```python
+checkpoint = torch.load('model.pt', map_location='cpu')
+# All tensors loaded to CPU regardless of original device
+```
+
+Then explicitly move to desired device:
+```python
+model.load_state_dict(checkpoint['model'])
+model = model.to('cuda:0')  # Explicit device control
+```
+
+This ensures:
+- Checkpoints are device-agnostic
+- Can load anywhere (CPU-only machine, different GPU setup)
+- Explicit device placement after loading
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting optimizer state**:
+   ```python
+   # INCOMPLETE!
+   torch.save(model.state_dict(), 'model.pt')
+   ```
+   Loses optimizer momentum - training resumes poorly.
+
+❌ **Not using map_location**:
+   ```python
+   checkpoint = torch.load('model.pt')  # Device-dependent!
+   ```
+   Breaks when loading on different hardware.
+
+❌ **Forgetting iteration**:
+   ```python
+   checkpoint = {'model': model.state_dict()}  # No iteration!
+   ```
+   Can't resume training at correct step.
+   Learning rate schedule breaks.
+
+❌ **Wrong dictionary keys**:
+   ```python
+   # Saving:
+   torch.save({'model': model.state_dict()})
+   # Loading:
+   checkpoint['model_state_dict']  # KeyError!
+   ```
+   Key names must match exactly.
+
+❌ **Not returning iteration**:
+   ```python
+   def load_checkpoint(...):
+       ...
+       # Forgot to return iteration!
+   ```
+   Caller can't resume training properly.
+
+❌ **Creating new model/optimizer**:
+   ```python
+   def load_checkpoint(...):
+       model = Model()  # WRONG! Loses caller's model
+       model.load_state_dict(checkpoint['model'])
+       return model
+   ```
+   Should modify in-place, not create new objects.
+
+Testing
+───────
+Your implementation will be tested against:
+• Save and load round-trip consistency
+• Optimizer state preservation
+• Iteration count accuracy
+• Device handling (CPU loading)
+• File path and file-like object support
+
+The validator will run: pytest tests/test_training.py::test_checkpoint -v
+
+Integration: Complete Training Pipeline
+────────────────────────────────────────
+**Training with checkpointing**:
+
+```python
+# Setup
+model = TransformerLM(...)
+optimizer = AdamW(model.parameters())
+start_iter = 0
+
+# Try to resume from checkpoint
+checkpoint_path = 'checkpoints/model_latest.pt'
+if os.path.exists(checkpoint_path):
+    print(f"Resuming from {checkpoint_path}")
+    start_iter = load_checkpoint(checkpoint_path, model, optimizer)
+    print(f"Resuming from iteration {start_iter}")
+
+# Training loop
+for iteration in range(start_iter, max_iters):
+    # Train step
+    x, y = get_batch(...)
+    logits = model(x)
+    loss = F.cross_entropy(...)
+    loss.backward()
+    optimizer.step()
+    
+    # Checkpoint every N iterations
+    if iteration % checkpoint_interval == 0:
+        save_checkpoint(
+            model, optimizer, iteration,
+            f'checkpoints/model_iter_{iteration}.pt'
+        )
+        print(f"Saved checkpoint at iteration {iteration}")
+
+# Final checkpoint
+save_checkpoint(model, optimizer, max_iters, 'checkpoints/model_final.pt')
+```
+
+**Key practices**:
+1. Check for existing checkpoint before training
+2. Save regularly (every 1000-10000 iterations)
+3. Keep multiple checkpoints (don't overwrite)
+4. Save final checkpoint at end
+
+**Checkpoint management strategies**:
+
+```python
+# Keep last N checkpoints
+def save_checkpoint_with_rotation(model, optimizer, iteration, dir, keep=5):
+    path = f'{dir}/model_iter_{iteration}.pt'
+    save_checkpoint(model, optimizer, iteration, path)
+    
+    # Find all checkpoints
+    checkpoints = sorted(glob.glob(f'{dir}/model_iter_*.pt'))
+    
+    # Remove old ones
+    for old_checkpoint in checkpoints[:-keep]:
+        os.remove(old_checkpoint)
+```
+
+**Cloud storage integration**:
+```python
+# Save locally then upload to cloud
+save_checkpoint(model, optimizer, iteration, 'local_model.pt')
+upload_to_s3('local_model.pt', f's3://bucket/checkpoints/iter_{iteration}.pt')
+```
+
+Performance Considerations
+──────────────────────────
+**Checkpoint size**:
+- GPT-2 small (124M params): ~500 MB checkpoint
+  - Model: 124M × 4 bytes = 496 MB
+  - Optimizer (AdamW): 124M × 2 moments × 4 bytes = 992 MB
+  - Total: ~1.5 GB!
+
+- GPT-3 (175B params): ~700 GB checkpoint!
+  - Saving time: 10-30 minutes
+  - This is why frequent checkpointing is expensive
+
+**Optimization strategies**:
+
+1. **Async checkpointing**: Save in background thread
+   ```python
+   def async_save(model, optimizer, iteration, path):
+       # Copy state to CPU
+       checkpoint = {
+           'model': {k: v.cpu() for k, v in model.state_dict().items()},
+           'optimizer': optimizer.state_dict(),
+           'iteration': iteration,
+       }
+       # Save in background thread
+       thread = threading.Thread(target=torch.save, args=(checkpoint, path))
+       thread.start()
+   ```
+
+2. **Compressed checkpoints**: Use gzip compression
+   ```python
+   import gzip
+   with gzip.open('model.pt.gz', 'wb') as f:
+       torch.save(checkpoint, f)
+   ```
+   Can reduce size by 50-70%!
+
+3. **Sharded checkpoints**: Split large models across files
+   ```python
+   # Save each layer separately for huge models
+   torch.save({'layer_0': model.layers[0].state_dict()}, 'layer_0.pt')
+   ```
+
+4. **Delta checkpoints**: Save only parameter changes
+   - Advanced technique for very large models
+   - Not covered here but used in production
+
+Why Checkpointing is Non-Negotiable
+────────────────────────────────────
+**Real-world scenarios**:
+
+1. **Hardware failures**: GPU dies mid-training
+   - Without checkpointing: Lose days of training
+   - With checkpointing: Resume from last save (lose minutes)
+
+2. **Preemption**: Cloud instances can be terminated
+   - Spot instances save 70% but can be preempted anytime
+   - Must checkpoint to use them effectively
+
+3. **Experimentation**: Compare different hyperparameters
+   - Load checkpoint, try different learning rate
+   - No need to retrain from scratch
+
+4. **Model selection**: Evaluate different checkpoints
+   - Often best checkpoint isn't the final one
+   - Need to save multiple to choose best
+
+5. **Debugging**: Training diverges at iteration 50K
+   - Load checkpoint from iteration 45K
+   - Investigate what went wrong
+
+**Production requirements**:
+- Checkpoint every 10-30 minutes
+- Keep last 10 checkpoints
+- Upload to persistent storage (S3, GCS)
+- Validate checkpoint integrity after saving
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your checkpointing functions. You'll then answer
+conceptual questions about what state to save, optimizer importance, device
+handling, and checkpoint management strategies.
+
+Hints
+─────
+• Package in dict: {'model_state_dict': ..., 'optimizer_state_dict': ..., 'iteration': ...}
+• Save: torch.save(checkpoint, path)
+• Load: torch.load(path, map_location='cpu')
+• In-place: model.load_state_dict() modifies model directly
+• Return iteration as int for convenience
+• map_location='cpu' ensures device compatibility
+
+Remember: Checkpointing is insurance for training. Save early, save often!
+The ability to resume training is what makes training large models practical! 🎯

@@ -777,3 +777,136 @@ The project will be implemented in a risk-managed, phased approach:
 1.  **Content Authoring:** Who are the designated authors and reviewers for the "Justify" questions and "Harden" bugs? What is the formal review and sign-off process?
 2.  **LLM Budget & Provider:** What is the per-student budget for LLM API calls? Which model/provider will be used to ensure consistent evaluation and manage costs?
 3.  **Support Model:** What is the formal support channel for students who get irrecoverably stuck on a challenge? How will TAs be trained on the Mastery Engine's specific pedagogy?
+=====
+Excellent question. This moves us directly to the technical blueprint for the "v3 Semantic Engine." You are asking for the specific "how" behind this ambitious goal.
+
+Automating the creation of build prompts, justify questions, and bugs from a knowledge graph is a complex but feasible multi-stage pipeline. It requires treating curriculum creation not as a writing task, but as a structured, code-generation-like process driven by an LLM.
+
+Here is the technical blueprint for how we can automate this, leveraging the knowledge graph triples we've been creating.
+
+---
+
+### **Technical Blueprint: Automated Curriculum Generation (v3 Semantic Engine)**
+
+The core idea is to use a "Curriculum Generation Pipeline" that takes a research paper (or your detailed notes) as input and outputs a complete, structured module folder (`build_prompt.txt`, `justify_questions.json`, `bugs/*.patch`). This pipeline consists of several specialized LLM-powered agents.
+
+#### **Stage 1: Knowledge Graph (KG) Extraction**
+
+This is the foundational step. An "Extractor Agent" reads the source material and produces the knowledge graph triples.
+
+*   **Input:** A research paper (e.g., `Attention_Is_All_You_Need.pdf`) or your detailed markdown notes.
+*   **Process:** A sophisticated LLM prompt instructs the model to act as a research analyst and extract all key entities, relationships, concepts, formulas, and historical context as structured triples.
+    ```prompt
+    SYSTEM: You are a research analyst specializing in deep learning. Your task is to read the provided paper and extract a comprehensive knowledge graph. Identify all key architectural components, mathematical formulas, training parameters, datasets, and conceptual claims. Represent these as (Subject, Relation, Object) triples. Be exhaustive.
+
+    USER: [Content of "Attention Is All You Need.pdf"]
+
+    ASSISTANT:
+    [
+      {"subject": "Transformer_architecture", "relation": "dispenses_with", "object": "recurrence"},
+      {"subject": "scaled_dot_product_attention", "relation": "scales_by", "object": "inverse_sqrt_dk"},
+      ...
+    ]
+    ```
+*   **Output:** A structured JSON file containing the raw knowledge graph triples. (This is what we are currently doing manually to create our "golden dataset").
+
+---
+
+#### **Stage 2: Build Prompt Generation**
+
+A "Tutorializer Agent" takes the knowledge graph and transforms it into a pedagogical `build_prompt.txt`.
+
+*   **Input:** The knowledge graph from Stage 1.
+*   **Process:** This is a multi-step prompting process.
+    1.  **Identify Core Component:** The agent is first asked to identify the central component being introduced (e.g., `(Attention_Is_All_You_Need, proposes, Transformer_architecture)` -> `Transformer_architecture`).
+    2.  **Structure the Narrative:** The agent is then given a template for a high-quality build prompt (Objective, Background, Mathematical Foundation, etc.) and instructed to populate it using the KG.
+        ```prompt
+        SYSTEM: You are a curriculum designer. Your task is to write a build prompt for the concept of "Scaled Dot-Product Attention". Use the provided knowledge graph to structure your explanation. Follow this template:
+        1.  **Objective**: State the learning goal.
+        2.  **Background**: Use historical context from the KG (e.g., why it replaced RNNs).
+        3.  **Mathematical Foundation**: Explain the core formula using triples like `(scaled_dot_product_attention, scales_by, inverse_sqrt_dk)`.
+        4.  **Conceptual "Why"**: Synthesize related triples to explain *why* it works (e.g., explain the purpose of the scaling factor).
+        5.  **Implementation Steps**: Provide a clear, step-by-step guide.
+        6.  **Common Pitfalls**: Infer common mistakes from the core concepts.
+
+        USER: [Knowledge Graph Triples for Attention]
+
+        ASSISTANT: [Generates the full build_prompt.txt content]
+        ```
+*   **Output:** A complete, formatted `build_prompt.txt` file.
+
+---
+
+#### **Stage 3: Justify Question Generation**
+
+A "Socratic Agent" generates deep, conceptual questions based on the knowledge graph, targeting non-obvious relationships.
+
+*   **Input:** The knowledge graph from Stage 1 and the build prompt from Stage 2.
+*   **Process:** The agent is prompted to identify the most critical and subtle concepts.
+    ```prompt
+    SYSTEM: You are a Socratic educator. Read the provided build prompt and knowledge graph. Your task is to generate 3-5 deep, conceptual questions that test a student's *understanding*, not just their memory. For each question, also generate a model answer and identify 3 common failure modes.
+
+    Focus on:
+    - **Causality**: "Why does X cause Y?" (e.g., "Why does the dot product variance scale with d_k?")
+    - **Trade-offs**: "What is the disadvantage of approach A vs. B?" (e.g., "Why multiple small heads vs. one large one?")
+    - **Counterfactuals**: "What would happen if we removed component Z?" (e.g., "What if we removed the scaling factor?")
+
+    USER:
+    KG: `[{"subject": "scaled_dot_product_attention", "relation": "scales_by", "object": "inverse_sqrt_dk"}, ...]`
+    Build Prompt: `[...] The scaling factor is CRITICAL for stability [...]`
+
+    ASSISTANT:
+    [
+      {
+        "id": "scaling_factor_rationale",
+        "question": "Why is scaling by √d_k essential for attention stability? Explain what happens to dot products as dimensionality increases, and how this affects softmax behavior.",
+        "model_answer": "...",
+        "failure_modes": [...]
+      },
+      ...
+    ]
+    ```
+*   **Output:** A structured `justify_questions.json` file.
+
+---
+
+#### **Stage 4: Harden Bug Generation**
+
+An "Automated Sabotage Agent" generates pedagogical bugs by targeting and violating core principles identified in the knowledge graph.
+
+*   **Input:** A **reference implementation** of the correct solution (from `.solutions/`) and the knowledge graph.
+*   **Process:** This is the most complex stage, likely involving a "code-aware" LLM.
+    1.  **Identify a Core Principle:** The agent selects a critical triple from the KG, e.g., `(scaled_dot_product_attention, scales_by, inverse_sqrt_dk)`.
+    2.  **Locate the Implementation:** The agent uses semantic search or AST (Abstract Syntax Tree) analysis to find the line(s) of code in the reference implementation that correspond to this principle.
+        *   e.g., It finds the line: `scores = scores / math.sqrt(d_k)`
+    3.  **Generate a Violation:** The agent is prompted to introduce a minimal, plausible bug that violates this principle.
+        ```prompt
+        SYSTEM: You are a software engineer creating a pedagogical bug. The principle is "attention scores must be scaled by sqrt(d_k)". The code is `scores = scores / math.sqrt(d_k)`. Introduce a subtle bug that violates this. Examples: comment out the line, change the scaling factor, apply it at the wrong time.
+
+        USER: `scores = scores / math.sqrt(d_k)`
+
+        ASSISTANT:
+        # BUG: Missing scaling by sqrt(d_k)!
+        # Should be: scores = scores / math.sqrt(Q.shape[-1])
+        ```
+    4.  **Create Patch and Symptom:**
+        *   The agent generates a `.patch` file by diffing the original and buggy code.
+        *   It then generates a `_symptom.txt` file by explaining the high-level consequence of this bug (e.g., "When training with large `d_k`, the model loss becomes NaN. This suggests a numerical overflow issue in the attention mechanism.").
+
+*   **Output:** A `bug_name.patch` file and a `bug_name_symptom.txt` file.
+
+---
+
+### **Putting It All Together: The Full Pipeline**
+
+The v3 Semantic Engine would orchestrate these agents:
+
+1.  A new research paper is published. A maintainer adds it to the system.
+2.  **Extractor Agent** runs, producing `paper_kg.json`.
+3.  **Tutorializer Agent** runs on the KG, producing `build_prompt.txt`.
+4.  **Socratic Agent** runs on the KG and prompt, producing `justify_questions.json`.
+5.  A human developer writes a single reference implementation (`.solutions/module.py`).
+6.  **Automated Sabotage Agent** runs on the reference code and KG, producing a set of `bugs/*.patch` and `bugs/*_symptom.txt` files.
+7.  All generated files are placed in a new module folder, ready for the Phase 0 CI pipeline to validate them before being released to students.
+
+This automated pipeline, bootstrapped and validated by the manual KG curation we are doing now, is how we can scale the creation of high-quality curriculum content.

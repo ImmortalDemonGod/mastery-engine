@@ -1,0 +1,62 @@
+[
+  {
+    "id": "checkpoint_q1",
+    "question": "A checkpoint for GPT-2 small (124M params) with AdamW optimizer is ~1.5GB (500MB model + 1GB optimizer). Explain why optimizer state is 2× larger than model weights. What exactly is stored in optimizer.state_dict()?",
+    "model_answer": "Optimizer state dominates checkpoint size because AdamW stores TWO momentum tensors per parameter. Model weights: 124M params × 4 bytes = 496 MB. AdamW state: First moment (exp_avg): 496 MB. Second moment (exp_avg_sq): 496 MB. Total optimizer: 992 MB. Complete checkpoint: 496MB + 992MB = 1.49GB. Optimizer is 2× model size! What's in optimizer.state_dict(): state dict maps param_id to {step, exp_avg, exp_avg_sq}. param_groups contains hyperparameters. For each parameter, AdamW needs momentum for convergence. Without these, training like SGD - much slower.",
+    "required_concepts": [
+      "AdamW stores 2 tensors per parameter: m and v",
+      "First moment (exp_avg): moving average of gradients",
+      "Second moment (exp_avg_sq): moving average of squared gradients",
+      "Total: model (496MB) + optimizer (992MB) = 1.5GB",
+      "Optimizer 2× model size - dominates checkpoint"
+    ]
+  },
+  {
+    "id": "checkpoint_q2",
+    "question": "Loading a checkpoint without map_location='cpu' causes errors when loading on different hardware. Give 3 concrete scenarios where this breaks and explain the fix.",
+    "model_answer": "Device-specific checkpoints break portability. Scenario 1 (GPU to CPU): Saved on cuda:0, load on CPU-only machine. Error: RuntimeError - CUDA device not available. Fix: map_location='cpu'. Scenario 2 (Multi-GPU to Single-GPU): Saved with tensors on cuda:7, load on single-GPU machine. Error: Invalid device ordinal cuda:7. Fix: map_location='cpu' then model.to('cuda:0'). Scenario 3 (Different architectures): V100 to A100 may have subtle issues. Best practice: Always load to CPU first. Why CPU is always safe: Every machine has CPU, no device ordinal issues, explicit device control after loading, checkpoint portability across all hardware.",
+    "required_concepts": [
+      "Scenario 1: cuda:0 to CPU-only fails without map_location",
+      "Scenario 2: cuda:7 to single GPU fails",
+      "CPU is universal - every machine has it",
+      "map_location='cpu' + explicit .to(device) is correct pattern",
+      "Makes checkpoints portable across all hardware"
+    ]
+  },
+  {
+    "id": "checkpoint_q3",
+    "question": "A training run saves checkpoints every 1000 iterations. At iteration 50000, training diverges (NaN loss). Explain how checkpointing enables debugging this failure. What checkpoint strategy would help catch the divergence earlier?",
+    "model_answer": "Checkpointing enables temporal debugging by rollback. Process: Load checkpoint from iteration 49000 (pre-divergence). Replay 49000-50000 with instrumentation. Add NaN checks, gradient monitoring. Pinpoint exact iteration where NaN appears. Identify problematic layer and pattern. Apply fix and resume from healthy checkpoint. Better strategy (hierarchical): Frequent temporary (every 100 iter, keep 10) for fast recovery. Milestone permanent (every 1000 iter) for long-term. This catches divergence within 100 iterations instead of 1000. Can also use monitoring-triggered checkpoints when validation loss increases or gradients spike.",
+    "required_concepts": [
+      "Load pre-divergence checkpoint to debug",
+      "Replay with instrumentation to find exact failure point",
+      "Fix issue and resume from healthy checkpoint",
+      "Better: checkpoint every 100 (temp) + 1000 (permanent)",
+      "Hierarchical checkpointing catches problems 10× faster"
+    ]
+  },
+  {
+    "id": "checkpoint_q4",
+    "question": "Explain why in-place restoration (load_state_dict) is critical for training resumption. What breaks if load_checkpoint returns new model/optimizer objects instead of modifying in-place?",
+    "model_answer": "In-place restoration preserves object identity and references. What breaks with new objects: (1) Scheduler references old optimizer - updates don't affect training. (2) Model hooks lost - attached to old model. (3) DataParallel wrapping lost - new model not wrapped, uses only 1 GPU. (4) Debug references invalid - inspecting old model shows old weights. (5) Memory leak - old objects not garbage collected. Why in-place is correct: Object identity preserved, all references remain valid, no memory leak, matches PyTorch conventions. load_state_dict uses param.data.copy_() to modify data in-place while keeping param object identity unchanged.",
+    "required_concepts": [
+      "In-place: load_state_dict modifies existing object",
+      "Creates new object: breaks scheduler, hooks, DataParallel",
+      "Scheduler still points to old optimizer",
+      "DataParallel wrapping lost",
+      "In-place preserves all references and identity"
+    ]
+  },
+  {
+    "id": "checkpoint_q5",
+    "question": "For a 1-week training run on cloud spot instances (can be preempted anytime), design a checkpointing strategy. Calculate overhead if checkpointing takes 2 minutes. What is the optimal checkpoint frequency?",
+    "model_answer": "Balance recovery time vs overhead. Given: 1 week = 168 hours, checkpoint save = 2 min, preemption rate = 1.5 per week. Cost model: Checkpoint overhead = (T/I)×C, Recovery overhead = P×(I/2). Total = (T/I)×C + P×(I/2). Optimize: I = sqrt(2×T×C/P) = sqrt(2×10080×2/1.5) ≈ 164 minutes ≈ 2.7 hours. Optimal strategy: Checkpoint every 2-3 hours gives ~2-4% total overhead. Practical improvements: (1) Async saving overlaps with training (0% overhead). (2) Keep last 3-5 checkpoints for redundancy. (3) Preemption handler saves emergency checkpoint on warning. Result: Makes spot instances practical, saving 60-70% on cloud compute costs.",
+    "required_concepts": [
+      "Overhead = (T/I)×C + P×(I/2)",
+      "Optimal: I = sqrt(2×T×C/P) ≈ 2.7 hours",
+      "Every 2-3 hours minimizes total overhead (~2-4%)",
+      "Async saving overlaps with training (0% overhead)",
+      "Makes spot instances practical (save 65%+ on cost)"
+    ]
+  }
+]
