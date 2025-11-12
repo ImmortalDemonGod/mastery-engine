@@ -101,18 +101,41 @@ Possible issues:
     - Verify files exist before and after copy
     - Track file copy success
 
-**Next Steps:**
-1.  User will run `engine submit-fix` again with debug logs enabled
-2.  Analyze logs to determine exact cause of workflow failure
-3.  Implement fix based on findings
-4.  Add regression test to prevent recurrence
+**Resolution:**
+Debug logs revealed the root cause: The validator script's stage detection logic was flawed.
 
-**Status:** Investigation in progress, debug instrumentation added
+When `submit-fix` runs:
+1.  Copies buggy file from `workspace/harden/utils.py` to `cs336_basics/utils.py` ✓
+2.  Calls validator with `cwd=shadow_worktree` ✓
+3.  Validator checks `if pwd == SHADOW_WORKTREE` → TRUE ✗
+4.  Takes HARDEN branch which does nothing (assumed file already correct) ✗
+5.  Tests run against the buggy code that was just copied ✓
+6.  But wait - tests passed? How?
+
+**Aha Moment:**
+Re-tested manually and tests FAILED with buggy code (as expected). This means on the original run, the validator must have tested stale correct code, not the freshly-copied buggy code.
+
+**Fix Applied:**
+Modified validator script logic to be simpler and correct:
+- BUILD stage: Copy from main dir → shadow worktree, cd to shadow worktree
+- HARDEN stage: File already copied by submit-fix, just cd to shadow worktree
+- Both cases: Always cd to shadow worktree and run tests there
+
+**Verification:**
+1.  Reset to HARDEN stage with buggy code
+2.  Ran `submit-fix` → FAILED (correct behavior) ✓
+3.  Fixed bug in harden workspace
+4.  Ran `submit-fix` → PASSED (correct behavior) ✓
+
+**Status:** Fixed and verified
 
 **Artifacts:**
+*   **Commit:** `[to be added]`
 *   **Files Modified:**
-    - `engine/main.py`: Added debug logging to submit_fix (lines 733-739)
-    - `curricula/cs336_a1/modules/softmax/validator.sh`: Added debug logging (lines 15-28)
+    - `curricula/cs336_a1/modules/softmax/validator.sh`: Fixed stage detection logic
+    - `curricula/cs336_a1/modules/cross_entropy/validator.sh`: Fixed test name
+    - `curricula/cs336_a1/modules/gradient_clipping/validator.sh`: Fixed test name
+    - `engine/main.py`: Removed debug logging
 
 ---
 
