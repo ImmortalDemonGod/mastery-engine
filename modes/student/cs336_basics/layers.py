@@ -125,28 +125,43 @@ class RMSNorm(nn.Module):
 
 class SwiGLU(nn.Module):
     """
-    SwiGLU feed-forward block:
-      out = W2( SiLU(W1(x)) * W3(x) )
+    SwiGLU gated feed-forward network.
+    
+    Implements: SwiGLU(x) = W₂(SiLU(W₁·x) ⊙ W₃·x)
+    
+    Where ⊙ denotes element-wise multiplication (Hadamard product).
+    This creates a gating mechanism where W₃ learns what to emphasize.
+    
     Shapes:
-      - W1: (d_ff, d_model)
-      - W3: (d_ff, d_model)
-      - W2: (d_model, d_ff)
+      - W₁: (d_ff, d_model) - value projection  
+      - W₃: (d_ff, d_model) - gate projection
+      - W₂: (d_model, d_ff) - output projection
     """
 
-    def __init__(self, d_model: int, d_ff: int) -> None:
+    def __init__(self, d_model: int, d_ff: int, device=None, dtype=None) -> None:
         super().__init__()
-        self.d_model = int(d_model)
-        self.d_ff = int(d_ff)
-        # Use our minimal Linear layers without bias
-        self.w1 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
-        self.w2 = Linear(in_features=self.d_ff, out_features=self.d_model, bias=False)
-        self.w3 = Linear(in_features=self.d_model, out_features=self.d_ff, bias=False)
+        # TODO: Create three Linear layers for SwiGLU
+        # Use your custom Linear class (not nn.Linear)
+        # 
+        # self.w1: projects x from d_model → d_ff (value path)
+        # self.w2: projects from d_ff → d_model (output)
+        # self.w3: projects x from d_model → d_ff (gate path)
+        #
+        # IMPORTANT: Name them exactly w1, w2, w3 (lowercase) for validator!
+        # Pass device and dtype to each Linear constructor
+        raise NotImplementedError("TODO: Implement SwiGLU.__init__")
 
-    def forward(self, in_features: Tensor) -> Tensor:
-        a = self.w1(in_features)
-        b = self.w3(in_features)
-        gated = silu(a) * b
-        return self.w2(gated)
+    def forward(self, x: Tensor) -> Tensor:
+        # TODO: Implement SwiGLU forward pass
+        # 1. Compute value path: w1_out = self.w1(x)
+        # 2. Apply SiLU activation: activated = silu(w1_out)
+        # 3. Compute gate path: gate = self.w3(x)  
+        # 4. Element-wise multiply: gated = activated * gate
+        # 5. Project to output: output = self.w2(gated)
+        #
+        # Formula: W₂(SiLU(W₁·x) ⊙ W₃·x)
+        # Shape: (..., d_model) → (..., d_model)
+        raise NotImplementedError("TODO: Implement SwiGLU.forward")
 
 
 def scaled_dot_product_attention(

@@ -1,0 +1,323 @@
+Build Challenge: SwiGLU Feed-Forward Network
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement SwiGLU, a gated feed-forward network that has become the standard in 
+modern large language models including LLaMA, PaLM, and Mistral. You will learn 
+how gating mechanisms enable networks to selectively route information, why this 
+outperforms traditional feed-forward layers, and how the components you've built 
+(SiLU, Linear layers) combine into powerful architectural building blocks.
+
+Background: The Evolution of Feed-Forward Networks
+───────────────────────────────────────────────────
+In the original Transformer (Vaswani et al., 2017), each block contained a 
+feed-forward network (FFN) with a simple two-layer structure:
+
+    FFN(x) = W₂ · ReLU(W₁ · x)
+    
+This expands from d_model → d_ff (typically 4×d_model), applies ReLU, then 
+projects back to d_model. While effective, this design lacks a key capability: 
+**selective gating** of information flow.
+
+The GLU Family
+──────────────
+Dauphin et al. (2017) introduced Gated Linear Units (GLU), which use one pathway 
+to gate another:
+
+    GLU(x) = (W₁ · x) ⊙ σ(W₂ · x)
+    
+Where ⊙ is element-wise multiplication and σ is sigmoid. The key insight: one 
+transformation (W₂ · x passed through sigmoid) acts as a learned gate that 
+controls which elements of another transformation (W₁ · x) should pass through.
+
+This spawned a family of variants:
+• **GLU**: Uses sigmoid activation for gating
+• **Bilinear**: No activation (identity)  
+• **ReGLU**: Uses ReLU for gating
+• **GEGLU**: Uses GELU for gating
+• **SwiGLU**: Uses SiLU (Swish) for gating ← We're implementing this!
+
+Why SwiGLU Wins
+───────────────
+Shazeer (2020) empirically tested all GLU variants and found SwiGLU consistently 
+outperformed alternatives. Key advantages:
+
+1. **Smooth gating**: SiLU provides smooth, differentiable gates
+2. **Parameter efficiency**: Achieves better results with similar parameter count
+3. **Empirical superiority**: ~0.5-1% improvement over ReLU FFN in large-scale experiments
+4. **Adopted widely**: LLaMA, PaLM, Mistral, Gemma all use SwiGLU
+
+Mathematical Foundation
+───────────────────────
+SwiGLU combines three linear projections with element-wise operations:
+
+    SwiGLU(x) = W₂ · (SiLU(W₁ · x) ⊙ W₃ · x)
+
+Where:
+• x ∈ ℝ^d_model: input embeddings
+• W₁ ∈ ℝ^(d_ff × d_model): first "up-projection" to wider hidden dimension
+• W₃ ∈ ℝ^(d_ff × d_model): gate projection (parallel to W₁)
+• W₂ ∈ ℝ^(d_model × d_ff): "down-projection" back to model dimension
+• ⊙: element-wise multiplication (Hadamard product)
+
+The computation flow:
+1. **Expand**: Project x from d_model → d_ff via W₁ and W₃ (parallel paths)
+2. **Activate**: Apply SiLU to W₁ · x (the "value" path)
+3. **Gate**: Element-wise multiply with W₃ · x (the "gate" path)
+4. **Compress**: Project back to d_model via W₂
+
+Key Insight: The gating mechanism
+──────────────────────────────────
+Think of W₃ · x as asking "which dimensions should we pay attention to?" and 
+W₁ · x as providing "the actual information." The element-wise multiplication 
+lets the network learn to selectively emphasize or suppress different dimensions.
+
+For example, at dimension i:
+• If (W₃ · x)ᵢ is large positive → SiLU((W₃ · x)ᵢ) ≈ (W₃ · x)ᵢ → gate is open
+• If (W₃ · x)ᵢ is near zero → SiLU((W₃ · x)ᵢ) ≈ 0 → gate is closed
+• If (W₃ · x)ᵢ is negative → SiLU((W₃ · x)ᵢ) < 0 → gate suppresses
+
+This is more flexible than ReLU's binary on/off switching!
+
+Dimension Analysis
+──────────────────
+Understanding the shapes is crucial:
+
+Input:  x                    : (..., d_model)
+After W₁: W₁ · x             : (..., d_ff)       [expanded]
+After W₃: W₃ · x             : (..., d_ff)       [expanded, parallel]
+After SiLU: SiLU(W₁ · x)     : (..., d_ff)       [activated]
+After gate: SiLU(W₁·x) ⊙ W₃·x: (..., d_ff)       [gated]
+After W₂: W₂ · (gated)       : (..., d_model)    [compressed]
+
+The ... represents arbitrary batch dimensions (batch_size, sequence_length, etc.).
+
+Typical values:
+• d_model = 512, 768, 1024, 2048, 4096, ...
+• d_ff = (8/3) · d_model, rounded to multiple of 64 for GPU efficiency
+  - For d_model=512: d_ff=1344
+  - For d_model=4096: d_ff=11008 (used in LLaMA-2 7B)
+
+Why (8/3) · d_model? To match parameter count with traditional 4×d_model FFN:
+• Traditional FFN: 2 weight matrices (W₁: 4d×d, W₂: d×4d) = 8d² params
+• SwiGLU: 3 weight matrices (W₁: d_ff×d, W₂: d×d_ff, W₃: d_ff×d)
+  - If d_ff = (8/3)d, total = 3·(8/3)d² = 8d² params ✓ matched!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the SwiGLU class as a PyTorch Module. The file contains your 
+previously implemented SiLU function and Linear layer—you'll use both!
+
+Requirements
+────────────
+Implement the SwiGLU class with the following specification:
+
+Class Signature
+───────────────
+
+class SwiGLU(nn.Module):
+    def __init__(self, d_model: int, d_ff: int, device=None, dtype=None):
+        """
+        SwiGLU feed-forward network with gating.
+        
+        Implements: SwiGLU(x) = W₂(SiLU(W₁·x) ⊙ W₃·x)
+        
+        Args:
+            d_model: Dimension of input/output embeddings
+            d_ff: Dimension of hidden layer (typically (8/3)*d_model)
+            device: Device to place parameters on
+            dtype: Data type for parameters
+        """
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply SwiGLU transformation.
+        
+        Args:
+            x: Input tensor of shape (..., d_model)
+        
+        Returns:
+            Output tensor of shape (..., d_model)
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Use your implementations**: You MUST use:
+   - Your custom Linear layers (not nn.Linear)
+   - Your custom silu() function (not F.silu)
+   - This reinforces understanding of how components compose
+
+2. **Three weight matrices**: Create exactly three Linear layers:
+   - w1: Linear(d_model, d_ff) for the value path
+   - w2: Linear(d_ff, d_model) for down-projection
+   - w3: Linear(d_model, d_ff) for the gate path
+   
+   Name them exactly as specified for the validator to load weights correctly!
+
+3. **No bias terms**: All Linear layers should have bias=False (your Linear 
+   class doesn't support bias anyway, following modern LLM practice)
+
+4. **Batch dimensions**: Your implementation must handle arbitrary leading 
+   dimensions:
+   - x.shape = (batch, seq_len, d_model) → common case
+   - x.shape = (d_model,) → single vector
+   - x.shape = (batch, seq_len, num_heads, d_model) → possible in some architectures
+
+5. **Element-wise multiplication**: Use * operator for Hadamard product.
+   In PyTorch, * is element-wise for tensors of same shape.
+
+6. **Initialization**: Use the standard initialization from your Linear class
+   (truncated normal as specified earlier). This happens automatically when
+   you instantiate Linear layers.
+
+Implementation Steps
+────────────────────
+
+Step 1: In __init__, create three Linear layers
+   - self.w1 = Linear(in_features=d_model, out_features=d_ff, ...)
+   - self.w2 = Linear(in_features=d_ff, out_features=d_model, ...)
+   - self.w3 = Linear(in_features=d_model, out_features=d_ff, ...)
+   - Pass device and dtype to each Linear constructor
+
+Step 2: In forward(), compute the value path
+   - Apply w1 to input: w1_out = self.w1(x)
+   - Apply SiLU activation: activated = silu(w1_out)
+   - Shape: (..., d_model) → (..., d_ff) → (..., d_ff)
+
+Step 3: Compute the gate path (parallel to step 2)
+   - Apply w3 to input: gate = self.w3(x)
+   - Shape: (..., d_model) → (..., d_ff)
+
+Step 4: Element-wise multiply (gating)
+   - gated = activated * gate
+   - Shape: (..., d_ff) after multiplying two (..., d_ff) tensors
+
+Step 5: Project back to d_model
+   - output = self.w2(gated)
+   - Shape: (..., d_ff) → (..., d_model)
+   - Return this output
+
+Mathematical Insight: Why Three Matrices?
+──────────────────────────────────────────
+You might wonder: why not just gate the input before projecting?
+
+❌ Simple gating: W₂ · SiLU((W₁ · x) ⊙ x)
+• Problem: x is in d_model dimensions, but we want gating in d_ff dimensions
+• Gating in input space is too restrictive
+
+✓ SwiGLU: W₂ · (SiLU(W₁ · x) ⊙ W₃ · x)
+• Both value and gate are projected to d_ff first
+• Gating happens in the high-dimensional space where the network has more 
+  capacity to learn complex patterns
+• W₃ learns what to gate, W₁ learns what values to compute
+
+Comparison with Traditional FFN
+────────────────────────────────
+
+**Traditional FFN**:
+    FFN(x) = W₂ · ReLU(W₁ · x)
+• 2 weight matrices
+• Simple activation
+• No learned gating
+• Hard ReLU cutoff
+
+**SwiGLU**:
+    SwiGLU(x) = W₂ · (SiLU(W₁ · x) ⊙ W₃ · x)
+• 3 weight matrices (33% more)
+• Smooth SiLU activation  
+• Learned element-wise gating via W₃
+• Soft, adaptive information flow
+
+The extra weight matrix (W₃) enables the network to learn WHAT to pay attention 
+to, making it more powerful despite having similar total parameter count (when 
+using d_ff = (8/3)d_model vs traditional d_ff = 4d_model).
+
+Common Pitfalls
+───────────────
+
+❌ **Wrong matrix order**: 
+   Wrong: self.w1 = Linear(d_ff, d_model)  # Dimensions backwards!
+   Right: self.w1 = Linear(d_model, d_ff)  # d_model → d_ff
+
+❌ **Using nn.Linear instead of your Linear**:
+   Wrong: self.w1 = nn.Linear(...)
+   Right: self.w1 = Linear(...)  # Use your implementation!
+
+❌ **Using F.silu instead of your silu**:
+   Wrong: activated = F.silu(w1_out)
+   Right: activated = silu(w1_out)  # Use your silu function!
+
+❌ **Forgetting to gate**:
+   Wrong: return self.w2(silu(self.w1(x)))  # This is just FFN, not SwiGLU!
+   Right: return self.w2(silu(self.w1(x)) * self.w3(x))  # Include gating!
+
+❌ **Gating in wrong order**:
+   Wrong: activated = silu(self.w1(x) * self.w3(x))  # Gating before activation!
+   Right: gated = silu(self.w1(x)) * self.w3(x)      # Activate then gate!
+
+❌ **Wrong variable names**:
+   The validator expects exact names: w1, w2, w3 (lowercase!)
+   Wrong: self.W1, self.weight1, self.up_proj
+   Right: self.w1, self.w2, self.w3
+
+Testing
+───────
+Your implementation will be tested against:
+• Various input shapes with different batch dimensions
+• Correct computation with provided weight matrices
+• Numerical accuracy vs reference implementation
+• Gradient correctness in backward pass
+• Parameter names match expected convention
+
+The validator will run: pytest tests/test_model.py::test_swiglu
+
+Performance Considerations
+──────────────────────────
+In a 32-layer Transformer with d_model=4096 and d_ff=11008:
+• Each SwiGLU has 3 × (4096 × 11008) = 135M parameters
+• Total FFN parameters: 32 × 135M = 4.3B parameters
+• This is roughly 2/3 of the model's total parameters!
+• The feed-forward layer is where most parameters live
+
+Despite the 33% more weight matrices vs traditional FFN, SwiGLU is worth it:
+• Better empirical performance
+• More expressive (learned gating)
+• Only ~10% more FLOPs in practice (gating is cheap vs matmuls)
+
+Integration with Transformer Blocks
+────────────────────────────────────
+In a complete Transformer block, SwiGLU replaces the traditional FFN:
+
+    # Pre-norm Transformer block with SwiGLU
+    z = x + MultiHeadAttention(RMSNorm(x))
+    output = z + SwiGLU(RMSNorm(z))
+
+You've now built: RMSNorm ✓, SiLU ✓, and will have SwiGLU ✓
+You're building toward the complete Transformer!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your SwiGLU against reference weights and verify all
+computations match. You'll then answer conceptual questions about gating
+mechanisms and why SwiGLU outperforms traditional feed-forward networks.
+
+Hints
+─────
+• Store the three Linear layers in __init__
+• forward() is just 5 lines: w1, silu, w3, multiply, w2
+• Use * for element-wise multiplication (Hadamard product)
+• The hard part is getting the shapes right—draw it out!
+• Test with simple inputs first (e.g., batch_size=1, seq_len=1)
+
+Remember: SwiGLU is used in EVERY Transformer block. In LLaMA-2 70B, there are 
+80 layers, meaning 80 SwiGLU modules. Getting this right is crucial for 
+understanding modern LLMs!
