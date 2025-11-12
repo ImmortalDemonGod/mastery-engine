@@ -342,54 +342,73 @@ def rope(
     d_k: int,
     theta: float,
     max_seq_len: int,
-    in_query_or_key: Tensor,
-    token_positions: Tensor,
-) -> Tensor:
+    in_query_or_key: Float[Tensor, " ... sequence_length d_k"],
+    token_positions: Int[Tensor, " ... sequence_length"],
+) -> Float[Tensor, " ... sequence_length d_k"]:
     """
-    Apply Rotary Positional Embedding (RoPE) to queries or keys.
+    Apply Rotary Position Embeddings (RoPE) to queries or keys.
+    
+    RoPE encodes position by rotating pairs of dimensions in complex space.
+    Each dimension pair rotates at a different frequency, creating multi-scale
+    position encoding that naturally captures relative position through the
+    rotation property: Rotation(m) ⊗ Rotation(n)* = Rotation(m-n).
 
     Args:
-        d_k: embedding dimension (must be even)
-        theta: RoPE base (e.g., 10000.0)
-        max_seq_len: maximum sequence length (unused at runtime; kept for API parity)
-        in_query_or_key: tensor of shape (..., seq_len, d_k)
-        token_positions: tensor of positions of shape (..., seq_len) or (seq_len,)
+        d_k: Dimension of queries/keys (must be even for pairing)
+        theta: Base angle θ (typically 10000.0, like original Transformer)
+        max_seq_len: Maximum sequence length to support
+        in_query_or_key: Input tensor of shape (..., seq_len, d_k)
+        token_positions: Position indices of shape (..., seq_len)
+                        Values in range [0, max_seq_len)
 
     Returns:
-        Tensor of same shape as in_query_or_key with RoPE applied along the last dim.
+        Rotated tensor of same shape as input
     """
-    x = in_query_or_key
-    assert d_k % 2 == 0, "RoPE requires even embedding dimension"
-    half = d_k // 2
-
-    # Prepare inverse frequencies
-    i = torch.arange(0, half, device=x.device, dtype=x.dtype)
-    inv_freq = 1.0 / (torch.tensor(theta, dtype=x.dtype, device=x.device) ** (i / half))
-
-    # Broadcast positions
-    pos = token_positions.to(device=x.device, dtype=x.dtype)
-    if pos.dim() == 1:
-        pos = pos.view(1, -1)
-    # Align pos to have trailing seq_len dimension
-    while pos.dim() < x.dim() - 1:
-        pos = pos.unsqueeze(0)
-
-    # Compute angles and trig
-    angles = pos.unsqueeze(-1) * inv_freq  # (..., seq_len, half)
-    cos = torch.cos(angles)
-    sin = torch.sin(angles)
-
-    # Split even/odd components
-    x_even = x[..., 0::2]
-    x_odd = x[..., 1::2]
-
-    x_rot_even = x_even * cos - x_odd * sin
-    x_rot_odd = x_odd * cos + x_even * sin
-
-    out = torch.empty_like(x)
-    out[..., 0::2] = x_rot_even
-    out[..., 1::2] = x_rot_odd
-    return out
+    # TODO: Implement RoPE (Rotary Position Embeddings)
+    #
+    # Step 1: Compute frequencies for each dimension pair
+    #   dim_pairs = torch.arange(0, d_k, 2, dtype=torch.float32, device=x.device)
+    #   freqs = 1.0 / (theta ** (dim_pairs / d_k))
+    #   Shape: (d_k/2,)
+    #
+    # Step 2: Create angles for all positions
+    #   positions = torch.arange(max_seq_len, dtype=torch.float32, device=x.device)
+    #   angles = torch.outer(positions, freqs)  # Outer product!
+    #   Shape: (max_seq_len, d_k/2)
+    #
+    # Step 3: Precompute cos and sin
+    #   cos_angles = torch.cos(angles)
+    #   sin_angles = torch.sin(angles)
+    #
+    # Step 4: Select angles for actual token positions
+    #   cos_selected = cos_angles[token_positions]  # Index with positions!
+    #   sin_selected = sin_angles[token_positions]
+    #   Shape: (..., seq_len, d_k/2)
+    #
+    # Step 5: Reshape input to pair dimensions
+    #   x_pairs = x.reshape(*x.shape[:-1], -1, 2)
+    #   x_even = x_pairs[..., 0]  # First of each pair
+    #   x_odd = x_pairs[..., 1]   # Second of each pair
+    #   Shape: (..., seq_len, d_k/2)
+    #
+    # Step 6: Apply 2D rotation formula
+    #   x_rotated_even = x_even * cos_selected - x_odd * sin_selected
+    #   x_rotated_odd = x_even * sin_selected + x_odd * cos_selected
+    #   CRITICAL: Note the minus sign in first equation!
+    #
+    # Step 7: Stack and reshape back
+    #   x_rotated = torch.stack([x_rotated_even, x_rotated_odd], dim=-1)
+    #   output = x_rotated.reshape(*x.shape)
+    #   Shape: (..., seq_len, d_k)
+    #
+    # Hints:
+    # - torch.outer(a, b) computes outer product (all pairs of products)
+    # - Indexing: cos_angles[token_positions] handles arbitrary positions
+    # - Reshape: reshape(..., -1, 2) pairs up dimensions automatically
+    # - Stack: stack([even, odd], dim=-1) interleaves them back
+    #
+    # This is the most mathematically elegant position encoding!
+    raise NotImplementedError("TODO: Implement rope")
 
 
 def transformer_lm(

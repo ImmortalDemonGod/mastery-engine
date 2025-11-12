@@ -1,0 +1,380 @@
+Build Challenge: RoPE (Rotary Position Embeddings)
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement RoPE (Rotary Position Embeddings), the elegant position encoding
+method that has become the standard in modern LLMs including LLaMA, PaLM,
+and Mistral. You will learn why position information is crucial for Transformers,
+how RoPE encodes position through rotation in complex space, and why this
+approach outperforms traditional learned or sinusoidal embeddings.
+
+Background: The Position Problem
+─────────────────────────────────
+Attention mechanisms (like the one you just implemented) are permutation
+invariant - they don't inherently know the ORDER of tokens:
+
+    Attention([cat, the]) = Attention([the, cat])
+
+This is a problem! Word order matters:
+- "the cat ate the mouse" ≠ "the mouse ate the cat"
+- "not good" ≠ "good not"
+
+We need to inject position information so the model knows token order.
+
+Evolution of Position Encodings
+────────────────────────────────
+
+**Absolute Sinusoidal (Original Transformer, 2017)**:
+    PE(pos, 2i) = sin(pos / 10000^(2i/d))
+    PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+
+Add position embeddings to input: x + PE(pos)
+
+Problems:
+• Position info gets diluted as it propagates through layers
+• No explicit relative position encoding
+• Fixed maximum sequence length
+
+**Learned Absolute Embeddings (BERT, GPT-2)**:
+    PE = learnable parameter matrix [max_seq_len × d_model]
+    
+Problems:
+• Can't generalize beyond max_seq_len
+• Wastes parameters
+• Still no relative position information
+
+**RoPE (2021 - Modern Standard)**:
+Instead of adding position to values, ROTATE queries and keys in complex space.
+
+Key insight: Relative positions emerge naturally from rotation properties!
+
+Mathematical Foundation of RoPE
+────────────────────────────────
+RoPE treats pairs of dimensions as complex numbers and applies rotation:
+
+For a vector x = [x₀, x₁, x₂, x₃, ...] at position m:
+• Pair up dimensions: (x₀, x₁), (x₂, x₃), ...
+• Treat each pair as complex: z_i = x₂ᵢ + ix₂ᵢ₊₁
+• Rotate by angle θ_i × m where θ_i = 1 / (10000^(2i/d))
+• Convert back to real coordinates
+
+In matrix form, for dimension pair (2i, 2i+1):
+
+    [x'₂ᵢ  ]   [cos(mθᵢ)  -sin(mθᵢ)] [x₂ᵢ  ]
+    [x'₂ᵢ₊₁] = [sin(mθᵢ)   cos(mθᵢ)] [x₂ᵢ₊₁]
+
+This is a 2D rotation by angle mθᵢ!
+
+Why This Works: The Rotation Property
+──────────────────────────────────────
+The beautiful property: When computing attention between positions m and n,
+the dot product naturally captures their relative distance!
+
+Given q at position m and k at position n:
+    q_rotated(m) · k_rotated(n) = q · k · cos((m-n)θ) + other terms
+
+The relative position (m-n) emerges from rotation arithmetic:
+    Rotation(m) ⊗ Rotation(n)^H = Rotation(m-n)
+
+Where ⊗ is complex multiplication and H is conjugate transpose.
+
+This means:
+• Attention naturally depends on RELATIVE position (m-n)
+• No explicit relative position computation needed
+• Works for any sequence length (no max limit!)
+• Position info preserved in every layer
+
+The θ Parameter (Theta)
+───────────────────────
+θ determines the rotation frequency for each dimension pair:
+
+    θᵢ = 1 / (base^(2i/d))
+
+Typically base = 10000 (same as original Transformer).
+
+Key properties:
+• Lower dimensions (small i) rotate faster → encode fine-grained position
+• Higher dimensions (large i) rotate slower → encode coarse position
+• Creates a logarithmic position encoding across dimensions
+
+Think of it like: Low frequencies (fast rotation) = local position info
+                 High frequencies (slow rotation) = global position info
+
+This multi-scale encoding lets the model attend to both nearby and distant tokens!
+
+Implementation Details
+──────────────────────
+
+**Step 1: Precompute rotation matrices**
+For each dimension pair i and each position m up to max_seq_len:
+    angle = m × θᵢ = m / (base^(2i/d))
+    Create 2×2 rotation matrix with cos(angle) and sin(angle)
+
+**Step 2: Apply rotations**
+Given query or key tensor of shape (..., seq_len, d_k):
+• Reshape to (..., seq_len, d_k/2, 2) - pair up dimensions
+• For each position m and dimension pair i:
+  - Extract [x₂ᵢ, x₂ᵢ₊₁]
+  - Apply rotation matrix
+  - Store result [x'₂ᵢ, x'₂ᵢ₊₁]
+• Reshape back to (..., seq_len, d_k)
+
+Optimization: Many implementations precompute cos and sin values instead of
+full rotation matrices, then use element-wise operations. This is faster!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the `rope()` function. This is applied to query and key
+tensors BEFORE attention computation, injecting position information through
+rotation.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def rope(
+    d_k: int,
+    theta: float,
+    max_seq_len: int,
+    in_query_or_key: Float[Tensor, " ... sequence_length d_k"],
+    token_positions: Int[Tensor, " ... sequence_length"],
+) -> Float[Tensor, " ... sequence_length d_k"]:
+    """
+    Apply Rotary Position Embeddings (RoPE) to queries or keys.
+    
+    RoPE encodes position by rotating pairs of dimensions in complex space.
+    Each dimension pair rotates at a different frequency, creating multi-scale
+    position encoding.
+    
+    Args:
+        d_k: Dimension of queries/keys (must be even)
+        theta: Base angle θ (typically 10000.0)
+        max_seq_len: Maximum sequence length to support
+        in_query_or_key: Input tensor of shape (..., seq_len, d_k)
+        token_positions: Position indices of shape (..., seq_len)
+                        Values should be in range [0, max_seq_len)
+    
+    Returns:
+        Rotated tensor of same shape as input
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Even dimensions only**: RoPE requires d_k to be even (pairs of dimensions)
+   Assert or check that d_k % 2 == 0
+
+2. **Precompute frequencies**: Calculate θᵢ = 1 / (theta^(2i/d_k)) for each pair
+   - i ranges from 0 to d_k/2 - 1
+   - Use torch.arange and theta ** (2*i/d_k)
+
+3. **Compute rotation angles**: For each position m and frequency θᵢ:
+   - angle = m × θᵢ
+   - Compute cos(angle) and sin(angle)
+
+4. **Apply rotation via complex multiplication**:
+   - Reshape input: (..., seq_len, d_k/2, 2) - pair dimensions
+   - Apply rotation: [x₀, x₁] → [x₀·cos - x₁·sin, x₀·sin + x₁·cos]
+   - Reshape back: (..., seq_len, d_k)
+
+5. **Handle arbitrary batch dimensions**: Must work for any leading dimensions
+   - Single query: (seq_len, d_k)
+   - Batched: (batch, seq_len, d_k)
+   - Multi-head: (batch, num_heads, seq_len, d_k)
+
+6. **Use token_positions for flexibility**: Don't assume positions are [0,1,2,...]
+   - Allows for padding, different sequence starts, etc.
+   - Index into precomputed angles using token_positions
+
+Implementation Steps
+────────────────────
+
+Step 1: Compute frequency for each dimension pair
+   ```python
+   # Dimension pairs: 0, 1, 2, ..., d_k/2 - 1
+   dim_pairs = torch.arange(0, d_k, 2, dtype=torch.float32, device=x.device)
+   # Frequency: θᵢ = 1 / (theta^(2i/d_k))
+   freqs = 1.0 / (theta ** (dim_pairs / d_k))
+   ```
+
+Step 2: Create position-frequency product matrix
+   ```python
+   # Positions: 0, 1, 2, ..., max_seq_len - 1
+   positions = torch.arange(max_seq_len, dtype=torch.float32, device=x.device)
+   # Outer product: (max_seq_len, d_k/2)
+   angles = torch.outer(positions, freqs)
+   ```
+
+Step 3: Precompute cos and sin
+   ```python
+   cos_angles = torch.cos(angles)  # (max_seq_len, d_k/2)
+   sin_angles = torch.sin(angles)  # (max_seq_len, d_k/2)
+   ```
+
+Step 4: Select angles for actual token positions
+   ```python
+   # token_positions: (..., seq_len)
+   # Index into precomputed angles
+   cos_selected = cos_angles[token_positions]  # (..., seq_len, d_k/2)
+   sin_selected = sin_angles[token_positions]  # (..., seq_len, d_k/2)
+   ```
+
+Step 5: Reshape input for rotation
+   ```python
+   # Reshape: (..., seq_len, d_k) → (..., seq_len, d_k/2, 2)
+   x_pairs = x.reshape(*x.shape[:-1], -1, 2)
+   # Extract even and odd dimensions
+   x_even = x_pairs[..., 0]  # (..., seq_len, d_k/2)
+   x_odd = x_pairs[..., 1]   # (..., seq_len, d_k/2)
+   ```
+
+Step 6: Apply 2D rotation
+   ```python
+   # Rotation formula:
+   # x'_even = x_even * cos - x_odd * sin
+   # x'_odd = x_even * sin + x_odd * cos
+   x_rotated_even = x_even * cos_selected - x_odd * sin_selected
+   x_rotated_odd = x_even * sin_selected + x_odd * cos_selected
+   ```
+
+Step 7: Stack and reshape back
+   ```python
+   # Stack: (..., seq_len, d_k/2, 2)
+   x_rotated = torch.stack([x_rotated_even, x_rotated_odd], dim=-1)
+   # Reshape back: (..., seq_len, d_k)
+   output = x_rotated.reshape(*x.shape)
+   ```
+
+Mathematical Insight: Complex Number Interpretation
+────────────────────────────────────────────────────
+RoPE can be viewed as multiplying by complex exponentials:
+
+For dimension pair (x₀, x₁) at position m:
+    z = x₀ + ix₁ (treat as complex number)
+    z' = z × e^(imθ) (multiply by unit complex number)
+    z' = (x₀ + ix₁) × (cos(mθ) + i·sin(mθ))
+    
+Expanding using complex multiplication:
+    x'₀ = x₀·cos(mθ) - x₁·sin(mθ)
+    x'₁ = x₀·sin(mθ) + x₁·cos(mθ)
+
+This is exactly the 2D rotation matrix! RoPE leverages beautiful properties
+of complex analysis.
+
+Why RoPE Outperforms Alternatives
+──────────────────────────────────
+
+**vs Absolute Embeddings**:
+• RoPE: Relative position info preserved at every layer
+• Absolute: Position info dilutes as it propagates
+
+**vs Learned Embeddings**:
+• RoPE: Works for any sequence length (extrapolates)
+• Learned: Fixed max length, can't generalize
+
+**vs Sinusoidal**:
+• RoPE: Applied to Q/K directly, not added to input
+• Sinusoidal: Position info can be overshadowed by content
+
+**Empirical Benefits**:
+• Better long-range dependencies
+• Improved length extrapolation (train on 2K, infer on 8K)
+• No extra parameters
+• Computational efficiency (just rotations)
+
+Integration with Attention
+──────────────────────────
+RoPE is applied to queries and keys BEFORE computing attention:
+
+Without RoPE:
+    scores = Q @ K^T / √d_k
+
+With RoPE:
+    Q_rotated = rope(Q, positions_q)
+    K_rotated = rope(K, positions_k)
+    scores = Q_rotated @ K_rotated^T / √d_k
+
+The rotation angles encode positions, and the dot product naturally captures
+relative position through rotation properties!
+
+Common Pitfalls
+───────────────
+
+❌ **Odd dimensions**:
+   Wrong: d_k = 127 (can't pair dimensions)
+   Right: d_k = 128 (pairs evenly)
+
+❌ **Forgetting to reshape back**:
+   Wrong: Return tensor with shape (..., seq_len, d_k/2, 2)
+   Right: Reshape to original (..., seq_len, d_k)
+
+❌ **Wrong rotation formula**:
+   Wrong: x'₀ = x₀·cos + x₁·sin (missing negative!)
+   Right: x'₀ = x₀·cos - x₁·sin
+
+❌ **Not using token_positions**:
+   Wrong: Assume positions are always [0, 1, 2, ...]
+   Right: Use token_positions to index precomputed angles
+
+❌ **Device mismatch**:
+   Wrong: Create tensors on CPU when input is on CUDA
+   Right: Create all tensors on same device as input
+
+❌ **Applying to values**:
+   RoPE should only be applied to queries and keys, NOT values!
+   Values don't need position info - they get weighted by position-aware attention.
+
+Testing
+───────
+Your implementation will be tested against:
+• Various input shapes (2D, 3D, 4D)
+• Different sequence lengths and d_k values
+• Non-sequential token positions (e.g., with padding)
+• Numerical accuracy vs reference implementation
+• Gradient correctness
+
+The validator will run: pytest tests/test_model.py::test_rope
+
+Performance Considerations
+──────────────────────────
+RoPE is very efficient:
+• Precomputation: O(max_seq_len × d_k) - done once
+• Per-token: O(d_k) - just rotations (element-wise ops)
+• No extra parameters to train
+• No matrix multiplications
+
+In LLaMA-2 7B with 32 layers:
+• RoPE called 64 times per forward pass (Q and K in each layer)
+• Still negligible compared to attention O(n²d) and FFN costs
+
+Modern implementations use fused CUDA kernels for RoPE, achieving near-zero
+overhead!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your RoPE implementation against reference implementations
+and verify all edge cases. You'll then answer conceptual questions about why
+rotation encodes position, how relative positions emerge, and why RoPE enables
+length extrapolation.
+
+Hints
+─────
+• torch.outer(a, b) computes outer product (useful for angles)
+• torch.stack(..., dim=-1) stacks along last dimension
+• .reshape(..., -1, 2) automatically computes d_k/2
+• Precompute as much as possible (cos/sin for all positions)
+• Test with d_k=4, seq_len=3 first to verify logic
+
+Remember: RoPE is used in LLaMA, PaLM, Mistral, and most modern LLMs. Getting
+this right is crucial for understanding state-of-the-art architectures!

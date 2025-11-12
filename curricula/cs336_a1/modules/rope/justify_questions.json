@@ -1,0 +1,62 @@
+[
+  {
+    "id": "rope_q1",
+    "question": "RoPE treats pairs of dimensions as complex numbers and applies rotation. Explain how the dot product between rotated queries and keys naturally captures RELATIVE position (m-n) rather than absolute positions (m and n separately). Use the rotation property of complex numbers in your explanation.",
+    "model_answer": "RoPE's elegance comes from the rotation property: Rotation(m) ⊗ Rotation(n)* = Rotation(m-n), where ⊗ is complex multiplication and * is conjugate. When we compute Q·K for positions m and n: Q_rotated(m) is Q multiplied by e^(imθ) (rotation by mθ). K_rotated(n) is K multiplied by e^(inθ) (rotation by nθ). The dot product Q_rotated·K_rotated involves the product e^(imθ) × e^(-inθ) = e^(i(m-n)θ), which depends only on the difference (m-n), not m and n individually! This means the attention score naturally encodes relative position: tokens that are 5 positions apart will have the same rotational relationship regardless of their absolute positions (positions 0&5, 10&15, 100&105 all have the same e^(5iθ) factor). The key insight: rotation angles add/subtract, so rotating by m then by -n gives rotation by (m-n). This emergent relative positional encoding happens automatically through dot product arithmetic - no explicit relative position calculation needed! This is why RoPE works for any sequence length and naturally focuses on relative distances.",
+    "required_concepts": [
+      "Complex rotation: e^(imθ) represents rotation by mθ",
+      "Rotation property: e^(imθ) × e^(-inθ) = e^(i(m-n)θ)",
+      "Dot product involves both forward and conjugate rotations",
+      "Relative position (m-n) emerges from rotation arithmetic",
+      "Same relative position gives same rotation regardless of absolute positions"
+    ]
+  },
+  {
+    "id": "rope_q2",
+    "question": "RoPE uses different rotation frequencies for different dimension pairs: θᵢ = 1/(10000^(2i/d_k)). Lower dimensions rotate faster, higher dimensions rotate slower. Why is this multi-scale frequency encoding beneficial? What would happen if all dimensions rotated at the same frequency?",
+    "model_answer": "Multi-scale frequency encoding allows the model to capture position information at different granularities simultaneously. Low indices (fast rotation): θ₀, θ₁ have high frequencies, rotating many times per position. These encode fine-grained, local position info - distinguishing between adjacent tokens (position 5 vs 6). High indices (slow rotation): θ_{d/2-1} have low frequencies, rotating slowly. These encode coarse-grained, global position info - distinguishing distant regions (beginning vs end of sequence). This creates a hierarchical position encoding: some dimensions focus on 'are these tokens right next to each other?' while others focus on 'are these in the same sentence/paragraph?'. If all dimensions rotated at the same frequency: (1) We'd lose this multi-scale structure - all position info at one granularity. (2) Can't simultaneously capture both local and global position. (3) Attention would struggle to balance nearby vs distant context. (4) Similar to having only one Fourier frequency instead of the full spectrum. The logarithmic frequency spacing (base 10000, like original Transformer) ensures we cover the full range from local to global, allowing the model to learn which scales matter for different linguistic phenomena. Lower layers might use high-frequency dimensions (local syntax), while higher layers use low-frequency dimensions (long-range semantics).",
+    "required_concepts": [
+      "Fast rotation = high frequency = local position info",
+      "Slow rotation = low frequency = global position info",
+      "Multi-scale encoding captures different granularities simultaneously",
+      "Single frequency would lose hierarchical structure",
+      "Logarithmic spacing covers local to global range"
+    ]
+  },
+  {
+    "id": "rope_q3",
+    "question": "RoPE enables length extrapolation - models trained on sequences of length N can handle sequences of length M > N at inference. Explain why RoPE has this property while learned absolute position embeddings do not. What is the theoretical limit of extrapolation, and what breaks in practice?",
+    "model_answer": "RoPE enables extrapolation because it defines a continuous function of position through rotation angles. Training on positions [0, N-1]: the model learns that relative position k (e.g., k=5) corresponds to rotation e^(ikθ). At inference on positions [0, M-1] where M > N: Position M-1 just corresponds to rotation e^(i(M-1)θ). The rotation formula works for ANY position - it's defined mathematically, not through learned parameters. The model has never seen absolute position M, but it HAS seen relative positions up to N, and those same relative positions appear in the longer sequence. Learned embeddings fail because: They have a fixed embedding table of size N - positions ≥ N have no embedding. Can't interpolate or extrapolate - embeddings are discrete lookup table entries. Each position's embedding is independent, no structural relationship. Theoretical limit: RoPE should work for infinite sequences - the rotation formula is defined for all m. Practice: Extrapolation breaks because: (1) High-frequency dimensions (fast rotation) have never seen large m values and their angles wrap around differently (aliasing). (2) Attention patterns at distance k > N were never trained, so the model doesn't know how to use them. (3) Context distribution shifts - linguistic patterns at distance 1000 may differ from distance 100. Most models extrapolate 2-4× training length (train 2K, infer 8K) before degrading. Recent work (ALiBi, PI) focuses on improving extrapolation by modifying the position encoding scheme.",
+    "required_concepts": [
+      "RoPE is continuous mathematical function, not lookup table",
+      "Relative positions < N seen during training appear in longer sequences",
+      "Learned embeddings are discrete, bounded by training length",
+      "Rotation formula defined for any position value",
+      "Extrapolation breaks due to aliasing and distributional shift"
+    ]
+  },
+  {
+    "id": "rope_q4",
+    "question": "Why is RoPE applied to queries and keys but NOT to values in attention? What would go wrong if we rotated values? Explain using the interpretation of Q/K/V in attention (what you search for, what you match, what you retrieve).",
+    "model_answer": "RoPE is applied only to Q and K because position information is needed for MATCHING and ROUTING, not for the CONTENT being retrieved. Attention interpretation: Queries (Q) = what each position is searching for. Keys (K) = what each position advertises about itself for matching. Values (V) = the actual information content to retrieve. Position matters for matching (Q·K) because we want to know WHERE things are - 'is this token nearby?' 'should I attend to the previous token?' The Q·K dot product with rotated Q and K naturally captures relative position through the rotation property. Position doesn't matter for values because once attention decides to look at a position (via softmax of Q·K scores), we want the RAW CONTENT from that position, not position-modified content. If we rotated values: (1) Retrieved information would be corrupted by position encoding - we'd get 'content mixed with position' instead of pure content. (2) The same word at different positions would have different value representations, reducing content sharing. (3) Output = Σ attention_weights × V_rotated would have position info baked into the aggregated content, confusing semantics with position. (4) Defeats the purpose of attention - we want to dynamically choose WHAT to look at (via Q/K with position), then retrieve WHAT WE FOUND (pure V without position mixing). Clean separation: Q/K handle routing (with position), V handles content (without position). This design lets the model ask 'where should I look?' (position-aware) then 'what's there?' (position-agnostic).",
+    "required_concepts": [
+      "Q/K determine routing and matching (position matters)",
+      "V provides content to retrieve (position shouldn't corrupt)",
+      "Attention weights computed from Q·K capture 'where to look'",
+      "Values should be pure content, not position-modified",
+      "Rotating V would confuse semantics with position"
+    ]
+  },
+  {
+    "id": "rope_q5",
+    "question": "RoPE requires d_k to be even (pairs of dimensions for rotation). In practice, models sometimes have odd dimensions. Describe two strategies for handling odd dimensions, and explain the trade-offs of each approach in terms of position encoding completeness and implementation complexity.",
+    "model_answer": "Strategy 1: Apply RoPE to first d_k-1 dimensions, leave last dimension unrotated. Implementation: Slice input as x[:,:,:-1] for rotation, x[:,:,-1:] for passthrough, concatenate results. Trade-offs: (+) Simple, minimal code changes. (+) Last dimension remains a pure 'content' dimension without position info. (-) Asymmetric - one dimension treated specially. (-) Slightly incomplete position encoding (loses one dimension of positional expressiveness). (-) Edge case handling in code. Strategy 2: Pad to next even dimension, apply RoPE, then slice back. Implementation: Pad with zeros to make even, rotate all, remove padding. Trade-offs: (+) Symmetric treatment of all dimensions. (+) Clean RoPE implementation (no special cases). (-) More complex padding/unpadding logic. (-) Wasted computation on padded dimension. (-) Padding might interact strangely with normalization or other operations. Strategy 3 (used in practice): Just make d_k even by design. Modern architectures (LLaMA, PaLM) ensure d_k = d_model/num_heads is always even by choosing appropriate d_model and num_heads. Trade-offs: (+) Cleanest - no special cases needed. (+) Most efficient - no padding overhead. (+) Design choice propagates: if d_model=768 and we want 12 heads, d_k=64 (even) ✓. (-) Constrains architectural choices (can't arbitrarily choose dimensions). Best practice: Strategy 3 - design for even dimensions from the start. If you inherit odd dimensions, Strategy 1 is simplest. The incompleteness from one unrotated dimension is negligible compared to having 63 rotated dimensions providing position info.",
+    "required_concepts": [
+      "RoPE needs dimension pairing for 2D rotations",
+      "Can leave one dimension unrotated (asymmetric)",
+      "Can pad to even then slice (symmetric but wasteful)",
+      "Modern models design for even dimensions",
+      "Trade-off between implementation simplicity and completeness"
+    ]
+  }
+]
