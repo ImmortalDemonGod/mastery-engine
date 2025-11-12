@@ -8,6 +8,18 @@
       "name": "Numerically Stable Softmax",
       "path": "modules/softmax",
       "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "cross_entropy",
+      "name": "Numerically Stable Cross-Entropy Loss",
+      "path": "modules/cross_entropy",
+      "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "gradient_clipping",
+      "name": "Global Gradient Clipping",
+      "path": "modules/gradient_clipping",
+      "baseline_perf_seconds": 0.10
     }
   ]
 }

@@ -1,0 +1,99 @@
+# Build Challenge: Global Gradient Clipping
+
+## Objective
+Implement gradient clipping that computes the global L2 norm across all parameter gradients and scales them proportionally to enforce a maximum norm threshold.
+
+## Background
+Gradient clipping is a critical technique for training stable deep networks. When gradients become too large (gradient explosion), they can cause catastrophic parameter updates that destabilize training. Clipping prevents this by limiting the magnitude of gradient updates.
+
+The key insight is that we must clip based on the **global norm** across all parameters, not individual parameter norms. Per-parameter clipping would distort the relative magnitudes of gradients, potentially changing the optimization direction.
+
+## Where to Edit
+**FILE TO MODIFY:** `cs336_basics/utils.py`
+
+You will edit the `gradient_clipping` function **directly in this file** in your main working directory. The Mastery Engine will validate your implementation by running tests in an isolated environment.
+
+**IMPORTANT:** Other functions in `utils.py` (e.g., `softmax`, `cross_entropy`) are already implemented. Only modify the `gradient_clipping` function.
+
+## Requirements
+Implement `gradient_clipping(parameters, max_l2_norm)` with the following specifications:
+
+### Function Signature
+```python
+def gradient_clipping(parameters, max_l2_norm: float) -> None:
+    """
+    Clip gradients in-place so that the global L2 norm across all 
+    parameter gradients does not exceed `max_l2_norm`.
+    
+    Args:
+        parameters: Iterable of torch.nn.Parameter (or objects with .grad)
+        max_l2_norm: Maximum allowed global L2 norm
+        
+    Returns:
+        None (modifies gradients in-place)
+    """
+```
+
+### Implementation Constraints
+1. **Global Norm Computation**:
+   - Compute the L2 norm of each parameter's gradient: `grad.norm(2)`
+   - Combine into global norm: `torch.stack(norms).norm(2)`
+   - This is equivalent to concatenating all gradients and computing their norm
+   
+2. **Proportional Scaling**:
+   - Only clip if `global_norm > max_l2_norm`
+   - Compute scaling factor: `clip_coef = max_l2_norm / (global_norm + eps)`
+   - Apply to **all** gradients: `grad.mul_(clip_coef)` for each grad
+   - Use `eps = 1e-6` to prevent division by zero
+   
+3. **In-Place Modification**:
+   - Modify gradients directly using `.mul_()`
+   - Do not create new tensors
+   - Handle missing gradients gracefully (some parameters may not have .grad)
+
+4. **Correctness**:
+   - Output must match `torch.nn.utils.clip_grad_norm_` behavior
+   - Must preserve relative gradient magnitudes (proportional scaling)
+   - Must handle edge cases: no gradients, zero norms, already below threshold
+
+### Mathematical Foundation
+**Global L2 Norm**:
+```
+global_norm = ||[g1, g2, ..., gn]||_2
+            = sqrt(||g1||_2^2 + ||g2||_2^2 + ... + ||gn||_2^2)
+```
+
+**Clipping Operation**:
+```
+if global_norm > max_norm:
+    for each gradient g:
+        g *= max_norm / global_norm
+```
+
+**Why Global Norm**:
+- Preserves the relative importance of different parameters
+- Maintains the direction of the combined gradient update
+- Prevents distortion of the optimization path
+
+## Testing
+Your implementation will be tested against:
+- Normal gradients (below threshold)
+- Large gradients requiring clipping
+- Mixed magnitude gradients
+- Edge cases: missing gradients, zero gradients
+- Comparison with `torch.nn.utils.clip_grad_norm_`
+
+## Submission
+Once implemented, run:
+```bash
+engine submit-build
+```
+
+The validator will run `pytest tests/test_nn_utils.py::test_gradient_clipping_matches_pytorch` and measure performance.
+
+## Hints
+- Use `torch.stack([...])` to combine individual norms
+- Remember `.detach()` when computing norms to avoid tracking gradients-of-gradients
+- The `getattr(p, "grad", None)` pattern safely checks for gradient existence
+- In-place operations use the `_` suffix: `.mul_()`, not `.mul()`
+- Early return if no gradients exist avoids unnecessary computation

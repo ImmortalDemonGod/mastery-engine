@@ -1,0 +1,23 @@
+--- cs336_basics/utils.py
++++ cs336_basics/utils.py
+@@ -60,13 +60,11 @@
+     """
+     # Collect grads that exist
+     grads = [p.grad for p in parameters if getattr(p, "grad", None) is not None]
+     if not grads:
+         return
+-    # Compute global L2 norm (same as norm of concatenation)
+-    norms = torch.stack([g.detach().norm(2) for g in grads])
+-    total_norm = norms.norm(2)
+-    # Only scale if norm exceeds the threshold
+-    if total_norm > max_l2_norm:
+-        clip_coef = max_l2_norm / (total_norm + 1e-6)
+-        for g in grads:
+-            g.mul_(clip_coef)
++    # BUG: Per-parameter clipping instead of global norm - distorts gradient direction!
++    for g in grads:
++        grad_norm = g.detach().norm(2)
++        if grad_norm > max_l2_norm:
++            # Clip each gradient independently
++            clip_coef = max_l2_norm / (grad_norm + 1e-6)
++            g.mul_(clip_coef)
