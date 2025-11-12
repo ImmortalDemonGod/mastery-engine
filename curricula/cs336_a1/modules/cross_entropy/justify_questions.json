@@ -1,0 +1,58 @@
+[
+  {
+    "id": "logsumexp_stability",
+    "question": "Your implementation uses `torch.logsumexp` instead of computing softmax explicitly and then taking the log. Explain the numerical stability benefit of the log-sum-exp formulation. Why does the two-step approach (softmax → log) fail for large logit magnitudes?",
+    "model_answer": "The log-sum-exp formulation avoids two critical numerical failures of the two-step approach. First, computing softmax explicitly requires exp(large_logits), which overflows to infinity for large positive values. Second, even if overflow is avoided via the subtract-max trick, the softmax output can underflow to exactly 0.0 for the non-maximum classes when the gap is large, and log(0) = -inf, which is unrecoverable. The logsumexp approach computes log(sum(exp(x))) stably using the identity logsumexp(x) = max(x) + log(sum(exp(x - max(x)))), which internally applies the subtract-max trick but never materializes the intermediate softmax probabilities that could underflow to zero.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["stability", "numerical", "better", "safer"],
+        "feedback": "You're correct that it's about numerical stability, but can you be more specific? What exact numerical failure happens in the two-step approach? Try explaining with a concrete example like logits = [100.0, 0.0]."
+      },
+      {
+        "category": "Incomplete (Missing Underflow)",
+        "keywords": ["overflow", "exp", "large"],
+        "feedback": "Good! You've identified overflow in exp(). But there's a second problem: even if we use subtract-max to prevent overflow in softmax, what happens when we take log() of the softmax output? Why can log(softmax(...)) still produce -inf?"
+      },
+      {
+        "category": "Conceptual Mismatch",
+        "keywords": ["approximation", "faster", "optimization"],
+        "feedback": "Important clarification: logsumexp is not an approximation or just an optimization. It's the mathematically correct way to compute log(sum(exp())) stably. Can you explain the mathematical identity that logsumexp uses internally to avoid overflow/underflow?"
+      }
+    ],
+    "required_concepts": [
+      "overflow in exp(large_logits)",
+      "underflow in softmax probabilities",
+      "log(0) = -inf problem",
+      "logsumexp identity: max(x) + log(sum(exp(x - max(x))))"
+    ]
+  },
+  {
+    "id": "gather_indexing",
+    "question": "Explain how `gather` is used in your implementation to extract the logits corresponding to the target class indices. Why can't we simply use direct indexing like `logits[targets]`, and what is the purpose of `unsqueeze(-1)` and `squeeze(-1)` in this operation?",
+    "model_answer": "Direct indexing `logits[targets]` doesn't work correctly for multi-dimensional tensors because targets is a 1D tensor of indices that should select along dim=-1 (the class dimension) for each batch element. The `gather(dim=-1, index=targets.unsqueeze(-1))` operation performs this per-batch-element indexing: unsqueeze(-1) reshapes targets from (batch_size,) to (batch_size, 1) to match the dimensionality requirements of gather, which then extracts one value from each row. The result is (batch_size, 1), so we squeeze(-1) to get back to (batch_size,) for the final mean() aggregation. This pattern correctly handles batched indexing where each batch element has its own target class index.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["indexing", "select", "extract"],
+        "feedback": "You're on the right track with indexing, but can you be more specific? What is the shape of logits, targets, and the desired output? Why does simple indexing fail to produce the right shape?"
+      },
+      {
+        "category": "Incomplete (Missing Shape Context)",
+        "keywords": ["gather", "targets"],
+        "feedback": "You've mentioned gather, but can you explain the shapes involved? What is the shape of targets before unsqueeze? After unsqueeze? After gather? Why is each transformation necessary?"
+      },
+      {
+        "category": "Conceptual Mismatch",
+        "keywords": ["fancy indexing", "advanced indexing", "logits[targets]"],
+        "feedback": "While Python/NumPy advanced indexing might work in simple cases, gather is the correct PyTorch primitive for batched indexing. Can you explain what gather(dim=-1) means: which dimension are we selecting from, and what are we using as indices?"
+      }
+    ],
+    "required_concepts": [
+      "batched indexing requirement",
+      "gather dimension semantics",
+      "shape transformations: unsqueeze and squeeze",
+      "per-batch-element index selection"
+    ]
+  }
+]

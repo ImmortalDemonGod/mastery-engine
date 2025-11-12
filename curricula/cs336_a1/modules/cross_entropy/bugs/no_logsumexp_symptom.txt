@@ -1,0 +1,59 @@
+# Bug Symptom: Numerical Instability in Cross-Entropy
+
+## Observed Behavior
+Your cross-entropy implementation produces `NaN` (Not a Number) or `inf` (infinity) values when processing inputs with large-magnitude logits.
+
+## Failing Test Case
+```python
+logits = torch.tensor([[100.0, 0.0, 0.0]])  # Large logit for class 0
+targets = torch.tensor([1])  # True class is 1 (not the largest logit)
+
+result = cross_entropy(logits, targets)
+# Expected: reasonable loss value (~100.0)
+# Actual: inf or nan
+```
+
+## Error Message
+```
+AssertionError: Cross-entropy output contains NaN or Inf values
+```
+
+## Your Challenge
+The bug arises from computing softmax explicitly before taking the log. This two-step process has two failure modes:
+
+1. **Overflow in `exp()`**: For large positive logits (e.g., 100.0), `exp(100) ≈ 10^43` overflows to `inf`
+2. **Underflow in softmax**: Even if overflow is avoided, softmax can produce probabilities so small they underflow to exactly 0.0, and `log(0) = -inf`
+
+**Debug this issue by:**
+1. Identifying whether the bug manifests as NaN (from inf/inf) or -inf (from log(0))
+2. Understanding why the two-step approach (softmax → log) is numerically unstable
+3. Implementing the log-sum-exp formulation directly: `logsumexp(logits) - logits[target]`
+4. Verifying the output matches PyTorch's `F.cross_entropy`
+
+## Expected Output After Fix
+After your fix, `cross_entropy(torch.tensor([[100.0, 0.0, 0.0]]), torch.tensor([1]))` should produce a finite loss value around 100.0, not infinity or NaN.
+
+## Debugging Tips
+- Print intermediate values: `exp_logits`, `softmax_probs`, `target_probs` before taking log
+- Check for overflow: `torch.isinf(exp_logits).any()`
+- Check for underflow: `(softmax_probs == 0.0).any()`
+- Try the test case with smaller logits (e.g., `[10.0, 0.0, 0.0]`) to see if it works
+
+## Mathematical Insight
+The log-sum-exp trick computes `log(sum(exp(logits)))` stably without materializing the intermediate `sum(exp(logits))` which could overflow. PyTorch's `logsumexp` uses the identity:
+
+```
+logsumexp(x) = max(x) + log(sum(exp(x - max(x))))
+```
+
+This keeps all exponentials in a safe range while computing the mathematically exact result.
+
+## Hint
+Cross-entropy can be computed directly as:
+```python
+loss = logsumexp(logits, dim=-1) - logits[target_index]
+```
+
+This never computes softmax probabilities explicitly, avoiding both overflow in exp() and underflow in the probabilities.
+
+Run `engine submit-fix` once you've fixed the numerical stability issue.

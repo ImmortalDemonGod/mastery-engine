@@ -1,0 +1,94 @@
+# Build Challenge: Numerically Stable Cross-Entropy Loss
+
+## Objective
+Implement a numerically stable cross-entropy loss function that avoids numerical overflow when computing with large logits, using the log-sum-exp trick.
+
+## Background
+Cross-entropy is the standard loss function for classification tasks in deep learning. It measures how well predicted probabilities match true labels. The naive implementation requires computing `softmax(logits)` followed by `-log(softmax[target])`, but this two-step process is numerically unstable for large logit values.
+
+The mathematically equivalent log-sum-exp formulation computes the loss directly from logits without materializing the softmax probabilities, providing both numerical stability and computational efficiency.
+
+## Where to Edit
+**FILE TO MODIFY:** `cs336_basics/utils.py`
+
+You will edit the `cross_entropy` function **directly in this file** in your main working directory. The Mastery Engine will validate your implementation by running tests in an isolated environment.
+
+**IMPORTANT:** Other functions in `utils.py` (e.g., `softmax`, `gradient_clipping`) are already implemented. Only modify the `cross_entropy` function.
+
+## Requirements
+Implement `cross_entropy(inputs, targets)` with the following specifications:
+
+### Function Signature
+```python
+def cross_entropy(
+    inputs: Float[torch.Tensor, " batch_size vocab_size"],
+    targets: torch.Tensor
+) -> Float[torch.Tensor, ""]:
+    """
+    Numerically-stable cross-entropy loss averaged over the batch.
+    
+    Args:
+        inputs: Unnormalized logits of shape (batch_size, vocab_size)
+        targets: Class indices tensor of shape (batch_size,), int dtype
+        
+    Returns:
+        Scalar tensor: mean cross-entropy over the batch
+    """
+```
+
+### Implementation Constraints
+1. **Numerical Stability**: Use `torch.logsumexp` for the log-sum-exp trick
+   - Never compute `softmax` explicitly
+   - Avoid taking `log` of potentially zero values
+   
+2. **Precision Policy**: 
+   - Upcast intermediate computations to `float32` for stability
+   - Cast final output back to input's original dtype
+   
+3. **Correctness**:
+   - Output must match `torch.nn.functional.cross_entropy` to within `atol=1e-6`
+   - Must handle extreme logits: very large positive/negative values
+   - Properly handles integer target indices
+
+### Mathematical Foundation
+**Log-Sum-Exp Formulation**:
+```
+cross_entropy = -log(softmax(logits)[target])
+              = -log(exp(logits[target]) / sum(exp(logits)))
+              = -(logits[target] - log(sum(exp(logits))))
+              = logsumexp(logits) - logits[target]
+```
+
+**Why this works**:
+- `logsumexp(x) = log(sum(exp(x)))` is computed stably by PyTorch
+- Never materializes `exp(large_number)` directly
+- Avoids the `log(small_number)` → `-inf` problem
+
+### Implementation Steps
+1. Convert targets to `long` dtype for indexing
+2. Upcast logits to `float32`
+3. Compute `logsumexp(logits, dim=-1)` for normalization term
+4. Use `gather` to extract logits corresponding to target indices
+5. Loss = `(logsumexp - target_logits).mean()`
+
+## Testing
+Your implementation will be tested against:
+- Standard classification scenarios
+- Large logit magnitudes (positive and negative)
+- Edge cases: single-class, large vocabulary sizes
+- Batch processing correctness
+
+## Submission
+Once implemented, run:
+```bash
+engine submit-build
+```
+
+The validator will run `pytest tests/test_nn_utils.py::test_cross_entropy_matches_pytorch` and measure performance.
+
+## Hints
+- Use `torch.logsumexp(logits, dim=-1)` for the log-sum-exp computation
+- Use `logits.gather(dim=-1, index=targets.unsqueeze(-1))` to extract target logits
+- Remember to `.squeeze(-1)` after gathering to restore shape
+- The `.mean()` aggregates loss across the batch
+- This is mathematically identical to softmax + log, but numerically superior
