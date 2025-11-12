@@ -163,7 +163,9 @@ cython_debug/
 *.zip
 .vscode/settings.json
 
-# Mastery Engine
+# Mastery Engine - Dual Mode System
+.active-mode
+cs336_basics/                  # Derived workspace (symlink to modes/)
 .mastery_engine_worktree/
 .mastery_progress.json
 
