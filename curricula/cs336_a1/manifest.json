@@ -20,6 +20,12 @@
       "name": "Global Gradient Clipping",
       "path": "modules/gradient_clipping",
       "baseline_perf_seconds": 0.10
+    },
+    {
+      "id": "rmsnorm",
+      "name": "Root Mean Square Layer Normalization",
+      "path": "modules/rmsnorm",
+      "baseline_perf_seconds": 0.12
     }
   ]
 }

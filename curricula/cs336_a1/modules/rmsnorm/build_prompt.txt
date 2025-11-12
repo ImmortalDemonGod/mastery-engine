@@ -1,0 +1,221 @@
+Build Challenge: Root Mean Square Layer Normalization (RMSNorm)
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement RMSNorm, a simplified and efficient normalization technique that has 
+become the standard in modern large language models including LLaMA, Mistral, 
+and GPT-NeoX. You will learn why normalization is critical for training deep 
+networks and how RMSNorm achieves comparable performance to LayerNorm with 
+reduced computational cost.
+
+Background: Why Normalization Matters
+──────────────────────────────────────
+Deep neural networks suffer from internal covariate shift—as parameters update 
+during training, the distribution of layer inputs changes, forcing downstream 
+layers to continuously adapt. This makes training unstable and slow.
+
+Layer normalization (LayerNorm) addresses this by normalizing activations to 
+have zero mean and unit variance. However, Zhang & Sennrich (2019) discovered 
+that the mean-centering step is largely unnecessary—normalizing by root mean 
+square alone provides nearly identical benefits with lower computational cost.
+
+RMSNorm has become the normalization of choice in state-of-the-art LLMs because:
+• 10-15% faster than LayerNorm (one less statistic to compute)
+• Simpler implementation with fewer numerical edge cases
+• Empirically equivalent performance across model scales
+• More stable gradients during mixed-precision training
+
+Mathematical Foundation
+───────────────────────
+Given an input vector x ∈ ℝᵈ, RMSNorm computes:
+
+    RMS(x) = √(1/d ∑ᵢ₌₁ᵈ xᵢ²)
+    
+    RMSNorm(x) = (x / RMS(x)) ⊙ γ
+
+Where:
+• RMS(x) is the root mean square (quadratic mean) of x
+• γ ∈ ℝᵈ is a learned scale parameter (initialized to 1)
+• ⊙ denotes element-wise multiplication
+
+The division by RMS(x) normalizes the vector to have RMS = 1, then the 
+learned scale γ allows the model to adjust the magnitude per dimension.
+
+Key Insight: Unlike LayerNorm which centers (x - μ) before scaling, RMSNorm 
+skips centering. The paper shows this is sufficient because the
+
+ important 
+information is in the *relative magnitudes* of features, not their absolute 
+values.
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the RMSNorm class as a PyTorch Module. The file already 
+contains other layer implementations (Linear, Embedding, SwiGLU, attention 
+layers) that you'll use later. For now, focus only on RMSNorm.
+
+IMPORTANT: Only modify the RMSNorm class. Do not change other functions.
+
+Requirements
+────────────
+Implement the RMSNorm class with the following specification:
+
+Class Signature
+───────────────
+
+class RMSNorm(nn.Module):
+    def __init__(self, d_model: int, eps: float = 1e-6, device=None, dtype=None):
+        """
+        Root Mean Square Layer Normalization.
+        
+        Args:
+            d_model: Dimensionality of the input features
+            eps: Small constant for numerical stability (avoid division by zero)
+            device: Device to place parameters on (e.g., 'cpu', 'cuda')
+            dtype: Data type for parameters (e.g., torch.float32)
+        """
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply RMSNorm to input tensor.
+        
+        Args:
+            x: Input tensor of shape (..., d_model)
+               Can have arbitrary leading batch dimensions
+        
+        Returns:
+            Normalized tensor of same shape as input
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Numerical Stability**: Use eps=1e-6 in the denominator to prevent 
+   division by zero when input magnitudes are very small.
+
+2. **Precision Policy**: 
+   - Upcast computation to float32 for numerical stability
+   - Cast output back to input's original dtype
+   - This prevents precision loss in float16/bfloat16 training
+
+3. **Batching**: Your implementation must handle arbitrary leading dimensions.
+   For example, if d_model=512:
+   - x.shape = (batch, seq_len, 512) → normalize over last dimension
+   - x.shape = (batch, heads, seq_len, 512) → normalize over last dimension
+   - The normalization always operates on the final dimension
+
+4. **Parameter Initialization**: Initialize the scale parameter γ to ones
+   using torch.nn.init.ones_(). This preserves the input magnitude initially.
+
+5. **Correctness**: Your output must match the reference implementation to 
+   within atol=1e-6 relative tolerance.
+
+Implementation Steps
+────────────────────
+
+Step 1: Store the learned scale parameter
+   - Create a parameter of shape (d_model,)
+   - Initialize to all ones
+   - Make sure it's registered as an nn.Parameter for training
+
+Step 2: In forward(), compute the RMS
+   - Square all elements: x²
+   - Take mean over the last dimension (dimension=-1, keepdim=True)
+   - Take square root: √(mean(x²))
+   - Add eps for numerical stability
+
+Step 3: Normalize and scale
+   - Divide input by RMS: x / (RMS(x) + eps)
+   - Multiply by learned scale: normalized_x * γ
+   - Ensure γ broadcasts correctly over the normalized tensor
+
+Step 4: Handle precision
+   - Save original dtype at start of forward()
+   - Convert to float32 for RMS computation
+   - Convert final output back to original dtype
+
+Mathematical Insight: Relationship to LayerNorm
+───────────────────────────────────────────────
+LayerNorm computes:
+    LayerNorm(x) = γ ⊙ (x - μ)/σ + β
+
+Where μ is mean and σ is standard deviation. RMSNorm simplifies this:
+    RMSNorm(x) = γ ⊙ x/RMS(x)
+
+The key differences:
+• No mean centering (x - μ)
+• No bias term (β)
+• Uses RMS instead of standard deviation
+
+Why does this work? Because Transformers use residual connections and already
+have learned biases in the feed-forward layers, making the bias term redundant.
+The mean-centering is similarly redundant—what matters is the relative scale
+of features, not their offset.
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting keepdim=True**: When computing mean, you must keep the 
+   dimension for proper broadcasting during division.
+   
+   Wrong: rms = torch.sqrt(torch.mean(x ** 2, dim=-1))  # shape changes!
+   Right: rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True))
+
+❌ **Incorrect dimension for normalization**: Always normalize over the 
+   LAST dimension (d_model), not over batch or sequence dimensions.
+
+❌ **Scale parameter shape mismatch**: γ must be shape (d_model,) to 
+   broadcast correctly over (..., d_model) inputs.
+
+❌ **Forgetting epsilon**: Division by very small RMS values causes NaN.
+   Always add eps before division: x / (rms + eps)
+
+❌ **Precision loss**: Running in float16 without upcasting to float32 can
+   cause training instability. Always upcast→compute→downcast.
+
+Testing
+───────
+Your implementation will be tested against:
+• Standard cases with various batch dimensions
+• Edge cases with very small/large input values  
+• Numerical stability with near-zero RMS
+• Gradient correctness in backward pass
+• Match with reference implementation (atol=1e-6)
+
+The validator will run: pytest tests/test_model.py::test_rmsnorm
+
+Performance Note
+────────────────
+RMSNorm is roughly 10-15% faster than LayerNorm because:
+• One statistic instead of two (RMS vs mean and stddev)
+• No subtraction operation
+• Simpler backward pass
+
+For a 1B parameter model, this saves ~5-10% of total training time when 
+considering that normalization is called twice per Transformer block and you 
+have dozens of blocks.
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your RMSNorm against our reference implementation and 
+verify all test cases pass. You'll then proceed to conceptual questions about 
+the role of normalization in deep learning.
+
+Hints
+─────
+• Use torch.nn.Parameter() to create learnable parameters
+• torch.mean() with keepdim=True preserves dimensions
+• Broadcasting rules: (d_model,) broadcasts to (..., d_model)
+• To upcast: x.float() or x.to(torch.float32)
+• To restore dtype: x.to(original_dtype)
+
+Remember: This is a fundamental building block. Every Transformer block uses 
+RMSNorm 2-3 times. Getting this right is crucial for stable training!

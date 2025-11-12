@@ -85,18 +85,26 @@ class RMSNorm(nn.Module):
     where reduction is over the last dimension (feature dimension).
     """
 
-    def __init__(self, d_model: int, eps: float = 1e-5) -> None:
+    def __init__(self, d_model: int, eps: float = 1e-6, device=None, dtype=None) -> None:
         super().__init__()
-        self.d_model = int(d_model)
-        self.eps = float(eps)
-        self.weight = nn.Parameter(torch.ones(self.d_model))
+        # TODO: Initialize RMSNorm parameters
+        # - Store d_model and eps
+        # - Create learnable scale parameter (weight) of shape (d_model,)
+        # - Initialize weight to ones using torch.nn.init.ones_()
+        raise NotImplementedError("TODO: Implement RMSNorm.__init__")
 
     def forward(self, in_features: Tensor) -> Tensor:
-        x = in_features
-        # Compute rms over last dim
-        rms = torch.sqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
-        y = x / rms
-        return y * self.weight
+        # TODO: Implement RMSNorm forward pass
+        # 1. Save original dtype and upcast to float32 for numerical stability
+        # 2. Compute RMS over last dimension (use keepdim=True!)
+        #    RMS(x) = sqrt(mean(x^2))
+        # 3. Normalize: x / (RMS(x) + eps)
+        # 4. Scale by learned weight parameter
+        # 5. Convert back to original dtype
+        #
+        # Remember: Your implementation must handle arbitrary batch dimensions!
+        # Shape (..., d_model) → (..., d_model)
+        raise NotImplementedError("TODO: Implement RMSNorm.forward")
 
 
 class SwiGLU(nn.Module):

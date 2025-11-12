@@ -1,0 +1,60 @@
+[
+  {
+    "id": "rmsnorm_q1",
+    "question": "Why is it critical to use keepdim=True when computing the mean in RMSNorm? Explain what would go wrong without it and why this affects the normalization computation.",
+    "model_answer": "keepdim=True preserves the dimension when computing the mean, so if the input has shape (batch, seq_len, d_model) and we compute mean over dim=-1, the result has shape (batch, seq_len, 1) instead of (batch, seq_len). Without keepdim=True, broadcasting fails during division because shapes don't align—you'd be trying to divide (batch, seq_len, d_model) by (batch, seq_len), which would normalize across the wrong dimensions or fail entirely. The keepdim=True ensures element-wise division happens correctly: each d_model-dimensional vector is divided by its own RMS scalar, which broadcasts from shape (..., 1) to (..., d_model).",
+    "required_concepts": [
+      "Broadcasting in PyTorch requires compatible shapes",
+      "keepdim=True preserves dimensions for proper broadcasting",
+      "Normalization must happen per-example, not across examples",
+      "Division must be element-wise per feature vector"
+    ]
+  },
+  {
+    "id": "rmsnorm_q2",
+    "question": "RMSNorm omits the mean-centering step (x - μ) that LayerNorm includes. Why does RMSNorm still work effectively for training Transformers despite this simplification? What properties of Transformer architectures make mean-centering redundant?",
+    "model_answer": "RMSNorm works because Transformers already have mechanisms that handle mean shifts: (1) Residual connections allow information to bypass normalized layers, so absolute offsets are preserved in skip connections. (2) Feed-forward layers have learned bias terms that can adjust for any mean shift. (3) What matters for training is the relative scale of features, not their absolute values—gradients depend on ratios and relative magnitudes. (4) The attention mechanism is also scale-invariant to uniform shifts due to softmax normalization. Empirically, removing mean-centering has negligible impact on final performance while reducing compute by ~10-15% since you eliminate one statistic calculation and the subtraction operation.",
+    "required_concepts": [
+      "Residual connections preserve absolute values",
+      "Learned biases can compensate for mean shifts",
+      "Relative feature magnitudes matter more than absolute values",
+      "Computational efficiency benefit of fewer operations"
+    ]
+  },
+  {
+    "id": "rmsnorm_q3",
+    "question": "Explain the numerical stability strategy in RMSNorm: why do we upcast to float32 for computation, add epsilon before division, and then downcast back to the original dtype? What would happen without each of these safeguards?",
+    "model_answer": "The three-step stability strategy prevents numerical errors: (1) Upcasting to float32 prevents precision loss during squaring and mean operations—float16 has limited range and precision, and x² can overflow or lose precision. Without upcasting, tiny differences become zero or large values become inf. (2) Adding epsilon (1e-6) before division prevents division by zero or near-zero—if all input values are very small, RMS could be ~0 causing NaN or inf. The epsilon makes the denominator safely non-zero. (3) Downcasting back to original dtype (e.g., float16/bfloat16) maintains memory efficiency for the rest of the forward pass and matches the model's training precision. Without downcasting, memory usage would double and downstream computations might expect specific dtypes.",
+    "required_concepts": [
+      "Float16 has limited precision for small numbers",
+      "Squaring can cause overflow or underflow",
+      "Division by near-zero values produces NaN/inf",
+      "Epsilon provides a numerical safety margin",
+      "Downcasting maintains memory efficiency"
+    ]
+  },
+  {
+    "id": "rmsnorm_q4",
+    "question": "The scale parameter γ is initialized to ones and is learnable. Explain why we initialize to ones specifically (not zeros or random values), and describe what the model learns to do with this parameter during training.",
+    "model_answer": "Initializing γ to ones is crucial because it makes RMSNorm an identity operation initially—at the start of training, RMSNorm(x) ≈ x (just normalized to unit RMS). This is important for residual networks: we want the model to start with clean residual paths where x + RMSNorm(f(x)) ≈ x + f(x) initially. If we initialized to zeros, the layer would output zeros, breaking gradient flow. Random initialization would inject noise that disrupts the careful initialization of other layers. During training, the model learns optimal scales per dimension: some features might need amplification (γᵢ > 1) while others need dampening (γᵢ < 1). This lets the model control which features are important, effectively learning a form of feature-wise attention or gating. The learned γ values often reflect which dimensions carry the most signal for the task.",
+    "required_concepts": [
+      "Identity initialization preserves gradient flow",
+      "Residual connections require stable initialization",
+      "Zero initialization would block gradients",
+      "Learned scales act as feature-wise importance weights",
+      "Per-dimension scaling allows selective amplification"
+    ]
+  },
+  {
+    "id": "rmsnorm_q5",
+    "question": "In a Transformer block, RMSNorm is applied before both the attention and feed-forward sublayers (pre-norm architecture). Why is this positioning critical for training stability, and what happens if we instead apply normalization after these sublayers (post-norm)?",
+    "model_answer": "Pre-norm (normalizing before sublayers) is critical for stability because: (1) It bounds the input to each sublayer, preventing activation explosions as depth increases. Each sublayer receives normalized inputs regardless of previous layer outputs. (2) Gradient flow is more stable since normalization happens before non-linearities, avoiding extreme gradients in deep networks. (3) The residual path x + sublayer(norm(x)) keeps x unnormalized, preserving information flow. Post-norm (normalizing after sublayers) is less stable because: (1) Sublayers can produce arbitrarily large outputs before normalization, especially in deep networks. (2) Gradients must flow through the normalization layer after the residual connection, creating optimization challenges. (3) Empirically, post-norm requires careful learning rate tuning and warmup, while pre-norm is robust to hyperparameters. Modern LLMs universally use pre-norm for this stability benefit, enabling training of models with hundreds of layers.",
+    "required_concepts": [
+      "Pre-norm bounds inputs to each sublayer",
+      "Residual paths preserve unnormalized information",
+      "Post-norm suffers from activation explosions in deep networks",
+      "Gradient flow is stabler with pre-norm",
+      "Pre-norm is more robust to hyperparameter choices"
+    ]
+  }
+]

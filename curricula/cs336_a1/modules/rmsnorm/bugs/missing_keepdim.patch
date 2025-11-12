@@ -1,0 +1,12 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -90,7 +90,8 @@ class RMSNorm(nn.Module):
+         orig_dtype = x.dtype
+         x = x.float()
+         # Compute RMS
+-        rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True))
++        # BUG: Missing keepdim=True causes broadcasting error!
++        rms = torch.sqrt(torch.mean(x ** 2, dim=-1))
+         # Normalize and scale
+         normalized = x / (rms + self.eps)
+         # Apply learned scale and convert back to original dtype
