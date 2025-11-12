@@ -11,11 +11,15 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     - Subtract the max along `dim` before exponentiation to avoid overflow.
     - Cast the final probabilities back to the original dtype of the input tensor.
     """
-    # TODO: Implement numerically stable softmax using subtract-max trick
-    # Hint: max_vals = x.max(dim=dim, keepdim=True).values
-    #       shifted = x - max_vals
-    #       return exp(shifted) / sum(exp(shifted))
-    raise NotImplementedError("TODO: Implement softmax with subtract-max trick")
+    x = in_features
+    orig_dtype = x.dtype
+    x32 = x.float()
+    max_vals = x32.max(dim=dim, keepdim=True).values
+    shifted = x32 - max_vals
+    exps = torch.exp(shifted)
+    sums = exps.sum(dim=dim, keepdim=True)
+    out = exps / sums
+    return out.to(orig_dtype)
 
 
 def cross_entropy(
@@ -31,11 +35,16 @@ def cross_entropy(
     Returns:
         Scalar tensor: mean cross-entropy over the batch.
     """
-    # TODO: Implement numerically stable cross-entropy using log-sum-exp
-    # Hint: lse = torch.logsumexp(logits, dim=-1)
-    #       target_logits = logits.gather(dim=-1, index=targets.unsqueeze(-1)).squeeze(-1)
-    #       loss = (lse - target_logits).mean()
-    raise NotImplementedError("TODO: Implement cross_entropy with log-sum-exp trick")
+    logits = inputs
+    orig_dtype = logits.dtype
+    x32 = logits.float()
+    t = targets.long()
+    # log-sum-exp for stability
+    lse = torch.logsumexp(x32, dim=-1)
+    # pick the logit for the correct class
+    correct = x32.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)
+    loss = (lse - correct).mean()
+    return loss.to(orig_dtype)
 
 
 def gradient_clipping(parameters, max_l2_norm: float) -> None:
@@ -49,10 +58,18 @@ def gradient_clipping(parameters, max_l2_norm: float) -> None:
         parameters: Iterable of torch.nn.Parameter (or objects with .grad tensors).
         max_l2_norm: Maximum allowed global L2 norm.
     """
-    # TODO: Implement gradient clipping by global L2 norm
-    # Hint: 1) Compute total_norm = sqrt(sum(grad.norm(2)^2 for all grads))
-    #       2) If total_norm > max_l2_norm: scale all grads by max_l2_norm/total_norm
-    raise NotImplementedError("TODO: Implement gradient clipping by global L2 norm")
+    # Collect grads that exist
+    grads = [p.grad for p in parameters if getattr(p, "grad", None) is not None]
+    if not grads:
+        return
+    # Compute global L2 norm (same as norm of concatenation)
+    norms = torch.stack([g.detach().norm(2) for g in grads])
+    total_norm = norms.norm(2)
+    # Only scale if norm exceeds the threshold
+    if total_norm > max_l2_norm:
+        clip_coef = max_l2_norm / (total_norm + 1e-6)
+        for g in grads:
+            g.mul_(clip_coef)
 
 
 def get_lr_cosine_schedule(
