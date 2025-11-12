@@ -21,6 +21,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from engine.state import StateManager, StateFileCorruptedError
 from engine.curriculum import CurriculumManager, CurriculumNotFoundError, CurriculumInvalidError
