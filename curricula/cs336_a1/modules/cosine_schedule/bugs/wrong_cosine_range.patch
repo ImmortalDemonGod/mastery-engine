@@ -1,0 +1,16 @@
+--- a/cs336_basics/optimizer.py
++++ b/cs336_basics/optimizer.py
+@@ -45,9 +45,10 @@ def lr_cosine_schedule(
+     # Cosine decay phase
+     progress = (step - warmup_steps) / (max_steps - warmup_steps)
+     
+-    # Apply cosine formula: (1 + cos(πt)) / 2 maps [-1,1] to [0,1]
+-    cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+-    lr = min_lr + (max_lr - min_lr) * cosine_decay
++    # BUG: Using cos(πt) directly without transformation!
++    # This goes negative after t=0.5, making learning rate negative.
++    # Should be: (1 + cos(πt)) / 2 to map [-1,1] → [0,1]
++    cosine_decay = math.cos(math.pi * progress)  # Wrong! Goes from 1 to -1
++    lr = min_lr + (max_lr - min_lr) * cosine_decay  # Will be negative!
+     
+     return lr

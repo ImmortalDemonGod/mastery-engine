@@ -1,0 +1,377 @@
+Build Challenge: Cosine Learning Rate Schedule with Warmup
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a cosine annealing learning rate schedule with linear warmup, the
+standard LR schedule used in GPT-3, LLaMA, and most modern LLM training. You
+will learn why learning rate schedules are critical for convergence, how warmup
+prevents early instability, why cosine decay outperforms linear decay, and how
+to balance exploration vs exploitation throughout training.
+
+Background: Why Learning Rate Schedules?
+─────────────────────────────────────────
+Fixed learning rates face a fundamental dilemma:
+
+**High LR (e.g., 3e-4):**
+- Fast initial progress (large gradient steps)
+- Can escape poor local minima
+- BUT: Oscillates near global minimum, never converges precisely
+- Final loss is suboptimal
+
+**Low LR (e.g., 3e-6):**
+- Precise convergence (small steps near minimum)
+- Stable, low-noise updates
+- BUT: Extremely slow initial progress
+- May get stuck in poor local minima early
+
+**Solution: Start high, end low!**
+- Early training: High LR for exploration and fast progress
+- Late training: Low LR for precise convergence
+
+This is learning rate scheduling: dynamically adjust LR during training.
+
+Evolution of LR Schedules
+──────────────────────────
+
+**Step Decay (Traditional):**
+    lr = lr_0 × γ^⌊epoch/drop_every⌋
+    
+Drop LR by factor γ (e.g., 0.1) every N epochs.
+
+Problems:
+- Abrupt changes disrupt training
+- Hard to tune (when to drop? by how much?)
+- Not smooth
+
+**Linear Decay:**
+    lr(t) = lr_max × (1 - t/T)
+    
+Linearly decrease from lr_max to 0 over T steps.
+
+Better but: Decreases too aggressively early, too slowly late.
+
+**Cosine Annealing (Modern Standard):**
+    lr(t) = lr_min + (lr_max - lr_min) × (1 + cos(πt/T)) / 2
+    
+Smooth cosine curve from lr_max to lr_min over T steps.
+
+Used by: GPT-3, LLaMA, PaLM, virtually all modern LLMs!
+
+**Cosine with Warmup (Best Practice):**
+    Warmup phase: Linear increase from 0 to lr_max (first few % of training)
+    Cosine decay: Smooth decrease from lr_max to lr_min (rest of training)
+
+This is what you'll implement!
+
+Mathematical Foundation: Cosine Schedule
+─────────────────────────────────────────
+
+The schedule has two phases:
+
+**Phase 1: Linear Warmup (t < T_warmup)**
+    lr(t) = lr_max × (t / T_warmup)
+
+Start from lr=0, linearly increase to lr_max over T_warmup steps.
+
+**Phase 2: Cosine Decay (t ≥ T_warmup)**
+    progress = (t - T_warmup) / (T_max - T_warmup)
+    lr(t) = lr_min + (lr_max - lr_min) × [1 + cos(π × progress)] / 2
+
+As progress goes from 0 → 1:
+- cos(0) = 1: lr starts at lr_max
+- cos(π/2) = 0: lr at midpoint between lr_max and lr_min
+- cos(π) = -1: lr ends at lr_min
+
+The cosine curve provides smooth, gradual decay!
+
+Why Warmup? The Initialization Problem
+───────────────────────────────────────
+At initialization, model parameters are random. Early gradients can be:
+- Extremely large (random initialization far from good solutions)
+- Highly variable (no stable features learned yet)
+- Noisy (model hasn't learned what signal to focus on)
+
+**Without warmup (starting at high LR immediately):**
+- First few batches: Huge gradients × high LR = massive parameter updates
+- Updates are 100× or 1000× too large
+- Parameters explode to NaN
+- Or: Jump to poor region, never recover
+
+**With warmup (starting at near-zero LR):**
+- First few steps: Large gradients × tiny LR = reasonable updates
+- Model gradually stabilizes
+- By end of warmup: Learned stable features, can handle high LR
+- Smooth transition to main training
+
+Typical warmup: 1-5% of total training steps (e.g., 2000 warmup / 100,000 total).
+
+Why Cosine over Linear?
+────────────────────────
+Compare decay shapes from lr_max to lr_min:
+
+**Linear: lr(t) = lr_max - (lr_max - lr_min) × t/T**
+- Constant rate of decrease
+- Same Δlr per step throughout
+- Decreases aggressively early, slowly late
+
+**Cosine: lr(t) = lr_min + (lr_max - lr_min) × [1 + cos(πt/T)] / 2**
+- Slow decrease early (gentle slope near cos(0))
+- Faster decrease middle (steeper slope near cos(π/2))
+- Slow decrease late (gentle slope near cos(π))
+
+**Why cosine is better:**
+1. **Early phase (still exploring)**: Keeps LR high longer, more exploration
+2. **Middle phase (rapid learning)**: Faster decay matches natural learning curve
+3. **Late phase (fine-tuning)**: Gentle decay allows precise convergence
+
+Empirically: Cosine consistently reaches lower final loss than linear!
+
+The cosine shape matches the natural learning dynamics: slow→fast→slow.
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/optimizer.py
+
+You will implement `lr_cosine_schedule()`, a function that computes learning
+rate for a given training step. This is typically called in the training loop
+to update the optimizer's learning rate.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def lr_cosine_schedule(
+    step: int,
+    max_lr: float,
+    min_lr: float,
+    warmup_steps: int,
+    max_steps: int,
+) -> float:
+    """
+    Cosine learning rate schedule with linear warmup.
+    
+    Phase 1 (step < warmup_steps): Linear warmup from 0 to max_lr
+    Phase 2 (step >= warmup_steps): Cosine decay from max_lr to min_lr
+    
+    Args:
+        step: Current training step (0-indexed)
+        max_lr: Maximum learning rate (peak after warmup)
+        min_lr: Minimum learning rate (floor at end of training)
+        warmup_steps: Number of steps for linear warmup
+        max_steps: Total number of training steps
+    
+    Returns:
+        Learning rate for current step
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Handle edge cases**:
+   - step = 0: Should return lr close to 0 (start of warmup)
+   - step = warmup_steps: Should return max_lr (end of warmup)
+   - step = max_steps: Should return min_lr (end of training)
+   - step > max_steps: Can return min_lr (no longer decaying)
+
+2. **Use math.cos for cosine**:
+   - Import: import math
+   - Cosine of angle in radians: math.cos(angle)
+   - π is math.pi
+
+3. **Smooth transition at warmup_steps**:
+   - Warmup ends exactly at max_lr
+   - Cosine phase begins exactly at max_lr
+   - No discontinuity!
+
+4. **Numerically stable**:
+   - Handle warmup_steps = 0 (no warmup)
+   - Handle warmup_steps = max_steps (all warmup, no decay)
+
+Implementation Steps
+────────────────────
+
+**Step 1: Handle warmup phase**
+```python
+if step < warmup_steps:
+    # Linear warmup: 0 → max_lr
+    return max_lr * (step / warmup_steps)
+```
+
+At step=0: lr = max_lr × 0 = 0
+At step=warmup_steps: lr = max_lr × 1 = max_lr
+
+**Step 2: Handle cosine decay phase**
+```python
+# Compute progress through decay phase (0 to 1)
+progress = (step - warmup_steps) / (max_steps - warmup_steps)
+```
+
+At step=warmup_steps: progress = 0
+At step=max_steps: progress = 1
+
+**Step 3: Apply cosine formula**
+```python
+cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+lr = min_lr + (max_lr - min_lr) * cosine_decay
+return lr
+```
+
+Breakdown:
+- cos(π × 0) = cos(0) = 1 → cosine_decay = 0.5 × (1 + 1) = 1.0
+  → lr = min_lr + (max_lr - min_lr) × 1.0 = max_lr ✓
+- cos(π × 0.5) = cos(π/2) = 0 → cosine_decay = 0.5 × (1 + 0) = 0.5
+  → lr = midpoint between min_lr and max_lr ✓
+- cos(π × 1) = cos(π) = -1 → cosine_decay = 0.5 × (1 + -1) = 0.0
+  → lr = min_lr + (max_lr - min_lr) × 0.0 = min_lr ✓
+
+Mathematical Insight: The Cosine Shape
+───────────────────────────────────────
+The cosine function cos(πt) for t ∈ [0,1] has beautiful properties:
+
+- **Starts high**: cos(0) = 1
+- **Ends low**: cos(π) = -1
+- **Smooth S-curve**: Derivative is -π sin(πt)
+  - Small derivative at t=0 and t=1 (gentle slopes)
+  - Large derivative at t=0.5 (steep middle)
+
+This S-shape naturally matches learning dynamics:
+- Early: Still discovering features, keep LR high
+- Middle: Rapid improvement phase, decay faster
+- Late: Fine-tuning, decay gently to avoid disruption
+
+The (1 + cos(πt))/2 transformation shifts from [-1,1] to [0,1] range.
+
+Integration with Training
+──────────────────────────
+Typical usage in training loop:
+
+```python
+optimizer = AdamW(model.parameters(), lr=1.0)  # Initial LR doesn't matter
+max_lr = 3e-4
+min_lr = 3e-5
+warmup_steps = 2000
+max_steps = 100000
+
+for step in range(max_steps):
+    # Compute current learning rate
+    lr = lr_cosine_schedule(step, max_lr, min_lr, warmup_steps, max_steps)
+    
+    # Update optimizer learning rate
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    
+    # Training step
+    loss = train_step(model, batch)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+The LR changes every step! This is why schedulers are so effective.
+
+Typical Hyperparameters for LLM Training
+─────────────────────────────────────────
+**GPT-3 style:**
+- max_lr = 3e-4 (peak LR)
+- min_lr = 3e-5 (10% of max_lr)
+- warmup_steps = 2000 (2% of training)
+- max_steps = 100,000-300,000 (depends on dataset size)
+
+**LLaMA style:**
+- max_lr = 6e-4 (slightly higher)
+- min_lr = 6e-5 (10% of max_lr)
+- warmup_steps = 2000
+- max_steps varies by model size
+
+**General guidelines:**
+- min_lr = 0.1 × max_lr (decay to 10% of peak)
+- warmup = 1-5% of max_steps
+- max_lr: Tune experimentally, typically 1e-4 to 6e-4
+
+Common Pitfalls
+───────────────
+
+❌ **Wrong cosine range**:
+   Wrong: lr = max_lr × cos(πt)  # Goes negative!
+   Right: lr = min_lr + (max_lr - min_lr) × (1 + cos(πt)) / 2
+
+❌ **Forgetting warmup**:
+   Without warmup, training often diverges or trains slowly.
+
+❌ **Wrong progress calculation**:
+   Wrong: progress = step / max_steps  # Ignores warmup!
+   Right: progress = (step - warmup_steps) / (max_steps - warmup_steps)
+
+❌ **Discontinuity at warmup boundary**:
+   Warmup should end exactly at max_lr, cosine should start at max_lr.
+
+❌ **Division by zero**:
+   If warmup_steps = max_steps, denominator is zero!
+   Handle this edge case.
+
+Testing
+───────
+Your implementation will be tested against:
+• Various warmup_steps and max_steps combinations
+• Edge cases (step=0, step=warmup_steps, step=max_steps)
+• Smoothness (no discontinuities)
+• Correct cosine shape
+• Numerical accuracy
+
+The validator will run: pytest tests/test_optimizer.py::test_lr_cosine_schedule
+
+Visualization Exercise
+──────────────────────
+Try plotting your schedule for intuition:
+
+```python
+import matplotlib.pyplot as plt
+steps = range(10000)
+lrs = [lr_cosine_schedule(s, 3e-4, 3e-5, 500, 10000) for s in steps]
+plt.plot(steps, lrs)
+plt.xlabel('Step')
+plt.ylabel('Learning Rate')
+plt.title('Cosine Schedule with Warmup')
+plt.show()
+```
+
+You should see:
+1. Linear ramp up (0 to 500 steps)
+2. Smooth cosine decay (500 to 10000 steps)
+3. No sharp corners
+
+Why This Matters
+─────────────────
+Learning rate is THE most important hyperparameter in deep learning. Getting
+the schedule right can mean:
+- 2-5× faster convergence
+- 10-20% better final performance
+- Difference between training success and failure
+
+Modern LLMs train for weeks on thousands of GPUs. A good LR schedule saves
+millions of dollars in compute!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your schedule against reference implementations and
+verify all edge cases. You'll then answer conceptual questions about warmup,
+cosine vs linear decay, and how schedules integrate with optimizers.
+
+Hints
+─────
+• math.pi is π, math.cos(x) is cosine of x radians
+• Progress should be 0 at warmup end, 1 at training end
+• Cosine phase formula: (1 + cos(πt)) / 2 maps cos output to [0,1]
+• Test edge cases: step 0, warmup boundary, max_steps
+
+Remember: This schedule is used in GPT-3, LLaMA, and every modern LLM. Getting
+it right is essential for training success! 🎯

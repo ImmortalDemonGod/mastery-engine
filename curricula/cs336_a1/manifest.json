@@ -68,6 +68,12 @@
       "name": "AdamW Optimizer",
       "path": "modules/adamw",
       "baseline_perf_seconds": 0.15
+    },
+    {
+      "id": "cosine_schedule",
+      "name": "Cosine Learning Rate Schedule with Warmup",
+      "path": "modules/cosine_schedule",
+      "baseline_perf_seconds": 0.08
     }
   ]
 }
