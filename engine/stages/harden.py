@@ -54,48 +54,63 @@ class HardenRunner:
         self,
         curriculum_id: str,
         module: ModuleMetadata,
-        source_filename: str
+        source_file_path: Path
     ) -> tuple[Path, str]:
         """
-        Set up and present a harden challenge to the user.
+        Set up and present a harden challenge to the user in shadow worktree.
         
-        This method:
+        SHADOW WORKTREE MODEL:
         1. Selects a bug from the module's bugs directory
-        2. Creates isolated harden workspace
-        3. Applies the bug patch
-        4. Returns the symptom description
+        2. Copies user's correct implementation to shadow worktree harden directory
+        3. Applies the bug patch to the shadow worktree copy
+        4. Returns path to buggy file in shadow worktree for user to debug
+        
+        The user's original correct implementation in main directory remains untouched.
         
         Args:
             curriculum_id: ID of the current curriculum
             module: Metadata for the current module
-            source_filename: Name of the build submission file
+            source_file_path: Path to user's correct implementation in main directory
             
         Returns:
-            Tuple of (harden_file_path, symptom_description)
+            Tuple of (harden_file_path_in_shadow_worktree, symptom_description)
             
         Raises:
             HardenChallengeError: If challenge setup fails
         """
         try:
+            # Verify shadow worktree exists
+            shadow_worktree = Path('.mastery_engine_worktree')
+            if not shadow_worktree.exists():
+                raise HardenChallengeError(
+                    "Shadow worktree not found. Please run 'engine init' first."
+                )
+            
             # Select a bug
             bugs_dir = self.curriculum_mgr.get_bugs_dir(curriculum_id, module)
             bug_patch, symptom_file = self._select_bug(bugs_dir)
             
             logger.info(f"Selected bug: {bug_patch.name}")
             
-            # Create isolated harden workspace
-            harden_file = self.workspace_mgr.create_harden_workspace(
-                module.id,
-                source_filename
-            )
+            # Create harden directory in shadow worktree
+            harden_dir = shadow_worktree / "workspace" / "harden"
+            harden_dir.mkdir(parents=True, exist_ok=True)
             
-            # Apply bug patch
+            # Copy user's correct implementation to shadow worktree harden directory
+            # Preserve directory structure (e.g., cs336_basics/utils.py)
+            import shutil
+            harden_file = harden_dir / source_file_path.name
+            shutil.copy2(source_file_path, harden_file)
+            
+            logger.info(f"Copied correct implementation to {harden_file}")
+            
+            # Apply bug patch to shadow worktree copy
             self.workspace_mgr.apply_patch(harden_file, bug_patch)
             
             # Read symptom description
             symptom = symptom_file.read_text(encoding='utf-8')
             
-            logger.info(f"Harden challenge prepared: {module.id}")
+            logger.info(f"Harden challenge prepared in shadow worktree: {module.id}")
             
             return harden_file, symptom
             

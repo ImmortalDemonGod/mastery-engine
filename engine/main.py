@@ -117,14 +117,22 @@ def next():
             logger.info(f"Displayed build prompt for module '{current_module.id}'")
             
         elif progress.current_stage == "harden":
-            # Present harden challenge
+            # Present harden challenge in shadow worktree
             workspace_mgr = WorkspaceManager()
             harden_runner = HardenRunner(curr_mgr, workspace_mgr)
+            
+            # Determine source file based on module
+            # For softmax, this is cs336_basics/utils.py in main directory
+            if current_module.id == "softmax":
+                source_file = Path("cs336_basics/utils.py")
+            else:
+                # Fallback for other modules
+                source_file = Path(f"{current_module.id}.py")
             
             harden_file, symptom = harden_runner.present_challenge(
                 progress.curriculum_id,
                 current_module,
-                "hello_world.py"  # TODO: Make this dynamic based on module
+                source_file
             )
             
             console.print()
@@ -135,7 +143,8 @@ def next():
                 padding=(1, 2)
             ))
             console.print()
-            console.print(f"[dim]Harden workspace created at: {harden_file}[/dim]")
+            console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
+            console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
             console.print()
             
             logger.info(f"Displayed harden challenge for module '{current_module.id}'")
@@ -639,9 +648,10 @@ def submit_fix():
         # Get current module
         current_module = manifest.modules[progress.current_module_index]
         
-        # Get validator and harden workspace paths
-        validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
-        harden_workspace = workspace_mgr.workspace_root / "harden"
+        # SHADOW WORKTREE MODEL:
+        # Harden workspace is in shadow worktree at .mastery_engine_worktree/workspace/harden/
+        shadow_worktree = Path('.mastery_engine_worktree')
+        harden_workspace = shadow_worktree / "workspace" / "harden"
         
         if not harden_workspace.exists():
             console.print()
@@ -654,12 +664,30 @@ def submit_fix():
             console.print()
             return
         
+        # Get validator path
+        validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
+        
         console.print()
         console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
         console.print()
         
-        # Execute validator against harden workspace
-        result = validator_subsys.execute(validator_path, harden_workspace)
+        # CRITICAL: Copy fixed file from harden workspace to shadow worktree root
+        # The validator expects files in their normal locations (e.g., cs336_basics/utils.py)
+        # Determine source file based on module
+        if current_module.id == "softmax":
+            harden_file = harden_workspace / "utils.py"
+            shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
+        else:
+            harden_file = harden_workspace / f"{current_module.id}.py"
+            shadow_dest = shadow_worktree / f"{current_module.id}.py"
+        
+        # Copy fixed file to shadow worktree for validation
+        import shutil
+        shadow_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(harden_file, shadow_dest)
+        
+        # Execute validator in shadow worktree
+        result = validator_subsys.execute(validator_path, shadow_worktree)
         
         if result.exit_code == 0:
             # Success!
