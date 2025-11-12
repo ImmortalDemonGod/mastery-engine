@@ -1,0 +1,14 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -35,8 +35,9 @@ class Linear(nn.Module):
+         return y * self.weight
+ 
+     def forward(self, in_features: Float[Tensor, " ... in_features"]) -> Float[Tensor, " ... out_features"]:
+-        # Compute y = x @ W^T
+-        y = in_features.matmul(self.weight.t())
++        # BUG: Missing transpose! This causes dimension mismatch since weight is (out, in)
++        # Should be: y = in_features.matmul(self.weight.t())
++        y = in_features.matmul(self.weight)  # Wrong! Dimensions don't match
+         
+         if self.bias is not None:
+             y = y + self.bias

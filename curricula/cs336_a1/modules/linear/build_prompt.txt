@@ -1,0 +1,323 @@
+Build Challenge: Linear (Fully-Connected) Layer
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a Linear (fully-connected) layer from scratch, the most fundamental
+building block in neural networks. You will learn why the transpose operation
+is used, how weight initialization affects training, why bias is sometimes
+omitted, and how this simple operation enables universal function approximation.
+This layer is used everywhere: SwiGLU FFNs, attention projections, and more!
+
+Background: The Linear Transformation
+──────────────────────────────────────
+A linear layer performs an affine transformation:
+
+    y = xW^T + b
+
+Where:
+- x: Input tensor of shape (..., in_features)
+- W: Weight matrix of shape (out_features, in_features)
+- b: Optional bias vector of shape (out_features,)
+- y: Output tensor of shape (..., out_features)
+
+**Why the transpose?** PyTorch convention:
+- Weights are stored as (out_features, in_features)
+- Forward pass computes x @ W^T to get (*, out_features)
+- This matches how we think: "out_features output neurons, each with in_features weights"
+
+**Key Insight**: Despite being called "linear", this is actually an **affine**
+transformation when bias is included. True linearity requires f(ax) = af(x) and
+f(x+y) = f(x)+f(y), which bias violates. But the name stuck!
+
+Why Linear Layers Work
+───────────────────────
+Linear layers enable learned feature transformations:
+
+**Before training (random initialization):**
+Input x = [1.0, 0.5, -0.3] → Output y = [0.23, -0.45, 0.12, 0.89]
+(Meaningless random transformation)
+
+**After training:**
+Input x = [word_embedding] → Output y = [query_vector_for_attention]
+(Learned semantic transformation!)
+
+The network learns which linear combinations of input features are useful:
+- y₁ = 0.8·x₁ + 0.3·x₂ - 0.1·x₃ (learned to extract certain pattern)
+- y₂ = -0.2·x₁ + 0.9·x₂ + 0.4·x₃ (learned to extract different pattern)
+
+**Universal Approximation**: With nonlinear activations between them, stacked
+linear layers can approximate any continuous function! This is why neural
+networks work.
+
+Mathematical Foundation
+───────────────────────
+Forward pass is matrix multiplication:
+
+Given:
+- Input: x ∈ ℝ^(batch × in_features)
+- Weight: W ∈ ℝ^(out_features × in_features)
+- Bias: b ∈ ℝ^(out_features)
+
+Compute:
+    y = x @ W^T + b
+    y ∈ ℝ^(batch × out_features)
+
+**Backward pass (automatic via PyTorch autograd):**
+- ∂Loss/∂x = (∂Loss/∂y) @ W
+- ∂Loss/∂W = (∂Loss/∂y)^T @ x  
+- ∂Loss/∂b = sum(∂Loss/∂y, dim=0)
+
+PyTorch handles all of this automatically when you use nn.Parameter!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the Linear class as a nn.Module **from scratch** using
+nn.Parameter. Do NOT use nn.Linear - this defeats the pedagogical purpose!
+
+Requirements
+────────────
+Implement the class with the following specification:
+
+Class Signature
+───────────────
+
+class Linear(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = False,
+    ) -> None:
+        """
+        From-scratch linear (fully-connected) layer: y = x @ W^T + b
+        
+        Args:
+            in_features: Size of each input sample
+            out_features: Size of each output sample  
+            bias: If True, adds learnable bias. Default: False
+        """
+    
+    def forward(self, in_features: Tensor) -> Tensor:
+        """
+        Args:
+            in_features: Input tensor of shape (..., in_features)
+        
+        Returns:
+            Output tensor of shape (..., out_features)
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **From Scratch with nn.Parameter**:
+   - Create weight as nn.Parameter(torch.empty(out_features, in_features))
+   - Create optional bias as nn.Parameter(torch.empty(out_features))
+   - Do NOT use nn.Linear!
+
+2. **Initialization (Kaiming Uniform)**:
+   - Use uniform distribution: U(-bound, bound)
+   - bound = 1 / sqrt(in_features)
+   - This prevents vanishing/exploding gradients initially
+   - Use nn.init.uniform_(tensor, -bound, bound)
+
+3. **Handle arbitrary batch dimensions**:
+   - Input: (..., in_features) - any leading batch dimensions
+   - Output: (..., out_features)
+   - Matmul handles this automatically!
+
+4. **Bias is optional**:
+   - If bias=False, don't create bias parameter
+   - Use self.register_parameter('bias', None) to explicitly set to None
+   - This is important for parameter counting and state_dict
+
+Implementation Steps
+────────────────────
+
+**Step 1: Initialize parameters in __init__**
+
+```python
+super().__init__()
+self.in_features = int(in_features)
+self.out_features = int(out_features)
+
+# Create weight parameter: (out_features, in_features)
+self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+
+# Create optional bias parameter
+if bias:
+    self.bias = nn.Parameter(torch.empty((out_features,)))
+else:
+    self.register_parameter('bias', None)
+
+# Initialize parameters
+self.reset_parameters()
+```
+
+**Step 2: Implement initialization**
+
+```python
+def reset_parameters(self) -> None:
+    # Kaiming uniform initialization
+    fan_in = max(1, self.in_features)
+    bound = 1.0 / math.sqrt(fan_in)
+    nn.init.uniform_(self.weight, -bound, bound)
+    if self.bias is not None:
+        nn.init.uniform_(self.bias, -bound, bound)
+```
+
+Why this initialization?
+- Keeps variance of activations stable across layers
+- Prevents vanishing gradients (values too small) or exploding gradients (too large)
+- Standard for ReLU-family activations
+
+**Step 3: Implement forward pass**
+
+```python
+def forward(self, in_features: Tensor) -> Tensor:
+    # Compute y = x @ W^T
+    y = in_features.matmul(self.weight.t())
+    
+    # Add bias if present
+    if self.bias is not None:
+        y = y + self.bias
+    
+    return y
+```
+
+Key operations:
+- `self.weight.t()` transposes weight from (out, in) to (in, out)
+- `matmul()` performs matrix multiplication
+- Broadcasting automatically handles bias addition
+
+Mathematical Insight: Why Transpose?
+─────────────────────────────────────
+Weight storage: W ∈ ℝ^(out × in)
+
+**Intuition**: Each row of W contains the in_features weights for one output neuron.
+- Row 0: weights for output[0]
+- Row 1: weights for output[1]
+- etc.
+
+**Forward computation**:
+    x: (batch, in)
+    W: (out, in)
+    W^T: (in, out)
+    y = x @ W^T: (batch, in) @ (in, out) = (batch, out) ✓
+
+Without transpose, dimensions wouldn't match!
+
+Common Pitfalls
+───────────────
+
+❌ **Using nn.Linear**:
+   Do NOT use nn.Linear - defeats the learning purpose!
+   Must implement from scratch with nn.Parameter.
+
+❌ **Wrong weight shape**:
+   Must be (out_features, in_features), not (in, out)!
+   Storage order matters for PyTorch conventions.
+
+❌ **Forgetting transpose in forward**:
+   Wrong: x @ self.weight  # Dimension mismatch!
+   Right: x.matmul(self.weight.t())  # Correct dimensions
+
+❌ **Not using nn.Parameter**:
+   Wrong: self.weight = torch.randn(...)  # Not tracked!
+   Right: self.weight = nn.Parameter(torch.empty(...))  # Tracked by optimizer
+
+❌ **Wrong bias handling**:
+   Wrong: self.bias = None  # Not properly registered
+   Right: self.register_parameter('bias', None)  # Properly registered as missing
+
+❌ **Bias dimension mismatch**:
+   Bias should be shape (out_features,) not (out_features, 1)
+   Broadcasting handles the rest!
+
+Testing
+───────
+Your implementation will be tested against:
+• Various input/output dimensions
+• Different batch shapes
+• With and without bias
+• Gradient correctness
+• Parameter counting
+
+The validator will run: pytest tests/test_model.py::test_linear -v
+
+Integration: Where Linear is Used
+──────────────────────────────────
+Linear layers appear everywhere in Transformers:
+
+**1. SwiGLU Feed-Forward Networks**:
+```python
+class SwiGLU(nn.Module):
+    def __init__(self, d_model, d_ff):
+        self.w1 = Linear(d_model, d_ff, bias=False)
+        self.w2 = Linear(d_ff, d_model, bias=False)  
+        self.w3 = Linear(d_model, d_ff, bias=False)
+```
+
+**2. Attention Projections**:
+```python
+# Q, K, V projections
+self.q_proj = Linear(d_model, d_model, bias=False)
+self.k_proj = Linear(d_model, d_model, bias=False)
+self.v_proj = Linear(d_model, d_model, bias=False)
+# Output projection
+self.o_proj = Linear(d_model, d_model, bias=False)
+```
+
+**3. LM Head** (vocabulary projection):
+```python
+self.lm_head = Linear(d_model, vocab_size, bias=False)
+```
+
+Modern Transformers often omit bias (bias=False) to:
+- Reduce parameter count
+- Improve training stability with normalization layers
+- Simplify implementation
+
+Parameter Count
+───────────────
+Linear layer parameters:
+- Weight: out_features × in_features
+- Bias (if present): out_features
+- Total: out_features × (in_features + 1) if bias, else out_features × in_features
+
+Example (GPT-2 small):
+- d_model = 768, d_ff = 3072
+- SwiGLU uses 3 linear layers:
+  - W1: 768 × 3072 = 2.36M parameters
+  - W2: 3072 × 768 = 2.36M parameters
+  - W3: 768 × 3072 = 2.36M parameters
+  - Total FFN: 7.08M parameters per layer!
+
+For a 12-layer model, FFN alone is 85M parameters.
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your linear layer against reference implementations.
+You'll then answer conceptual questions about why transpose is used, how
+initialization affects training, the role of bias, and why linear layers
+enable universal approximation.
+
+Hints
+─────
+• Weight shape: (out_features, in_features) - remember this!
+• Initialize with uniform(-1/√in, 1/√in) using nn.init.uniform_
+• Forward: y = x @ W^T + b (don't forget transpose!)
+• Use self.weight.t() for transpose
+• Bias broadcasting works automatically
+• register_parameter('bias', None) when bias=False
+
+Remember: This is THE fundamental building block. Every complex operation in
+modern neural networks ultimately reduces to sequences of linear transformations
+and nonlinearities. Master this, and everything else follows! 🎯
