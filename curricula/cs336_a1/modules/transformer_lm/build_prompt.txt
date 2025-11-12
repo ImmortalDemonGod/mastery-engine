@@ -1,0 +1,421 @@
+Build Challenge: Transformer Language Model Assembly
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement the complete Transformer language model by assembling all components
+you've built: embeddings, transformer blocks, normalization, and LM head. You
+will learn how components connect, why this architecture enables autoregressive
+generation, how weight management works, and why the final design is both
+elegant and powerful. This is THE capstone - bringing everything together!
+
+Background: From Components to Complete Model
+──────────────────────────────────────────────
+You've implemented individual pieces:
+- Token embeddings (discrete → continuous)
+- RMSNorm (stabilize activations)
+- Multi-head attention with RoPE (sequence modeling)
+- SwiGLU FFN (non-linear transformations)
+- Transformer blocks (attention + FFN with residuals)
+
+But these are just LEGO blocks. Now you assemble the complete structure:
+
+**TransformerLM Pipeline**:
+```
+Token IDs [23, 56, 89, ...]
+    ↓ Embedding lookup
+Vectors (batch, seq_len, d_model)
+    ↓ N × Transformer Blocks
+Hidden states (batch, seq_len, d_model)
+    ↓ Final RMSNorm
+Normalized (batch, seq_len, d_model)
+    ↓ LM head projection
+Logits (batch, seq_len, vocab_size)
+```
+
+Each position predicts next token probabilities!
+
+Why This Architecture Works
+────────────────────────────
+**Autoregressive Language Modeling**:
+The model predicts token at position t using only positions 0...t-1.
+
+Given sequence: "The cat sat on the"
+- Position 0: Predict "cat" (given "The")
+- Position 1: Predict "sat" (given "The cat")
+- Position 2: Predict "on" (given "The cat sat")
+- Position 3: Predict "the" (given "The cat sat on")
+- Position 4: Predict next word (given full context)
+
+**How architecture enables this**:
+1. **Causal masking**: Attention can only see previous positions
+2. **Position encoding**: RoPE tells model where each token is
+3. **Parallel training**: All positions trained simultaneously
+4. **Sequential generation**: At inference, generate one token at a time
+
+**The magic**: Train on billions of tokens predicting next word.
+Result: Model learns language structure, reasoning, world knowledge!
+
+Mathematical Foundation
+───────────────────────
+**Forward Pass Mathematics**:
+
+Input: token indices x ∈ ℤ^(batch × seq_len), values in [0, vocab_size)
+
+1. **Embedding**:
+   E ∈ ℝ^(vocab_size × d_model)
+   h₀ = E[x]  # Lookup: (batch, seq_len, d_model)
+
+2. **Transformer Blocks** (repeated N times):
+   For layer i = 1..N:
+     h_i = TransformerBlock(h_{i-1})
+     Where TransformerBlock(x) = x + FFN(RMSNorm(x + Attention(RMSNorm(x))))
+
+3. **Final Normalization**:
+   h_final = RMSNorm(h_N)
+
+4. **LM Head**:
+   W_lm ∈ ℝ^(vocab_size × d_model)
+   logits = h_final @ W_lm^T  # (batch, seq_len, vocab_size)
+
+**Output**: logits[b, t, v] = unnormalized log probability of token v at position t
+
+**Loss** (training):
+   CrossEntropy(logits[:, :-1, :].flatten(0,1), targets[:, 1:].flatten())
+   Predicting next token at each position!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the `transformer_lm` function that orchestrates the complete
+forward pass using a provided weights dictionary.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def transformer_lm(
+    vocab_size: int,
+    context_length: int,
+    d_model: int,
+    num_layers: int,
+    num_heads: int,
+    d_ff: int,
+    rope_theta: float,
+    weights: dict,
+    in_indices: Tensor,
+) -> Tensor:
+    """
+    Complete Transformer language model forward pass.
+    
+    Args:
+        vocab_size: Size of vocabulary
+        context_length: Maximum sequence length
+        d_model: Model dimension
+        num_layers: Number of transformer blocks
+        num_heads: Number of attention heads per block
+        d_ff: Feed-forward hidden dimension
+        rope_theta: RoPE base frequency (typically 10000.0)
+        weights: Dictionary containing ALL model weights
+        in_indices: Input token IDs of shape (..., seq_len)
+    
+    Returns:
+        Logits of shape (..., seq_len, vocab_size)
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Use provided weights dictionary**:
+   - weights["token_embeddings.weight"]: Embedding matrix
+   - weights["layers.{i}.*"]: Weights for layer i
+   - weights["ln_final.weight"]: Final normalization
+   - weights["lm_head.weight"]: LM head projection
+   - DO NOT create new parameters - use what's provided
+
+2. **Call component functions**:
+   - Don't reimplement - use transformer_block() function
+   - Pass correct weight subsets to each layer
+   - Extract weights using proper keys
+
+3. **Handle batch dimensions**:
+   - Input: (..., seq_len) - any leading dimensions
+   - Output: (..., seq_len, vocab_size)
+   - All operations should broadcast naturally
+
+4. **Efficient implementation**:
+   - Extract layer weights once, not repeatedly
+   - Use dictionary comprehension for weight subsets
+   - Avoid unnecessary tensor copies
+
+Implementation Steps
+────────────────────
+
+**Step 1: Embedding lookup**
+
+```python
+def transformer_lm(...):
+    # Lookup token embeddings
+    token_emb = weights["token_embeddings.weight"]  # (vocab_size, d_model)
+    x = token_emb[in_indices]  # (..., seq_len, d_model)
+```
+
+Simple indexing into embedding matrix. Each token ID becomes a d_model vector.
+
+**Step 2: Apply transformer blocks**
+
+```python
+    # Apply N transformer blocks
+    for i in range(num_layers):
+        # Extract weights for this layer
+        block_weights = {
+            "ln1.weight": weights[f"layers.{i}.ln1.weight"],
+            "attn.q_proj.weight": weights[f"layers.{i}.attn.q_proj.weight"],
+            "attn.k_proj.weight": weights[f"layers.{i}.attn.k_proj.weight"],
+            "attn.v_proj.weight": weights[f"layers.{i}.attn.v_proj.weight"],
+            "attn.output_proj.weight": weights[f"layers.{i}.attn.output_proj.weight"],
+            "ln2.weight": weights[f"layers.{i}.ln2.weight"],
+            "ffn.w1.weight": weights[f"layers.{i}.ffn.w1.weight"],
+            "ffn.w2.weight": weights[f"layers.{i}.ffn.w2.weight"],
+            "ffn.w3.weight": weights[f"layers.{i}.ffn.w3.weight"],
+        }
+        
+        # Call transformer_block
+        x = transformer_block(
+            d_model=d_model,
+            num_heads=num_heads,
+            d_ff=d_ff,
+            max_seq_len=context_length,
+            theta=rope_theta,
+            weights=block_weights,
+            in_features=x,
+        )
+```
+
+Stack transformer blocks, each transforming hidden states.
+
+**Step 3: Final normalization**
+
+```python
+    # Apply final RMSNorm
+    ln_final = RMSNorm(d_model=d_model, eps=1e-5)
+    with torch.no_grad():
+        ln_final.weight.copy_(weights["ln_final.weight"])
+    x = ln_final(x)
+```
+
+Normalize before LM head projection for stability.
+
+**Step 4: LM head projection**
+
+```python
+    # Project to vocabulary
+    lm_head_w = weights["lm_head.weight"]  # (vocab_size, d_model)
+    logits = x.matmul(lm_head_w.t())  # (..., seq_len, vocab_size)
+    
+    return logits
+```
+
+Each position gets probability distribution over vocabulary!
+
+Mathematical Insight: Why Final Normalization?
+───────────────────────────────────────────────
+Without final RMSNorm:
+- After N layers, hidden states can have large variance
+- LM head projection: variance grows by factor of d_model
+- Logits have huge range → softmax becomes unstable
+- Gradient flow back to early layers is poor
+
+With final RMSNorm:
+- Normalize hidden states to unit RMS
+- LM head projection has controlled scale
+- Softmax receives well-scaled logits
+- Better gradient flow throughout network
+
+**Empirical result**: Final norm improves training stability significantly.
+Modern architectures (LLaMA, GPT-3) always include it!
+
+Common Pitfalls
+───────────────
+
+❌ **Creating new parameters**:
+   Wrong: self.embedding = Embedding(vocab_size, d_model)
+   Right: Use weights["token_embeddings.weight"] directly
+
+❌ **Wrong weight key format**:
+   Wrong: weights[f"layer_{i}.attention"]
+   Right: weights[f"layers.{i}.attn.q_proj.weight"]
+   Must match exact state_dict structure!
+
+❌ **Forgetting final normalization**:
+   Skipping ln_final significantly hurts performance.
+   This is a critical component!
+
+❌ **Wrong LM head shape**:
+   lm_head is (vocab_size, d_model), not (d_model, vocab_size).
+   Must transpose: x @ lm_head.t()
+
+❌ **Modifying input indices**:
+   in_indices are token IDs (integers), not to be modified.
+   Only use for embedding lookup!
+
+❌ **Not handling batch dimensions**:
+   Input can be (seq_len,) or (batch, seq_len) or (batch1, batch2, seq_len).
+   Implementation must handle arbitrary leading dims!
+
+Testing
+───────
+Your implementation will be tested against:
+• Various model sizes (small to large)
+• Different sequence lengths
+• Batch and single inputs
+• Gradient correctness
+• Output shape verification
+
+The validator will run: pytest tests/test_model.py::test_transformer_lm -v
+
+Integration: Full Training Loop
+────────────────────────────────
+**How this fits into training**:
+
+```python
+# 1. Prepare batch
+tokenizer = Tokenizer(vocab, merges)
+token_ids = tokenizer.encode(text)
+x, y = get_batch(token_ids, batch_size=32, context_length=512)
+
+# 2. Forward pass (THIS FUNCTION!)
+logits = transformer_lm(
+    vocab_size=50257,
+    context_length=512,
+    d_model=768,
+    num_layers=12,
+    num_heads=12,
+    d_ff=3072,
+    rope_theta=10000.0,
+    weights=model_state_dict,
+    in_indices=x,
+)
+
+# 3. Compute loss
+loss = F.cross_entropy(
+    logits[:, :-1, :].reshape(-1, vocab_size),  # All but last position
+    y[:, 1:].reshape(-1),  # All but first position (shifted targets)
+)
+
+# 4. Backward & update
+loss.backward()
+optimizer.step()
+```
+
+**Generation** (inference):
+
+```python
+# Start with prompt
+prompt_ids = tokenizer.encode("Once upon a time")
+generated = prompt_ids.copy()
+
+# Generate tokens one at a time
+for _ in range(max_new_tokens):
+    # Forward pass
+    logits = transformer_lm(..., in_indices=generated)
+    
+    # Get next token
+    next_token_logits = logits[0, -1, :]  # Last position
+    next_token = torch.argmax(next_token_logits)
+    
+    # Append and continue
+    generated.append(next_token.item())
+
+# Decode
+text = tokenizer.decode(generated)
+```
+
+This is how ChatGPT, GPT-4, Claude, etc. generate text!
+
+Architecture Variations
+───────────────────────
+The basic TransformerLM structure is universal, but there are variants:
+
+**1. Tied embeddings** (weight tying):
+```python
+# Share embedding and LM head weights
+lm_head_w = weights["token_embeddings.weight"]  # Same as input embeddings!
+```
+Saves parameters: vocab_size × d_model weights reused.
+Used in many models (GPT-2, BERT).
+
+**2. Pre-norm vs Post-norm**:
+```python
+# Post-norm (older, less stable):
+x = RMSNorm(x + Attention(x))
+
+# Pre-norm (modern, what we use):
+x = x + Attention(RMSNorm(x))
+```
+Pre-norm stabilizes training for very deep networks.
+
+**3. Position encoding variants**:
+- RoPE (what we use): Applied inside attention
+- Learned absolute positions: Added to embeddings
+- ALiBi: Bias in attention scores
+
+**4. Attention variants**:
+- Full attention (O(n²)): What we use
+- Sparse attention: Reduces complexity
+- Flash attention: Optimized memory/speed
+
+Our implementation: Modern best practices (pre-norm, RoPE, RMSNorm).
+
+Parameter Count
+───────────────
+Let's count parameters for GPT-2 small config:
+- vocab_size=50257, d_model=768, num_layers=12, num_heads=12, d_ff=3072
+
+**Embeddings**:
+- Token embeddings: 50257 × 768 = 38.6M
+
+**Transformer blocks** (per layer):
+- Attention (Q,K,V,O): 4 × 768² = 2.36M
+- FFN (W1,W2,W3): 3 × 768 × 3072 = 7.08M
+- RMSNorm (ln1, ln2): 2 × 768 = 1.5K (negligible)
+- Total per layer: 9.44M
+
+**All layers**: 12 × 9.44M = 113.3M
+
+**Final norm**: 768 parameters (negligible)
+
+**LM head**: 50257 × 768 = 38.6M (or 0 if tied)
+
+**Total**: 38.6 + 113.3 + 38.6 = 190.5M parameters
+(Or 152M with tied embeddings)
+
+GPT-2 small official: 124M (they use tied embeddings and slightly different d_ff).
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your complete model assembly. You'll then answer
+conceptual questions about autoregressive modeling, component interaction,
+weight management, and why this architecture revolutionized NLP.
+
+Hints
+─────
+• Use weights dict directly - don't create new parameters
+• Extract layer weights with f"layers.{i}.*" format
+• Call transformer_block() - don't reimplement
+• Final norm is critical for stability
+• LM head: transpose weight matrix for matmul
+• Test with small model first (num_layers=2)
+
+Remember: This is the culmination of everything you've built. Each component
+plays a role in the complete system. Token embeddings → transformers → logits.
+This architecture powers every modern LLM! 🎯

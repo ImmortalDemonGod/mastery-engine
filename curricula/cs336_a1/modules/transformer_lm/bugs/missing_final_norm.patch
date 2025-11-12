@@ -1,0 +1,17 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -40,10 +40,8 @@ def transformer_lm(...):
+             in_features=x,
+         )
+     
+-    # Final RMSNorm
+-    ln_final = RMSNorm(d_model=d_model, eps=1e-5)
+-    with torch.no_grad():
+-        ln_final.weight.copy_(weights["ln_final.weight"])
+-    x = ln_final(x)
++    # BUG: Missing final normalization!
++    # Without this, hidden states have large variance before LM head
++    # This causes unstable softmax and poor gradient flow
++    # Should apply: x = RMSNorm(x) using weights["ln_final.weight"]
+     
+     # LM head projection
