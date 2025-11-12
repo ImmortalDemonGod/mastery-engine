@@ -1,0 +1,377 @@
+Build Challenge: Scaled Dot-Product Attention
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement scaled dot-product attention, the fundamental mechanism that made
+Transformers possible and revolutionized deep learning. You will learn how
+attention enables models to dynamically focus on relevant information, why
+scaling is crucial for stability, and how causal masking enables autoregressive
+generation. This is arguably the most important function you'll implement in
+this course.
+
+Background: The Attention Revolution
+─────────────────────────────────────
+Before Transformers (2017), sequence models were dominated by RNNs and LSTMs,
+which processed sequences sequentially. This created two major problems:
+
+1. **Parallelization bottleneck**: Can't process position t until finishing t-1
+2. **Long-range dependencies**: Information from early tokens gets compressed
+   through many sequential steps, causing vanishing gradients
+
+Attention changed everything by asking: "What if each position could directly
+look at ALL other positions?" This enables:
+- Full parallelization (all positions process simultaneously)
+- Direct connections between any two positions (no compression)
+- Dynamic, input-dependent routing of information
+
+The result: Transformers now power GPT, BERT, LLaMA, and virtually every
+state-of-the-art NLP model.
+
+Mathematical Foundation
+───────────────────────
+Given queries Q, keys K, and values V, scaled dot-product attention computes:
+
+    Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+
+Where:
+• Q ∈ ℝ^(n×d_k): queries (what we're looking for)
+• K ∈ ℝ^(m×d_k): keys (what we're matching against)
+• V ∈ ℝ^(m×d_v): values (what we want to retrieve)
+• n: number of query positions
+• m: number of key/value positions (usually n = m for self-attention)
+• d_k: dimension of queries/keys
+• d_v: dimension of values
+
+The Three Components: Queries, Keys, Values
+────────────────────────────────────────────
+Think of attention as a soft dictionary lookup:
+
+**Keys**: Like dictionary keys - what you match against
+**Queries**: What you're searching for
+**Values**: The actual information you retrieve
+
+Example analogy: You walk into a library (attention mechanism)
+- Query: "I need information about neural networks"
+- Keys: Book titles/summaries on every shelf
+- Values: The actual book contents
+- Attention computes: Which books (keys) match your query?
+  Then retrieves weighted combination of those books (values)
+
+The beauty: This matching is differentiable, so the network learns what to
+query for and what keys/values to create!
+
+Step-by-Step Computation
+─────────────────────────
+
+**Step 1: Compute similarity scores**
+    Scores = Q · K^T
+    
+Matrix multiply queries with transposed keys. Each element scores[i,j] 
+measures how much query i should attend to key j.
+
+Shape: (n, d_k) × (d_k, m) = (n, m)
+
+**Step 2: Scale by √d_k**
+    Scaled_scores = Scores / √d_k
+    
+This is CRITICAL for stability! Without scaling, dot products grow large as
+d_k increases, pushing softmax into regions with tiny gradients.
+
+**Step 3: Apply causal mask (for autoregressive models)**
+    Masked_scores = Scaled_scores + mask
+    
+For language modeling, we mask future tokens by setting them to -∞. This
+ensures position i can only attend to positions ≤ i.
+
+Mask shape: (n, m) where mask[i,j] = 0 if position i can see j, -∞ otherwise
+
+**Step 4: Apply softmax**
+    Attention_weights = softmax(Masked_scores, dim=-1)
+    
+Softmax over the key dimension turns scores into a probability distribution.
+Each query gets a weighted distribution over all keys.
+
+Shape: (n, m) - each row sums to 1
+
+**Step 5: Weighted sum of values**
+    Output = Attention_weights · V
+    
+Matrix multiply attention weights with values to get final output.
+
+Shape: (n, m) × (m, d_v) = (n, d_v)
+
+Why Scaling by √d_k is Critical
+────────────────────────────────
+Consider what happens without scaling:
+
+If q and k are unit variance random vectors of dimension d_k, their dot product
+q·k has variance d_k (sum of d_k independent unit variance products).
+
+As d_k grows:
+• Dot products get larger in magnitude
+• After softmax, distribution becomes very sharp (near one-hot)
+• Gradients → 0 in most positions
+• Training becomes unstable
+
+Scaling by √d_k normalizes variance back to 1, keeping softmax in a stable
+range regardless of d_k.
+
+Mathematical proof: If q,k ~ N(0,1), then:
+- Var(q·k) = d_k
+- Var(q·k / √d_k) = 1  ← normalized!
+
+Causal Masking for Autoregressive Generation
+─────────────────────────────────────────────
+In language modeling, we predict the next token given previous tokens. This
+means position i should NOT see positions > i (future tokens).
+
+Without masking: Model could "cheat" by looking ahead
+With masking: Model learns genuine next-token prediction
+
+Implementation: Set future positions to -∞ before softmax
+- softmax(-∞) = 0, so future positions get zero attention weight
+- After masking, position i only attends to positions ≤ i
+
+Mask construction for causal attention:
+    mask[i,j] = 0 if j ≤ i else -∞
+
+Or equivalently, upper triangular matrix of -∞ values above the diagonal.
+
+Self-Attention vs Cross-Attention
+──────────────────────────────────
+**Self-attention**: Q, K, V all come from same sequence
+- Used in: Transformer encoder/decoder blocks
+- Allows each position to attend to all positions in its sequence
+
+**Cross-attention**: Q from one sequence, K/V from another
+- Used in: Encoder-decoder models (e.g., translation)
+- Decoder queries attend to encoder keys/values
+
+For this module, you're implementing the core attention mechanism that works
+for both cases!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the `scaled_dot_product_attention` function. This is a 
+standalone function (not a class), as attention itself is stateless - all
+parameters come from Q, K, V projections done elsewhere.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def scaled_dot_product_attention(
+    Q: Float[Tensor, " ... queries d_k"],
+    K: Float[Tensor, " ... keys d_k"],
+    V: Float[Tensor, " ... values d_v"],
+    mask: Bool[Tensor, " ... queries keys"] | None = None,
+) -> Float[Tensor, " ... queries d_v"]:
+    """
+    Compute scaled dot-product attention.
+    
+    Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+    
+    Args:
+        Q: Query tensor of shape (..., n_queries, d_k)
+        K: Key tensor of shape (..., n_keys, d_k)
+        V: Value tensor of shape (..., n_keys, d_v)
+        mask: Optional boolean mask of shape (..., n_queries, n_keys)
+              True indicates positions that should be MASKED (set to -inf)
+              Typically used for causal masking in autoregressive models
+    
+    Returns:
+        Output tensor of shape (..., n_queries, d_v)
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Batch dimensions**: Must handle arbitrary leading batch dimensions
+   - Single attention: Q shape (n, d_k)
+   - Batched: (batch, n, d_k)
+   - Multi-head batched: (batch, num_heads, n, d_k)
+   
+   Use @ for matrix multiply - it handles batch dimensions automatically!
+
+2. **Scaling**: MUST scale by √d_k after computing scores
+   - Extract d_k from Q.shape[-1]
+   - Scale factor: 1 / math.sqrt(d_k)
+
+3. **Masking**: If mask is provided, set masked positions to -inf BEFORE softmax
+   - Where mask is True, set to float('-inf')
+   - Use: scores = scores.masked_fill(mask, float('-inf'))
+   - This ensures softmax outputs 0 for masked positions
+
+4. **Softmax dimension**: Apply softmax over the KEY dimension (dim=-1)
+   - This normalizes attention weights for each query
+   - Each query's attention weights sum to 1
+
+5. **Use your softmax**: Call your custom softmax() function from utils.py
+   - Don't use torch.softmax or F.softmax
+   - This reinforces how components connect!
+
+6. **Numerical stability**: Your softmax handles stability, but be careful with -inf
+   - Only use float('-inf'), not -1e9 or other large negative numbers
+   - True -inf is handled correctly by softmax
+
+Implementation Steps
+────────────────────
+
+Step 1: Compute attention scores
+   - Multiply Q by K transposed: scores = Q @ K.transpose(-2, -1)
+   - The transpose swaps the last two dimensions
+   - Shape: (..., n_queries, d_k) @ (..., d_k, n_keys) = (..., n_queries, n_keys)
+
+Step 2: Scale scores
+   - Get d_k from Q: d_k = Q.shape[-1]
+   - Compute scale factor: scale = 1 / math.sqrt(d_k)
+   - Apply: scaled_scores = scores * scale
+
+Step 3: Apply mask (if provided)
+   - Check if mask is not None
+   - Use masked_fill: scaled_scores = scaled_scores.masked_fill(mask, float('-inf'))
+   - Where mask is True, scores become -inf
+
+Step 4: Apply softmax
+   - Use your custom softmax: attn_weights = softmax(scaled_scores, dim=-1)
+   - dim=-1 normalizes over keys for each query
+   - Shape unchanged: (..., n_queries, n_keys)
+
+Step 5: Weighted sum of values
+   - Multiply attention weights by values: output = attn_weights @ V
+   - Shape: (..., n_queries, n_keys) @ (..., n_keys, d_v) = (..., n_queries, d_v)
+   - Return this output
+
+Mathematical Insight: Why This Works
+─────────────────────────────────────
+The attention mechanism computes a differentiable, weighted average:
+
+For each query position i:
+1. Compare it to all key positions (via dot product)
+2. Normalize scores to a distribution (softmax)
+3. Take weighted average of values using those weights
+
+This is like a soft database lookup where:
+- Hard lookup: "Give me the value for exact key k"
+- Soft lookup: "Give me a blend of all values, weighted by key similarity"
+
+The softness is crucial - it's differentiable, allowing end-to-end learning!
+
+Attention Patterns in Practice
+───────────────────────────────
+Visualizing attention weights reveals what the model learns:
+
+**Early layers**: Often attend to nearby tokens (local patterns)
+**Middle layers**: Syntactic structure (subject-verb agreement, etc.)
+**Late layers**: Semantic relationships (coreferencing, long-range dependencies)
+
+With causal masking, you often see attention concentrated on:
+- Recent tokens (recency bias)
+- Specific important tokens (e.g., subject in a sentence)
+- Repeated patterns
+
+Computational Complexity
+────────────────────────
+Attention is O(n²d) where n is sequence length, d is model dimension:
+- QK^T: O(n²d) - the quadratic bottleneck!
+- softmax: O(n²)
+- Attention weights × V: O(n²d)
+
+This quadratic cost is why long context is expensive. For n=2048, d=4096:
+- ~33M operations per attention call
+- With 32 layers × 32 heads = 34 billion operations per forward pass!
+
+Many recent architectures (Flash Attention, Linear Attention) focus on
+reducing this quadratic cost.
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting to scale**:
+   Wrong: attn = softmax(Q @ K.T)
+   Right: attn = softmax(Q @ K.T / sqrt(d_k))
+   
+❌ **Softmax on wrong dimension**:
+   Wrong: softmax(scores, dim=-2)  # Normalizes over queries!
+   Right: softmax(scores, dim=-1)  # Normalizes over keys
+
+❌ **Mask in wrong format**:
+   Wrong: mask[i,j] = 0 for masked, 1 for unmasked
+   Right: mask[i,j] = True for masked, False for unmasked
+   (Then use masked_fill to set masked positions to -inf)
+
+❌ **Using wrong transpose**:
+   Wrong: K.T  # Only works for 2D
+   Right: K.transpose(-2, -1)  # Works for any number of dimensions
+
+❌ **Not using your softmax**:
+   Wrong: torch.softmax(scores, dim=-1)
+   Right: softmax(scores, dim=-1)  # Use your implementation!
+
+❌ **Mask after softmax**:
+   Wrong: softmax(scores) * mask
+   Right: softmax(scores.masked_fill(mask, -inf))
+   (Mask must be applied BEFORE softmax)
+
+Testing
+───────
+Your implementation will be tested against:
+• Various input shapes (2D, 3D, 4D with batch/head dimensions)
+• With and without masking
+• Different d_k values to verify scaling
+• Causal mask patterns
+• Numerical accuracy vs reference implementation
+• Gradient correctness
+
+The validator will run: pytest tests/test_model.py::test_scaled_dot_product_attention
+
+Integration with Multi-Head Attention
+──────────────────────────────────────
+Scaled dot-product attention is the core of multi-head attention:
+
+    MultiHead(Q,K,V) = Concat(head₁, ..., head_h) · W_O
+    where head_i = Attention(Q·W_Q^i, K·W_K^i, V·W_V^i)
+
+Each head applies your scaled_dot_product_attention function independently!
+You're building the foundational piece of the Transformer.
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your attention mechanism against reference implementations
+and verify all edge cases. You'll then answer conceptual questions about why
+attention works, the role of scaling, and how masking enables autoregressive
+generation.
+
+Hints
+─────
+• Use @ for matrix multiplication - it handles batching automatically
+• K.transpose(-2, -1) swaps last two dimensions, works for any rank
+• Your softmax already handles numerical stability
+• float('-inf') is the correct way to mask before softmax
+• Test with small inputs first (n=3, d_k=4) to verify logic
+
+Performance Note
+────────────────
+In GPT-3 (175B parameters):
+• 96 layers × 96 heads = 9,216 attention computations per forward pass
+• Context length = 2048
+• Each attention: 2048² × 128 ≈ 537M FLOPs
+• Total attention FLOPs per token: ~5 TFLOPs!
+
+Attention dominates compute in Transformers. Optimizing this function is
+critical for training efficiency. Libraries like Flash Attention and xFormers
+provide kernel-level optimizations, achieving 2-4x speedups.
+
+Remember: You're implementing the mechanism that made GPT, ChatGPT, and modern
+AI possible. This function is called trillions of times during LLM training!

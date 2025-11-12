@@ -168,32 +168,55 @@ def scaled_dot_product_attention(
     Q: Float[Tensor, " ... queries d_k"],
     K: Float[Tensor, " ... keys d_k"],
     V: Float[Tensor, " ... values d_v"],
-    mask: torch.Tensor | None = None,
+    mask: Bool[Tensor, " ... queries keys"] | None = None,
 ) -> Float[Tensor, " ... queries d_v"]:
     """
     Compute scaled dot-product attention.
+    
+    Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+    
+    This is the core mechanism that enables Transformers to dynamically route
+    information. Each query position computes a weighted average over all value
+    positions, with weights determined by query-key similarity.
 
     Args:
-        Q: Query tensor of shape (..., queries, d_k)
-        K: Key tensor of shape   (..., keys,   d_k)
-        V: Value tensor of shape (..., values, d_v) with values == keys
-        mask: Optional boolean mask of shape (..., queries, keys). True indicates keep; False indicates mask out.
+        Q: Query tensor of shape (..., n_queries, d_k)
+        K: Key tensor of shape (..., n_keys, d_k)
+        V: Value tensor of shape (..., n_keys, d_v)
+        mask: Optional boolean mask of shape (..., n_queries, n_keys)
+              True indicates positions that should be MASKED (set to -inf)
+              Used for causal masking in autoregressive generation
 
     Returns:
-        Tensor of shape (..., queries, d_v)
+        Output tensor of shape (..., n_queries, d_v)
     """
-    q = Q.float()
-    k = K.float()
-    v = V.float()
-    d_k = q.shape[-1]
-    scale = 1.0 / math.sqrt(max(1, d_k))
-    # (..., queries, keys)
-    scores = torch.matmul(q, k.transpose(-1, -2)) * scale
-    if mask is not None:
-        scores = scores.masked_fill(~mask, float('-inf'))
-    attn = _softmax(scores, dim=-1)
-    out = torch.matmul(attn, v)
-    return out.to(V.dtype)
+    # TODO: Implement scaled dot-product attention
+    # 
+    # Step 1: Compute attention scores
+    #   scores = Q @ K^T  (use K.transpose(-2, -1) for any rank)
+    #   Shape: (..., n_queries, d_k) @ (..., d_k, n_keys) = (..., n_queries, n_keys)
+    #
+    # Step 2: Scale by √d_k for stability
+    #   d_k = Q.shape[-1]
+    #   scaled_scores = scores / math.sqrt(d_k)
+    #   This prevents dot products from growing with dimensionality!
+    #
+    # Step 3: Apply causal mask if provided
+    #   if mask is not None:
+    #       scaled_scores = scaled_scores.masked_fill(mask, float('-inf'))
+    #   Masked positions get -inf so softmax makes them 0
+    #
+    # Step 4: Apply softmax over keys (dim=-1)
+    #   attn_weights = softmax(scaled_scores, dim=-1)
+    #   Use YOUR custom softmax from utils!
+    #   Each query gets a probability distribution over keys
+    #
+    # Step 5: Weighted sum of values
+    #   output = attn_weights @ V
+    #   Shape: (..., n_queries, n_keys) @ (..., n_keys, d_v) = (..., n_queries, d_v)
+    #
+    # Remember: Use @ for matrix multiply, it handles batch dimensions!
+    raise NotImplementedError("TODO: Implement scaled_dot_product_attention")
 
 
 def multihead_self_attention(

@@ -1,0 +1,15 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -180,8 +180,9 @@ def scaled_dot_product_attention(
+     # Compute attention scores: Q @ K^T
+     scores = Q @ K.transpose(-2, -1)
+     
+-    # Scale by sqrt(d_k) for stability
+-    d_k = Q.shape[-1]
+-    scores = scores / math.sqrt(d_k)
++    # BUG: Missing scaling by sqrt(d_k)!
++    # Without scaling, large dot products push softmax into saturated regions
++    # causing vanishing gradients and training instability.
++    # Should be: scores = scores / math.sqrt(Q.shape[-1])
+     
+     # Apply causal mask if provided
