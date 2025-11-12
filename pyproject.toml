@@ -44,6 +44,9 @@ python-preference = "managed"
 log_cli = true
 log_cli_level = "WARNING"
 addopts = "-s"
+markers = [
+    "integration: marks tests as integration tests that use real API calls (deselect with '-m \"not integration\"')"
+]
 
 [tool.ruff]
 line-length = 120
