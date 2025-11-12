@@ -868,7 +868,7 @@ def init(curriculum_id: str):
         console.print()
         console.print(Panel(
             f"[bold green]✓ Initialization Complete![/bold green]\n\n"
-            f"Curriculum: [bold]{manifest.name}[/bold]\n"
+            f"Curriculum: [bold]{manifest.curriculum_name}[/bold]\n"
             f"Modules: {len(manifest.modules)}\n\n"
             f"Shadow worktree created at: [cyan]{SHADOW_WORKTREE_DIR}[/cyan]\n\n"
             f"You are now ready to begin learning!\n\n"
