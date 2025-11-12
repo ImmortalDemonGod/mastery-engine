@@ -2,101 +2,214 @@
 
 ## Purpose
 
-This directory contains the source of truth for student and developer modes.
+This directory contains the source of truth for **student mode** (learning path) and **developer mode** (reference implementations).
 
-## What Gets Stubbed vs What Stays Complete
+The CS336 assignment follows a **"from scratch" ethos**: students implement all critical components of a Transformer language model without using high-level PyTorch abstractions like `nn.Linear` or `nn.Embedding`.
+
+## Complete Curriculum: 21 Modules
+
+The curriculum teaches **21 modules** covering the full LM pipeline:
+
+### Foundation Components (8 modules)
+- `softmax` - Numerically stable softmax
+- `cross_entropy` - Numerically stable cross-entropy loss  
+- `gradient_clipping` - Global gradient clipping
+- `linear` - Fully-connected layer (from scratch, no `nn.Linear`)
+- `embedding` - Token embeddings (from scratch, no `nn.Embedding`)
+- `silu` - SiLU activation function
+- `rmsnorm` - Root Mean Square Layer Normalization
+- `rope` - Rotary Position Embeddings
+
+### Architecture Components (5 modules)
+- `swiglu` - SwiGLU gated feed-forward network
+- `attention` - Scaled dot-product attention
+- `multihead_attention` - Multi-head self-attention with RoPE
+- `transformer_block` - Complete transformer block
+- `transformer_lm` - Full model assembly
+
+### Training Infrastructure (5 modules)
+- `adamw` - AdamW optimizer with bias correction
+- `cosine_schedule` - Cosine learning rate schedule with warmup
+- `data_loader` - Batch sampling for training (`get_batch`)
+- `checkpointing` - Model save/load with optimizer state
+- `training_loop` - Complete training integration
+
+### Application (3 modules)
+- `bpe_tokenizer` - Byte Pair Encoding training
+- `tokenizer_class` - Tokenizer wrapper with encode/decode
+- `text_generation` - Autoregressive generation with sampling
+
+## Student Mode vs Developer Mode
 
 ### Student Mode (`modes/student/cs336_basics/`)
 
-**Stubbed (TODO implementations):**
-- `utils.py` - Contains 3 functions taught by the curriculum:
-  - `softmax()` - Numerically stable softmax
-  - `cross_entropy()` - Numerically stable cross-entropy loss
-  - `gradient_clipping()` - Global gradient clipping
+**18 Components Stubbed** (must implement):
 
-**Complete (scaffolding for LLM):**
-- `layers.py` - Neural network layers (Linear, Embedding, RMSNorm, SwiGLU, attention, transformer blocks, RoPE)
-- `tokenizer.py` - BPE tokenizer implementation
-- `bpe.py` - Byte Pair Encoding algorithm
-- `optimizer.py` - AdamW optimizer
-- `pretokenization_example.py` - Example preprocessing scripts
-- `__init__.py` - Package initialization
+`layers.py`:
+- `Linear` class
+- `Embedding` class  
+- `silu()` function
+- `RMSNorm` class
+- `SwiGLU` class
+- `scaled_dot_product_attention()` function
+- `rope()` function
+- `multihead_self_attention_with_rope()` function
+- `transformer_block()` function
+- `transformer_lm()` function
+
+`utils.py`:
+- `softmax()` function
+- `cross_entropy()` function
+- `gradient_clipping()` function
+- `get_lr_cosine_schedule()` function
+- `get_batch()` function
+- `save_checkpoint()` function
+- `load_checkpoint()` function
+
+`optimizer.py`:
+- `AdamW` class
+
+`bpe.py`:
+- `train_bpe()` function
+
+`generation.py`:
+- `generate()` function
+
+**Helper Functions** (provided complete):
+- `multihead_self_attention()` - Non-RoPE variant (not in curriculum)
+- Utility helpers in `pretokenization_example.py`
 
 ### Developer Mode (`modes/developer/cs336_basics/`)
 
-**Complete implementations of everything:**
-- `utils.py` - All 3 functions fully implemented
-- All other files identical to student mode
+**All components fully implemented** - serves as reference and enables engine development.
 
-## Why This Design?
+## Why "From Scratch"?
 
-### The CS336 Curriculum Goal
+The curriculum philosophy: **No magic black boxes.**
 
-The original CS336 assignment is about building an LLM from scratch. Students need:
+❌ **Not allowed:**
+```python
+self.linear = nn.Linear(in_features, out_features)  # Too high-level!
+self.embed = nn.Embedding(vocab_size, d_model)     # Hides the mechanism!
+```
 
-1. **Core utilities** (curriculum teaches these):
-   - Numerically stable softmax
-   - Cross-entropy loss
-   - Gradient clipping
+✅ **Required:**
+```python
+# Implement using nn.Parameter directly
+self.weight = nn.Parameter(torch.empty(out_features, in_features))
+nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 
-2. **LLM scaffolding** (provided as complete):
-   - Transformer architecture (layers.py)
-   - Tokenizer (BPE)
-   - Optimizer (AdamW)
+def forward(self, x):
+    return x.matmul(self.weight.t()) + self.bias  # y = x @ W^T + b
+```
 
-### What Students Can Do After Finishing
+**Why this matters:**
+- Understand weight initialization (Kaiming uniform, truncated normal)
+- Understand matrix shapes and transposes
+- Understand parameter counting and memory usage
+- Build intuition for backpropagation and gradients
+- No "automagic" - every line has clear meaning
 
-After completing the 3 curriculum modules (softmax, cross_entropy, gradient_clipping), students have:
+## What Students Build
 
-✅ Complete cs336_basics package  
-✅ Can train a language model  
-✅ Can use all the transformer components  
-✅ Have working implementations of the 3 critical functions they learned
+After completing all 21 modules, students have:
 
-### Mastery Engine Curriculum Scope
+✅ **Complete Transformer LM from scratch**
+- No `nn.Linear` or `nn.Embedding` used
+- Every component hand-built with `nn.Parameter`
+- Deep understanding of architecture internals
 
-The Mastery Engine **only teaches the 3 functions** in the curriculum manifest:
-- Module 1: `softmax()`
-- Module 2: `cross_entropy()`  
-- Module 3: `gradient_clipping()`
+✅ **Full training pipeline**
+- Data loading with random sampling
+- AdamW optimizer with momentum
+- Cosine schedule with warmup
+- Checkpointing for resilience
 
-Everything else (layers, tokenizer, etc.) is **pre-implemented scaffolding** that enables the LLM training workflow.
+✅ **Production-ready tokenizer**
+- BPE training from corpus
+- Encode/decode with special tokens
+- UTF-8 byte-level for multilingual
 
-## File Verification
+✅ **Text generation**
+- Autoregressive sampling
+- Temperature, top-k, top-p strategies
+- Real LLM interaction
 
-Run this to verify modes are set up correctly:
+## File Structure
 
-```bash
-# All support files should be identical in both modes
-diff modes/student/cs336_basics/layers.py modes/developer/cs336_basics/layers.py
-# Should output: (no differences)
-
-# Only utils.py should differ
-diff modes/student/cs336_basics/utils.py modes/developer/cs336_basics/utils.py
-# Should output: differences showing TODO stubs vs implementations
+```
+modes/
+├── student/              # Learning mode - stubs for curriculum
+│   └── cs336_basics/
+│       ├── layers.py     # 10 components stubbed
+│       ├── utils.py      # 7 functions stubbed
+│       ├── optimizer.py  # AdamW stubbed
+│       ├── bpe.py        # train_bpe stubbed
+│       ├── generation.py # generate stubbed
+│       ├── tokenizer.py  # Complete (helper)
+│       └── __init__.py
+│
+└── developer/            # Reference mode - all complete
+    └── cs336_basics/
+        └── [all files complete]
 ```
 
 ## Mode Switching
 
-When you switch modes with `./scripts/mode switch student|developer`:
+Use the mode script:
 
-- **Student mode**: Tests fail until you implement softmax, cross_entropy, gradient_clipping
-- **Developer mode**: Tests pass, you can develop engine features
+```bash
+./scripts/mode switch student    # Activate learning mode
+./scripts/mode switch developer  # Activate reference mode
+```
 
-Both modes have complete LLM scaffolding, so students can:
-- Run the LLM training after finishing the curriculum
-- Use transformer layers, tokenizer, optimizer without implementing them
-- Focus on learning the 3 core numerical stability concepts
+**Student mode:**
+- 18 components raise `NotImplementedError`
+- Tests fail until implementations complete
+- Forces learning through implementation
 
-## Future Curriculum Expansion
+**Developer mode:**  
+- All components fully implemented
+- Tests pass immediately
+- Enables engine development without waiting for curriculum completion
 
-To add more modules to the curriculum:
+## Verification
 
-1. Add module to `curricula/cs336_a1/manifest.json`
-2. Create module content in `curricula/cs336_a1/modules/{module_name}/`
-3. If teaching a new function:
-   - Add TODO stub to `modes/student/cs336_basics/{file}.py`
-   - Add complete implementation to `modes/developer/cs336_basics/{file}.py`
-4. Keep all other files identical in both modes
+Check alignment between modes:
 
-The dual-mode architecture supports expanding the curriculum without breaking existing scaffolding.
+```bash
+# Student mode should have stubs
+grep -n "NotImplementedError" modes/student/cs336_basics/*.py
+
+# Developer mode should be complete (no stubs)
+grep -n "NotImplementedError" modes/developer/cs336_basics/*.py
+# Should return nothing
+
+# Files in both modes
+ls modes/student/cs336_basics/
+ls modes/developer/cs336_basics/
+# Should have identical file lists
+```
+
+## Curriculum Expansion
+
+To add new modules:
+
+1. **Update manifest**: Add to `curricula/cs336_a1/manifest.json`
+2. **Create module content**:
+   - `curricula/cs336_a1/modules/{module_id}/build_prompt.txt`
+   - `curricula/cs336_a1/modules/{module_id}/justify_questions.json`
+   - `curricula/cs336_a1/modules/{module_id}/validator.sh`
+   - `curricula/cs336_a1/modules/{module_id}/bugs/*.patch`
+3. **Update student mode**: Add stub to appropriate file
+4. **Update developer mode**: Add complete implementation
+
+## Design Philosophy
+
+**Minimal scaffolding, maximum learning:**
+- Students implement what matters (architecture, training, tokenization)
+- No busywork (pretokenization scripts provided)
+- Progressive complexity (foundation → components → integration)
+- Real understanding through implementation
+
+**The goal:** Students who complete this curriculum can confidently say "I built a Transformer language model from scratch" and mean it literally.
