@@ -86,6 +86,73 @@ This means:
 • Works for any sequence length (no max limit!)
 • Position info preserved in every layer
 
+Distance Decay Property
+────────────────────────
+A key advantage of RoPE: attention naturally DECAYS with distance.
+
+As the relative position |m-n| increases, the dot product between rotated
+queries and keys decreases. This creates an inductive bias toward local
+context while still allowing long-range dependencies.
+
+**Mathematical intuition**: The rotation matrices for distant positions become
+increasingly orthogonal, reducing their dot product. This is NOT a hard
+cutoff (like attention masks) but a smooth, learnable decay.
+
+**Why this matters**:
+• Helps model focus on nearby tokens (local coherence)
+• Provides inductive bias that improves training
+• Explains empirical success on long-document tasks
+• Natural regularization - distant tokens contribute less
+
+Think of it like: As tokens get farther apart, their "alignment" in rotated
+space decreases, making attention weights naturally smaller.
+
+Length Extrapolation
+────────────────────
+Unlike learned embeddings (which have a fixed max_seq_len), RoPE can
+EXTRAPOLATE to longer sequences!
+
+**Key capability**:
+• Train on sequences of length 512
+• Inference on sequences of length 2048+
+• No architectural changes needed!
+
+**Why it works**: Rotation is continuous. If the model learns that rotation
+by 45° means "next token", it can generalize to 90° meaning "two tokens away"
+even if it never saw that during training.
+
+**This is critical for production**:
+• LLaMA: Trained on 2K context, extended to 32K+ with "RoPE scaling"
+• Mistral: Similar extrapolation techniques
+• Enables efficient training (short sequences) + flexible inference (long)
+
+**Contrast with learned embeddings**:
+```python
+learned_pe = nn.Parameter(torch.randn(max_seq_len, d_model))  # Fixed!
+# Can't use position 513 if max_seq_len=512 - would need retraining
+```
+
+With RoPE, there's no such limit - just apply the rotation formula to any
+position index!
+
+Linear Attention Compatibility
+───────────────────────────────
+RoPE works with ANY attention mechanism, not just standard O(N²) attention!
+
+**For efficient attention (Performer, FLASH)**:
+• Apply rotation AFTER kernel feature maps: ϕ(RoPE(q)), φ(RoPE(k))
+• Preserves O(N) complexity while adding position information
+• This is a key advantage over some position encoding methods
+
+**Why this matters**:
+• Shows RoPE is not tied to quadratic attention
+• Enables position-aware efficient transformers
+• Demonstrates generality of the rotation approach
+
+Modern models using RoPE with efficient attention:
+• Flash Attention 2 + RoPE: Standard combination
+• Linear transformers: Can incorporate RoPE without breaking O(N)
+
 The θ Parameter (Theta)
 ───────────────────────
 θ determines the rotation frequency for each dimension pair:

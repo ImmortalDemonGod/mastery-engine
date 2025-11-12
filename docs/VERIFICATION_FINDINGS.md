@@ -206,15 +206,252 @@ Our rope module is **mathematically accurate** and explains the core mechanism w
 
 ---
 
-## Next Modules to Verify
+## Module: linear (Linear/Fully-Connected Layer)
 
-1. **linear** - Check against Attention Is All You Need + GLU Variants
-2. **tokenizer_class** - Check against BPE papers
-3. **transformer_lm** - Check against Attention Is All You Need
-4. **embedding** - Check against Attention Is All You Need
-5. **data_loader** - Check against CS336 Assignment + Scaling Laws
-6. **checkpointing** - Check against CS336 Assignment
+### Literature Sources
+- `transformer_paradigm/Attention_Is_All_You_Need_Analysis.md`
+- `core_architectural_components/GLU_Variants_Improve_Transformer_Analysis.md`
+
+### Verification Status: ✅ ACCURATE - No changes needed
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **Mathematical Foundation**: y = x W^T + b - Correct
+✅ **Weight Shape**: (out_features, in_features) - Correct
+✅ **Transpose Rationale**: Properly explained
+✅ **Kaiming Initialization**: Mentioned appropriately
+✅ **Usage Context**: FFN, attention projections, SwiGLU
+✅ **Universal Approximation**: Correctly stated
+
+### Literature Confirmation
+
+**From Attention Is All You Need**:
+- Position-wise FFN uses two linear transformations: FFN(x) = W₂(ReLU(W₁(x)))
+- Our explanation aligns perfectly
+
+**From GLU Variants Paper**:
+- Linear layers are building blocks: "FFN(x) = max(0, xW₁+b₁)W₂+b₂"
+- SwiGLU uses THREE linear layers (W1, W2, W3) - our prompt correctly mentions this
+- Width halving for parameter parity - good context in our prompt
+
+### Assessment: **95/100** - Excellent, pedagogically sound
+
+**Minor Enhancement Opportunity**:
+Could mention that in SwiGLU, hidden dim is often ~(8/3)d_model for parameter parity when using 3 matrices instead of 2. But this is covered in the SwiGLU module.
+
+**Conclusion**: No changes required. Linear module is accurate and well-explained.
 
 ---
 
-**Status**: rope verification complete, 5 modules remaining
+## Module: embedding (Token Embeddings)
+
+### Literature Source
+`transformer_paradigm/Attention_Is_All_You_Need_Analysis.md`
+
+### Verification Status: ✅ ACCURATE with minor enhancement opportunity
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **From-Scratch Requirement**: Uses nn.Parameter (not nn.Embedding) - Correct
+✅ **Truncated Normal Init**: Appropriate for embeddings
+✅ **Lookup Mechanism**: Simple indexing weight[token_ids]
+✅ **Embedding Dimension**: d_model context
+
+### Literature Confirmation
+
+**From Attention Is All You Need**:
+- Uses learned embeddings to convert tokens to vectors
+- Weight tying: "we share the same weight matrix between the two embedding layers and the pre-softmax linear transformation"
+- Scaling by √d_model in original paper (not always used in modern variants)
+
+### Enhancement Opportunity
+
+**Weight Tying** (mentioned in literature but not our prompt):
+```markdown
+### Weight Tying (Optional Advanced Concept)
+
+In the original Transformer and many modern LLMs, the embedding weights
+are SHARED with the LM head (output projection):
+
+    embedding.weight = lm_head.weight  # Same parameter matrix!
+
+Why this works:
+- Embedding: Maps token ID → semantic vector
+- LM head: Maps semantic vector → token logits
+- These are inverse operations, so sharing weights makes sense
+
+Benefits:
+- Saves vocab_size × d_model parameters (~38M for GPT-2 small)
+- Acts as regularization
+- Used in BERT, GPT-2, GPT-3, many modern LLMs
+
+This is implemented at the model level, not in the Embedding class itself.
+```
+
+### Assessment: **90/100** - Accurate, could mention weight tying
+
+**Conclusion**: Minor enhancement about weight tying would add valuable context, but current content is correct.
+
+---
+
+## Module: tokenizer_class (Tokenizer Encode/Decode)
+
+### Literature Sources
+- `subword_tokenization/Neural_Machine_Translation_of_Rare_Words_with_Subword_Units_Analysis.md`
+- `subword_tokenization/Formalizing_BPE_Tokenization_Analysis.md`
+
+### Verification Status: ✅ ACCURATE - Excellent coverage
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **Sequential Merge Application**: Order matters - Correct and emphasized
+✅ **Byte-Level BPE**: Universal coverage without OOV
+✅ **Reverse Vocabulary**: O(1) lookup optimization
+✅ **UTF-8 Handling**: errors='replace' properly explained
+✅ **Special Tokens**: Consistent ID management
+
+### Literature Confirmation
+
+**From Sennrich et al. (2016)**:
+- BPE solves OOV problem - we explain this correctly
+- Merge order is critical - we emphasize this strongly
+
+**From Berglund & van der Merwe (2023)**:
+- Formal semantics of merge application
+- Greedy algorithm and rule priority
+- Our explanation aligns with formal analysis
+
+### Assessment: **95/100** - Comprehensive and accurate
+
+**Conclusion**: No changes required. One of the strongest modules - excellent pedagogical quality.
+
+---
+
+## Module: transformer_lm (Full Model Assembly)
+
+### Literature Source
+`transformer_paradigm/Attention_Is_All_You_Need_Analysis.md`
+
+### Verification Status: ✅ ACCURATE with minor enhancements
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **Assembly Pipeline**: embeddings → N blocks → norm → LM head - Correct
+✅ **Pre-Norm Architecture**: Modern standard properly explained
+✅ **Autoregressive Setup**: Next-token prediction clearly stated
+✅ **State Dict Management**: Correct key format explanation
+
+### Literature Confirmation
+
+**From Attention Is All You Need**:
+- N=6 encoder/decoder layers (stacking architecture)
+- Residual connections around each sublayer
+- LayerNorm (we use RMSNorm, a modern variant)
+- Output projection to vocabulary
+
+### Enhancement: Layer Stacking Depth
+
+**Current**: Explains N layers correctly
+**Enhancement**: Add context on why depth matters
+
+```markdown
+### Why N Layers?
+
+Original Transformer: N=6 encoder, N=6 decoder
+Modern LLMs scale N dramatically:
+- GPT-2 small: N=12
+- GPT-3: N=96
+- LLaMA 70B: N=80
+
+Why more layers help:
+- Each layer refines representations
+- Early layers: syntax, local patterns
+- Middle layers: semantics, entities
+- Late layers: reasoning, long-range dependencies
+
+Empirical finding: Performance scales with depth (and width and data)
+up to compute limits. See "Training Compute-Optimal Large Language Models"
+(Chinchilla paper) for scaling laws.
+```
+
+### Assessment: **92/100** - Accurate, could add scaling context
+
+**Conclusion**: Minor enhancement about layer depth would add valuable perspective.
+
+---
+
+## Module: data_loader (get_batch)
+
+### Literature Sources
+- `practical_implementation_guides/CS336_Assignment_1_Analysis.md` (primary)
+- `training_mechanisms_understanding/Training_Dynamics_Underlying_Language_Model_Scaling_Laws_Analysis.md` (conceptual)
+
+### Verification Status: ✅ ACCURATE - Excellent pedagogical coverage
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **Random vs Sequential**: Overfitting explanation - Excellent
+✅ **Sampling Range**: [0, N-L-1] with clear off-by-one analysis
+✅ **Input/Target Shift**: y = x shifted by 1 - Correct
+✅ **Fancy Indexing**: O(1) vs O(N×V) optimization - Great explanation
+✅ **Birthday Paradox**: Statistical analysis for large datasets
+
+### Assessment: **95/100** - Outstanding pedagogical quality
+
+**Conclusion**: No changes required. One of the best modules - comprehensive and insightful.
+
+---
+
+## Module: checkpointing (Save/Load)
+
+### Literature Source
+`practical_implementation_guides/CS336_Assignment_1_Analysis.md`
+
+### Verification Status: ✅ ACCURATE - Excellent practical coverage
+
+### What Our Build Prompt Gets RIGHT
+
+✅ **Complete State**: model + optimizer + iteration - Correct
+✅ **Optimizer 2× Size**: AdamW stores m and v - Accurate
+✅ **map_location='cpu'**: Device compatibility properly explained
+✅ **In-Place Restoration**: Reference preservation - Correct
+✅ **Spot Instance Math**: Optimal checkpoint frequency calculation
+
+### Assessment: **95/100** - Excellent practical guidance
+
+**Conclusion**: No changes required. Strong practical focus with proper theory.
+
+---
+
+## Summary of Verification Results
+
+| Module | Status | Score | Changes Needed |
+|:---|:---:|:---:|:---|
+| **rope** | ✅ Verified | 85/100 | Add 4 enhancements (distance decay, extrapolation, linear attention, empirical context) |
+| **linear** | ✅ Verified | 95/100 | None - excellent |
+| **embedding** | ✅ Verified | 90/100 | Optional: add weight tying context |
+| **tokenizer_class** | ✅ Verified | 95/100 | None - excellent |
+| **transformer_lm** | ✅ Verified | 92/100 | Optional: add layer depth scaling context |
+| **data_loader** | ✅ Verified | 95/100 | None - excellent |
+| **checkpointing** | ✅ Verified | 95/100 | None - excellent |
+
+### Overall Assessment
+
+**Average Score: 92.4/100** - Exceptionally high quality curriculum
+
+**Required Changes**: 1 module (rope - 4 enhancements)
+**Optional Enhancements**: 2 modules (embedding, transformer_lm)
+
+**Strengths**:
+- Mathematical accuracy throughout
+- Strong pedagogical explanations
+- Excellent practical context
+- Proper from-scratch implementation guidance
+
+**Primary Action Required**:
+Enhance rope module with distance decay, length extrapolation, linear attention compatibility, and empirical context.
+
+---
+
+**Status**: ALL 6 NEW MODULES VERIFIED ✅
+**Next Step**: Apply improvements to rope module
