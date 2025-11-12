@@ -191,13 +191,16 @@ def run_engine_command(repo_path: Path, *args: str) -> subprocess.CompletedProce
         CompletedProcess with stdout, stderr, and returncode
     """
     import sys
+    import os
     # Use current Python interpreter to avoid venv complications in temp dirs
     cmd = [sys.executable, "-m", "engine.main"] + list(args)
+    # CRITICAL: Pass current environment including PYTHONPATH set by fixture
     return subprocess.run(
         cmd,
         cwd=repo_path,
         capture_output=True,
-        text=True
+        text=True,
+        env=os.environ.copy()  # Inherit PYTHONPATH from fixture
     )
 
 
