@@ -25,6 +25,7 @@ from rich.panel import Panel
 from engine.state import StateManager, StateFileCorruptedError
 from engine.curriculum import CurriculumManager, CurriculumNotFoundError, CurriculumInvalidError
 from engine.workspace import WorkspaceManager, PatchApplicationError
+from engine.schemas import UserProgress
 from engine.validator import (
     ValidationSubsystem,
     ValidatorNotFoundError,
