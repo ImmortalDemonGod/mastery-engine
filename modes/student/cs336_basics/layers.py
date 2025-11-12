@@ -73,8 +73,24 @@ class Embedding(nn.Module):
 
 
 def silu(in_features: Tensor) -> Tensor:
-    """SiLU activation: x * sigmoid(x)."""
-    return in_features * torch.sigmoid(in_features)
+    """
+    Apply SiLU (Sigmoid Linear Unit) activation function element-wise.
+    
+    SiLU(x) = x * sigmoid(x) = x / (1 + exp(-x))
+    
+    Also known as Swish activation.
+    
+    Args:
+        in_features: Input tensor of any shape
+    
+    Returns:
+        Tensor of same shape with SiLU applied element-wise
+    """
+    # TODO: Implement SiLU activation
+    # SiLU(x) = x * σ(x) where σ is sigmoid
+    # Hint: Use torch.sigmoid() - it's numerically stable!
+    # This is a one-liner!
+    raise NotImplementedError("TODO: Implement silu activation")
 
 
 class RMSNorm(nn.Module):

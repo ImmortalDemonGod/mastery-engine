@@ -1,0 +1,12 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -73,7 +73,8 @@ def silu(in_features: Tensor) -> Tensor:
+     Returns:
+         Tensor of the same shape as input with SiLU applied element-wise
+     """
+-    return in_features * torch.sigmoid(in_features)
++    # BUG: Missing multiplication by input! This returns just sigmoid, not SiLU.
++    return torch.sigmoid(in_features)
+ 
+ 
+ class RMSNorm(nn.Module):
