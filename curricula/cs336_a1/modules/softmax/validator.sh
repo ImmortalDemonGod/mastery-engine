@@ -10,12 +10,17 @@ if [ -z "$SHADOW_WORKTREE" ]; then
     exit 1
 fi
 
-# Copy user's implementation from main directory to shadow worktree
-# This allows validation in isolation without touching the user's working directory
-cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
-
-# Change to shadow worktree to run tests
-cd "$SHADOW_WORKTREE"
+# Determine if we're already in shadow worktree (for harden stage)
+# or in main directory (for build stage)
+if [ "$(pwd)" != "$SHADOW_WORKTREE" ]; then
+    # BUILD STAGE: Copy from main directory to shadow worktree
+    cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
+    cd "$SHADOW_WORKTREE"
+else
+    # HARDEN STAGE: Already in shadow worktree, file was copied by submit-fix
+    # Just stay here and run tests
+    true
+fi
 
 # Record start time for performance measurement
 start_time=$(python3 -c 'import time; print(time.time())')
