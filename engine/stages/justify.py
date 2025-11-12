@@ -17,6 +17,7 @@ Key responsibilities:
 
 import logging
 import json
+import os
 from pathlib import Path
 
 from engine.schemas import JustifyQuestion
@@ -87,6 +88,8 @@ class JustifyRunner:
         local keyword matching against pre-defined failure modes to catch
         shallow/vague answers without calling the LLM.
         
+        Can be disabled via environment variable: MASTERY_DISABLE_FAST_FILTER=true
+        
         Args:
             question: The justify question with failure modes
             user_answer: User's response text (case-insensitive matching)
@@ -96,6 +99,11 @@ class JustifyRunner:
             - matched: True if a failure mode was detected
             - feedback: Pre-written feedback for the matched failure mode, or None
         """
+        # Check if fast filter is disabled via environment variable (for debugging)
+        if os.getenv('MASTERY_DISABLE_FAST_FILTER', '').lower() in ('true', '1', 'yes'):
+            logger.info("Fast filter DISABLED via MASTERY_DISABLE_FAST_FILTER environment variable")
+            return False, None
+        
         user_answer_lower = user_answer.lower()
         
         for failure_mode in question.failure_modes:
