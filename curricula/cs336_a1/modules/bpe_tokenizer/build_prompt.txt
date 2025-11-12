@@ -1,0 +1,337 @@
+Build Challenge: BPE Tokenizer Training
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement Byte Pair Encoding (BPE) tokenizer training, the algorithm that creates
+vocabularies for GPT-2, GPT-3, LLaMA, and most modern LLMs. You will learn how
+to convert raw text into a compact vocabulary of subword tokens, why subword
+tokenization is superior to word-level or character-level approaches, how the
+greedy merge algorithm works, and why vocabulary size affects model capacity
+and efficiency. This is where text preprocessing happens!
+
+Background: The Tokenization Problem
+─────────────────────────────────────
+Neural networks operate on fixed vocabularies of discrete tokens. How do we
+represent arbitrary text with a fixed vocabulary?
+
+**Approach 1: Character-level**
+- Vocabulary: [a, b, c, ..., z, A, B, ..., space, ...]
+- Size: ~100 characters
+- Example: "hello" → [h, e, l, l, o]
+
+Advantages: Small vocab, can represent anything
+Disadvantages: VERY long sequences (1 char = 1 token), poor semantic units
+
+**Approach 2: Word-level**
+- Vocabulary: [the, cat, sat, on, mat, ...]
+- Size: ~50,000 words
+- Example: "hello world" → [hello, world]
+
+Advantages: Good semantic units, shorter sequences
+Disadvantages: Huge vocab, can't handle rare words, OOV (out-of-vocabulary) problem
+
+**Approach 3: Subword (BPE)**
+- Vocabulary: Mix of characters, common subwords, and words
+- Size: ~30,000-100,000 tokens
+- Example: "hello" → [hello], "hellobob" → [hello, bob] or [hel, lo, bob]
+
+Advantages: Compact vocab, handles rare words, no OOV, good semantic units
+THIS IS THE STANDARD! Used by virtually all modern LLMs.
+
+What is BPE?
+────────────
+Byte Pair Encoding iteratively merges the most frequent adjacent pairs of tokens:
+
+Start: Every character is a token.
+Repeat: Find most frequent pair, merge it into new token.
+Stop: After vocab_size merges.
+
+**Example:**
+Text: "low low low lower lower lowest"
+
+Iteration 1: Most frequent pair?
+- Counts: "lo" appears 9 times, "ow" appears 6 times, etc.
+- Merge "lo" → new token [lo]
+- Vocabulary: [l, o, w, e, r, s, t, lo]
+- Text becomes: "lo w lo w lo w lo wer lo wer lo west"
+
+Iteration 2: Most frequent pair now?
+- Counts: "lo w" appears 3 times (most frequent)
+- Merge "lo w" → new token [low]
+- Vocabulary: [..., low]
+- Text becomes: "low low low lower lower lowest"
+
+Continue this process for vocab_size - initial_size merges!
+
+The result: A vocabulary containing:
+- Individual characters (rare symbols)
+- Common subwords (prefixes, suffixes)
+- Frequent words (entire words as single tokens)
+
+Mathematical Foundation
+───────────────────────
+BPE is a greedy algorithm for text compression:
+
+**Objective**: Minimize sequence length (fewer tokens) given vocabulary limit.
+
+**Algorithm**:
+```
+vocab = {all unique characters in corpus}
+text_as_tokens = [each character as separate token]
+
+for merge_num in range(desired_vocab_size - len(vocab)):
+    # Count all adjacent pairs
+    pair_counts = count_pairs(text_as_tokens)
+    
+    # Find most frequent pair
+    best_pair = argmax(pair_counts)
+    
+    # Create new token from this pair
+    new_token = merge(best_pair[0], best_pair[1])
+    vocab.add(new_token)
+    
+    # Replace all occurrences in text
+    text_as_tokens = replace_all(text_as_tokens, best_pair, new_token)
+
+return vocab, merge_operations
+```
+
+The algorithm is deterministic and greedy (locally optimal at each step).
+
+Why BPE Works
+─────────────
+BPE discovers linguistic structure through frequency:
+
+**Common words** get merged into single tokens:
+- "the" is very frequent → becomes single token early
+- Efficient: 1 token instead of 3 characters
+
+**Common morphemes** (prefixes/suffixes) get discovered:
+- "ing", "ed", "un" are frequent → become tokens
+- Generalization: "running" = [run, ing], "walked" = [walk, ed]
+
+**Rare words** decompose into subwords:
+- "antidisestablishmentarianism" might be [anti, dis, establish, ment, arian, ism]
+- Never OOV! Can always decompose to characters if needed.
+
+The frequency-based nature means BPE automatically learns useful subword units!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/tokenizer.py
+
+You will implement `train_bpe()`, a function that learns a BPE vocabulary from
+a text corpus. This produces both the vocabulary and the merge operations.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def train_bpe(
+    text: str,
+    vocab_size: int,
+) -> tuple[dict[int, str], list[tuple[str, str]]]:
+    """
+    Train a BPE tokenizer on given text.
+    
+    Args:
+        text: Training corpus (raw text string)
+        vocab_size: Target vocabulary size
+    
+    Returns:
+        vocab: Dictionary mapping token IDs to token strings
+               {0: 'a', 1: 'b', ..., 256: 'th', ...}
+        merges: List of merge operations in order applied
+                [('t', 'h'), ('th', 'e'), ...]
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Start with byte-level encoding**:
+   - Initial vocabulary: 256 bytes (0-255)
+   - Each byte maps to a token
+   - This handles any Unicode text via UTF-8 encoding
+
+2. **Iterative merging**:
+   - Count all adjacent token pairs in current encoding
+   - Merge most frequent pair
+   - Update text encoding with new token
+   - Repeat until vocab_size reached
+
+3. **Efficient counting**:
+   - Count pairs across entire corpus
+   - Use dictionaries/counters for efficiency
+   - Update counts incrementally if possible
+
+4. **Handle ties**:
+   - If multiple pairs have same frequency, pick deterministically
+   - Common: use lexicographic order
+
+5. **Return merge operations**:
+   - Record sequence of merges: [merge1, merge2, ...]
+   - These define the tokenizer (needed for encoding new text)
+
+Implementation Steps
+────────────────────
+
+**Step 1: Initialize vocabulary with bytes**
+```python
+vocab = {i: bytes([i]) for i in range(256)}  # Bytes 0-255
+token_id = 256  # Next token ID to assign
+```
+
+**Step 2: Convert text to initial byte-level tokens**
+```python
+text_bytes = text.encode('utf-8')
+tokens = list(text_bytes)  # Each byte is a token ID
+```
+
+**Step 3: Merge loop**
+```python
+merges = []
+for _ in range(vocab_size - 256):  # vocab_size - initial_vocab_size merges
+    # Count all adjacent pairs
+    pair_counts = {}
+    for i in range(len(tokens) - 1):
+        pair = (tokens[i], tokens[i+1])
+        pair_counts[pair] = pair_counts.get(pair, 0) + 1
+    
+    # Find most frequent pair
+    if not pair_counts:
+        break  # No more pairs to merge
+    best_pair = max(pair_counts, key=pair_counts.get)
+    
+    # Record merge
+    merges.append((vocab[best_pair[0]], vocab[best_pair[1]]))
+    
+    # Create new token
+    vocab[token_id] = vocab[best_pair[0]] + vocab[best_pair[1]]
+    
+    # Replace all occurrences of pair with new token
+    tokens = replace_pair(tokens, best_pair, token_id)
+    token_id += 1
+```
+
+**Step 4: Return vocabulary and merges**
+```python
+# Convert vocab bytes to strings for readability
+vocab_str = {k: v.decode('utf-8', errors='replace') for k, v in vocab.items()}
+return vocab_str, merges
+```
+
+Mathematical Insight: Compression & Information Theory
+───────────────────────────────────────────────────────
+BPE is related to data compression:
+
+**Entropy**: H(X) = -Σ p(x) log p(x) measures information content.
+
+**Optimal code length**: Frequent symbols get short codes, rare symbols get long.
+
+BPE achieves similar compression:
+- Frequent sequences → single token (short encoding)
+- Rare sequences → multiple tokens (longer encoding)
+
+This compression property is why BPE reduces sequence length significantly
+(often 3-4× compared to character-level)!
+
+Integration with Model
+──────────────────────
+Once trained, BPE tokenizer is used for encoding/decoding:
+
+**Encoding** (text → tokens):
+```python
+def encode(text, vocab, merges):
+    tokens = list(text.encode('utf-8'))  # Start with bytes
+    for (a, b) in merges:  # Apply merges in order
+        tokens = apply_merge(tokens, a, b)
+    return tokens
+```
+
+**Decoding** (tokens → text):
+```python
+def decode(tokens, vocab):
+    byte_string = b''.join(vocab[t] for t in tokens)
+    return byte_string.decode('utf-8')
+```
+
+The vocabulary and merge list fully define the tokenizer!
+
+Common Pitfalls
+───────────────
+
+❌ **Inefficient pair counting**:
+   Counting pairs naively for each merge is O(n × vocab_size × corpus_len).
+   Use efficient data structures!
+
+❌ **Not handling bytes**:
+   Starting with characters fails for non-ASCII text.
+   Must use byte-level encoding (UTF-8).
+
+❌ **Wrong merge order**:
+   Merges must be applied in the order they were learned!
+   [('a','b'), ('c','d')] ≠ [('c','d'), ('a','b')]
+
+❌ **Forgetting to update tokens after merge**:
+   After merging pair → new token, must replace in text!
+
+❌ **Off-by-one in vocab size**:
+   vocab_size includes initial 256 bytes + merges.
+   Number of merges = vocab_size - 256.
+
+Testing
+───────
+Your implementation will be tested against:
+• Small text corpus with known merges
+• Vocabulary size matching
+• Merge sequence correctness
+• Unicode handling
+• Efficiency on larger corpora
+
+The validator will run: pytest tests/test_tokenizer.py::test_train_bpe
+
+Vocabulary Size Trade-offs
+───────────────────────────
+Choosing vocab_size is important:
+
+**Small vocabulary (10K-30K)**:
+- Pros: Fewer parameters in embedding layer, faster training
+- Cons: Longer sequences, less semantic units
+
+**Large vocabulary (50K-100K)**:
+- Pros: Shorter sequences, better semantic units, more words as single tokens
+- Cons: More embedding parameters, potentially more data needed
+
+Modern LLMs:
+- GPT-2: 50,257 tokens
+- GPT-3: 50,257 tokens
+- LLaMA: 32,000 tokens
+- Claude: ~100,000 tokens
+
+Typical range: 30K-100K is standard.
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your BPE training against reference implementations.
+You'll then answer conceptual questions about why BPE works, how it compares
+to other tokenization methods, the role of vocabulary size, and how BPE enables
+handling of rare words and multilingual text.
+
+Hints
+─────
+• Start simple: Get basic algorithm working, optimize later
+• Use Counter from collections for pair counting
+• Test on small examples where you can verify by hand
+• Replace all occurrences of pair efficiently (can't use naive loop!)
+
+Remember: This algorithm is used to create the vocabulary for GPT-3, LLaMA,
+Claude! Every prompt you send first goes through BPE tokenization! 🎯

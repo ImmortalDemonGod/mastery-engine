@@ -86,6 +86,12 @@
       "name": "Training Loop (Complete Integration)",
       "path": "modules/training_loop",
       "baseline_perf_seconds": 0.20
+    },
+    {
+      "id": "bpe_tokenizer",
+      "name": "BPE Tokenizer Training",
+      "path": "modules/bpe_tokenizer",
+      "baseline_perf_seconds": 0.18
     }
   ]
 }
