@@ -50,6 +50,12 @@
       "name": "RoPE (Rotary Position Embeddings)",
       "path": "modules/rope",
       "baseline_perf_seconds": 0.14
+    },
+    {
+      "id": "multihead_attention",
+      "name": "Multi-Head Self-Attention with RoPE",
+      "path": "modules/multihead_attention",
+      "baseline_perf_seconds": 0.22
     }
   ]
 }

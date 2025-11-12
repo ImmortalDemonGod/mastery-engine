@@ -475,45 +475,88 @@ def multihead_self_attention_with_rope(
     num_heads: int,
     max_seq_len: int,
     theta: float,
-    q_proj_weight: Tensor,
-    k_proj_weight: Tensor,
-    v_proj_weight: Tensor,
-    o_proj_weight: Tensor,
-    in_features: Tensor,
-    token_positions: Tensor,
-) -> Tensor:
+    q_proj_weight: Float[Tensor, " d_k d_model"],
+    k_proj_weight: Float[Tensor, " d_k d_model"],
+    v_proj_weight: Float[Tensor, " d_v d_model"],
+    o_proj_weight: Float[Tensor, " d_model d_v"],
+    in_features: Float[Tensor, " ... sequence_length d_model"],
+    token_positions: Int[Tensor, " ... sequence_length"] | None = None,
+) -> Float[Tensor, " ... sequence_length d_model"]:
     """
-    Batched Multi-Head Self-Attention with RoPE (causal, no dropout).
+    Multi-head self-attention with RoPE position encoding.
+    
+    Combines multiple attention heads operating in parallel, each with RoPE.
+    This is the complete attention mechanism used in LLaMA, PaLM, GPT-4.
+    
+    Args:
+        d_model: Model dimension (input/output size)
+        num_heads: Number of parallel attention heads
+        max_seq_len: Maximum sequence length for RoPE
+        theta: RoPE base parameter (typically 10000.0)
+        q_proj_weight: Query projection weights
+        k_proj_weight: Key projection weights
+        v_proj_weight: Value projection weights
+        o_proj_weight: Output projection weights
+        in_features: Input of shape (..., seq_len, d_model)
+        token_positions: Optional positions, defaults to [0,1,2,...]
+    
+    Returns:
+        Output of shape (..., seq_len, d_model)
     """
-    head_dim = d_model // num_heads
-    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
-
-    orig_leading = in_features.shape[:-2]
-    seq_len = in_features.shape[-2]
-
-    x = in_features.reshape(-1, seq_len, d_model)
-
-    # Projections
-    q_all = x.matmul(q_proj_weight.t())
-    k_all = x.matmul(k_proj_weight.t())
-    v_all = x.matmul(v_proj_weight.t())
-
-    def to_heads(t: Tensor) -> Tensor:
-        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
-
-    q = to_heads(q_all)
-    k = to_heads(k_all)
-    v = to_heads(v_all)
-
-    # Apply RoPE to Q and K per head
-    q = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=q, token_positions=token_positions)
-    k = rope(d_k=head_dim, theta=theta, max_seq_len=max_seq_len, in_query_or_key=k, token_positions=token_positions)
-
-    # Causal mask and attention
-    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
-    context = scaled_dot_product_attention(q, k, v, mask=causal)
-
-    # Merge heads
-    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
-    out = context.matmul(o_proj_weight.t())
-    return out.reshape(*orig_leading, seq_len, d_model)
+    # TODO: Implement multi-head self-attention with RoPE
+    #
+    # Step 1: Calculate head dimension
+    #   d_head = d_model // num_heads
+    #   assert d_model % num_heads == 0
+    #
+    # Step 2: Project to Q, K, V
+    #   Q = in_features @ q_proj_weight.T  # (..., seq_len, d_model)
+    #   K = in_features @ k_proj_weight.T
+    #   V = in_features @ v_proj_weight.T
+    #
+    # Step 3: Reshape for multiple heads
+    #   batch_shape = Q.shape[:-2]
+    #   seq_len = Q.shape[-2]
+    #   Q = Q.view(*batch_shape, seq_len, num_heads, d_head)
+    #   # Now: (..., seq_len, num_heads, d_head)
+    #
+    # Step 4: Transpose to batch heads
+    #   Q = Q.transpose(-3, -2)  # Swap seq_len and num_heads
+    #   # Now: (..., num_heads, seq_len, d_head)
+    #   # Do same for K and V
+    #
+    # Step 5: Create default token_positions if None
+    #   if token_positions is None:
+    #       token_positions = torch.arange(seq_len, device=Q.device)
+    #
+    # Step 6: Apply RoPE to Q and K (NOT V!)
+    #   Q_rope = rope(d_head, theta, max_seq_len, Q, token_positions)
+    #   K_rope = rope(d_head, theta, max_seq_len, K, token_positions)
+    #   # V is NOT rotated!
+    #
+    # Step 7: Compute attention for all heads in parallel
+    #   attn_output = scaled_dot_product_attention(Q_rope, K_rope, V, mask=None)
+    #   # Shape: (..., num_heads, seq_len, d_head)
+    #
+    # Step 8: Transpose back
+    #   attn_output = attn_output.transpose(-3, -2)
+    #   # Now: (..., seq_len, num_heads, d_head)
+    #   CRITICAL: Must transpose back before reshaping!
+    #
+    # Step 9: Concatenate heads (reshape)
+    #   attn_output = attn_output.reshape(*batch_shape, seq_len, d_model)
+    #   # Now: (..., seq_len, d_model)
+    #
+    # Step 10: Output projection
+    #   output = attn_output @ o_proj_weight.T
+    #   return output
+    #
+    # Key insights:
+    # - transpose(-3, -2) swaps seq_len ↔ num_heads
+    # - This batches heads for parallel computation
+    # - Must transpose back before reshaping to concat
+    # - RoPE uses d_head, not d_model!
+    # - All heads computed simultaneously (NO loop!)
+    #
+    # The reshape-transpose-attention-transpose-reshape dance is essential!
+    raise NotImplementedError("TODO: Implement multihead_self_attention_with_rope")

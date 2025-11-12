@@ -1,0 +1,424 @@
+Build Challenge: Multi-Head Self-Attention with RoPE
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement multi-head self-attention with RoPE, the complete attention mechanism
+used in modern Transformers like LLaMA, PaLM, and GPT-4. You will learn why
+multiple attention heads are more powerful than a single head, how to efficiently
+batch head computations, and how RoPE integrates into the attention pipeline.
+This combines everything you've built: Linear layers, attention, and RoPE!
+
+Background: Why Multiple Heads?
+────────────────────────────────
+A single attention head computes one set of query-key-value relationships.
+But different aspects of language require different attention patterns:
+
+**Single Head Limitations:**
+- Can only learn one type of attention pattern
+- Example: Maybe it learns to attend to subjects, but misses modifiers
+- Fixed capacity for representing relationships
+
+**Multi-Head Benefits:**
+- Each head can specialize in different patterns:
+  - Head 1: Syntactic dependencies (subject-verb)
+  - Head 2: Semantic relationships (coreference)
+  - Head 3: Local context (adjacent words)
+  - Head 4: Long-range dependencies
+- Parallel processing of different attention patterns
+- Richer representation through ensemble of perspectives
+
+Empirical observation: More heads generally improve performance, but with
+diminishing returns beyond ~16-32 heads per layer.
+
+Mathematical Foundation
+───────────────────────
+Multi-head attention splits the model dimension into multiple heads and runs
+attention in parallel:
+
+Given input X ∈ ℝ^(batch × seq_len × d_model):
+
+1. **Project to Q, K, V** for each head:
+   Q = X · W_Q  where W_Q ∈ ℝ^(d_model × d_k)
+   K = X · W_K  where W_K ∈ ℝ^(d_model × d_k)
+   V = X · W_V  where W_V ∈ ℝ^(d_model × d_v)
+   
+   Typically d_k = d_v = d_model / num_heads (evenly split dimensions)
+
+2. **Reshape for parallel head computation**:
+   Split d_k into (num_heads, d_k/num_heads):
+   Q: (batch, seq_len, d_k) → (batch, num_heads, seq_len, d_k/num_heads)
+
+3. **Apply RoPE** to queries and keys:
+   Q_rotated = rope(Q, positions)
+   K_rotated = rope(K, positions)
+
+4. **Scaled dot-product attention** per head:
+   For each head h:
+   head_h = Attention(Q_h, K_h, V_h) = softmax(Q_h K_h^T / √d_head) V_h
+
+5. **Concatenate heads**:
+   Concat all heads back to d_model dimension
+
+6. **Output projection**:
+   Output = Concat(heads) · W_O  where W_O ∈ ℝ^(d_model × d_model)
+
+The Key Insight: Batched Computation
+─────────────────────────────────────
+Naïve implementation: Loop over heads, compute attention separately
+Efficient implementation: Batch all heads, compute in parallel!
+
+Instead of:
+```python
+outputs = []
+for h in range(num_heads):
+    q_h = Q[:, :, h*d_head:(h+1)*d_head]
+    k_h = K[:, :, h*d_head:(h+1)*d_head]
+    v_h = V[:, :, h*d_head:(h+1)*d_head]
+    out_h = attention(q_h, k_h, v_h)
+    outputs.append(out_h)
+```
+
+Do this:
+```python
+Q_reshaped = Q.view(batch, seq_len, num_heads, d_head)
+Q_heads = Q_reshaped.transpose(1, 2)  # (batch, num_heads, seq_len, d_head)
+# Now all heads computed in parallel!
+output = attention(Q_heads, K_heads, V_heads)
+```
+
+The transpose puts num_heads in a "batch-like" dimension, and PyTorch's
+batched operations handle all heads simultaneously. This is crucial for
+GPU efficiency!
+
+RoPE Integration
+────────────────
+RoPE is applied AFTER projecting to Q/K but BEFORE attention:
+
+Workflow:
+1. Project: X → Q, K, V via linear layers
+2. Reshape: Split into multiple heads
+3. **RoPE: Apply position encoding to Q and K heads**
+4. Attention: Compute attention with rotated Q/K
+5. Concat: Merge heads back together
+6. Project: Final output projection
+
+Why this order? RoPE works on the head dimension (d_head), and we want
+each head to have its own position-encoded queries and keys.
+
+Dimension Gymnastics
+────────────────────
+This is where many students get confused. Let's trace shapes carefully:
+
+Input X: (batch, seq_len, d_model)
+
+After Q/K/V projection:
+  Q, K, V: (batch, seq_len, d_model)
+  
+Reshape for heads:
+  Q: (batch, seq_len, num_heads, d_head)
+  where d_model = num_heads × d_head
+  
+Transpose for batching:
+  Q: (batch, num_heads, seq_len, d_head)
+  Now num_heads acts like a batch dimension!
+  
+Apply RoPE:
+  Q_rope: (batch, num_heads, seq_len, d_head)
+  Still same shape, just rotated
+  
+Attention:
+  scores: (batch, num_heads, seq_len, seq_len)
+  output: (batch, num_heads, seq_len, d_head)
+  
+Transpose back:
+  output: (batch, seq_len, num_heads, d_head)
+  
+Reshape (concatenate heads):
+  output: (batch, seq_len, d_model)
+  
+Final projection:
+  output: (batch, seq_len, d_model)
+
+The key trick: View/reshape to split heads, transpose to batch heads, then
+reverse the operations to merge back!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement `multihead_self_attention_with_rope()` as a function that
+takes weight matrices and input, returning the multi-head attention output.
+
+This is a function, not a class, because we're implementing it as an adapter
+that works with externally provided weights (test compatibility).
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def multihead_self_attention_with_rope(
+    d_model: int,
+    num_heads: int,
+    max_seq_len: int,
+    theta: float,
+    q_proj_weight: Float[Tensor, " d_k d_model"],
+    k_proj_weight: Float[Tensor, " d_k d_model"],
+    v_proj_weight: Float[Tensor, " d_v d_model"],
+    o_proj_weight: Float[Tensor, " d_model d_v"],
+    in_features: Float[Tensor, " ... sequence_length d_model"],
+    token_positions: Int[Tensor, " ... sequence_length"] | None = None,
+) -> Float[Tensor, " ... sequence_length d_model"]:
+    """
+    Multi-head self-attention with RoPE position encoding.
+    
+    Combines multiple attention heads operating in parallel, each with its own
+    learned projections. RoPE encodes position information by rotating query
+    and key representations.
+    
+    Args:
+        d_model: Model dimension (input/output size)
+        num_heads: Number of parallel attention heads
+        max_seq_len: Maximum sequence length for RoPE
+        theta: RoPE base parameter (typically 10000.0)
+        q_proj_weight: Query projection (d_model → d_k, usually d_k = d_model)
+        k_proj_weight: Key projection (d_model → d_k)
+        v_proj_weight: Value projection (d_model → d_v, usually d_v = d_model)
+        o_proj_weight: Output projection (d_v → d_model)
+        in_features: Input of shape (..., seq_len, d_model)
+        token_positions: Optional positions of shape (..., seq_len)
+                        If None, use [0, 1, 2, ..., seq_len-1]
+    
+    Returns:
+        Output of shape (..., seq_len, d_model)
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Use your implementations**:
+   - Your scaled_dot_product_attention() for attention
+   - Your rope() for position encoding
+   - This is compositional learning!
+
+2. **Head dimension calculation**:
+   - d_head = d_model // num_heads
+   - Must divide evenly (assert d_model % num_heads == 0)
+
+3. **Efficient batched computation**:
+   - NO loops over heads!
+   - Use reshape and transpose to batch all heads
+   - Let PyTorch handle parallelization
+
+4. **Default token positions**:
+   - If token_positions is None: create torch.arange(seq_len)
+   - Must match device and shape of input
+
+5. **Handle arbitrary batch dimensions**:
+   - Input can be (seq_len, d_model)
+   - Or (batch, seq_len, d_model)
+   - Or (batch1, batch2, seq_len, d_model)
+   - Use ...shape[:-2] to handle any leading dims
+
+6. **Matrix multiply for projections**:
+   - Q = in_features @ q_proj_weight.T
+   - Use @ operator for automatic batching
+
+Implementation Steps
+────────────────────
+
+**Step 1: Project to Q, K, V**
+```python
+# Linear projections
+Q = in_features @ q_proj_weight.T  # (..., seq_len, d_k)
+K = in_features @ k_proj_weight.T  # (..., seq_len, d_k)
+V = in_features @ v_proj_weight.T  # (..., seq_len, d_v)
+```
+
+**Step 2: Reshape for multiple heads**
+```python
+batch_shape = Q.shape[:-2]  # All dims except seq_len and d_k
+seq_len = Q.shape[-2]
+d_head = d_model // num_heads
+
+# Reshape: (..., seq_len, d_k) → (..., seq_len, num_heads, d_head)
+Q = Q.view(*batch_shape, seq_len, num_heads, d_head)
+K = K.view(*batch_shape, seq_len, num_heads, d_head)
+V = V.view(*batch_shape, seq_len, num_heads, d_head)
+```
+
+**Step 3: Transpose to batch heads**
+```python
+# Transpose: (..., seq_len, num_heads, d_head) → (..., num_heads, seq_len, d_head)
+Q = Q.transpose(-3, -2)  # Swap seq_len and num_heads
+K = K.transpose(-3, -2)
+V = V.transpose(-3, -2)
+```
+
+**Step 4: Handle token positions**
+```python
+if token_positions is None:
+    token_positions = torch.arange(seq_len, device=Q.device)
+# Broadcast positions to match Q's batch dimensions
+```
+
+**Step 5: Apply RoPE to Q and K**
+```python
+Q_rope = rope(d_head, theta, max_seq_len, Q, token_positions)
+K_rope = rope(d_head, theta, max_seq_len, K, token_positions)
+# V is NOT rotated!
+```
+
+**Step 6: Compute attention for all heads**
+```python
+# All heads computed in parallel!
+attn_output = scaled_dot_product_attention(Q_rope, K_rope, V, mask=None)
+# Shape: (..., num_heads, seq_len, d_head)
+```
+
+**Step 7: Transpose back**
+```python
+# (..., num_heads, seq_len, d_head) → (..., seq_len, num_heads, d_head)
+attn_output = attn_output.transpose(-3, -2)
+```
+
+**Step 8: Concatenate heads**
+```python
+# Reshape: (..., seq_len, num_heads, d_head) → (..., seq_len, d_model)
+attn_output = attn_output.reshape(*batch_shape, seq_len, d_model)
+```
+
+**Step 9: Output projection**
+```python
+output = attn_output @ o_proj_weight.T
+return output
+```
+
+Mathematical Insight: Why Split Then Concat?
+─────────────────────────────────────────────
+You might wonder: Why split d_model into heads, then concat back?
+
+The split allows each head to learn DIFFERENT attention patterns:
+- Input is d_model dimensional
+- Split into num_heads × d_head dimensional projections
+- Each head sees a different subspace
+- Each head learns different patterns
+- Concatenation combines diverse perspectives
+
+This is like having an ensemble of specialists, each focusing on different
+aspects of the input, then combining their insights!
+
+Alternative view: It's a form of **model parallelism** - different heads
+process different feature dimensions simultaneously.
+
+Why Not Just Make d_head Bigger?
+─────────────────────────────────
+**num_heads = 1, d_head = 512**:
+- Single attention pattern
+- 512-dimensional queries/keys/values
+- Limited expressiveness
+
+**num_heads = 8, d_head = 64**:
+- 8 diverse attention patterns
+- Each head learns different relationships
+- Combined: More expressive than single large head
+- Empirically better despite same parameter count!
+
+Common Pitfalls
+───────────────
+
+❌ **Wrong transpose dimensions**:
+   Wrong: Q.transpose(0, 1)  # Only works for specific ranks!
+   Right: Q.transpose(-3, -2)  # Works for any batch dimensions
+
+❌ **Forgetting to transpose back**:
+   After attention, MUST transpose before reshaping to concat heads
+
+❌ **Applying RoPE to V**:
+   Wrong: rope(Q), rope(K), rope(V)
+   Right: rope(Q), rope(K), V  # No RoPE on values!
+
+❌ **Wrong d_head for RoPE**:
+   Wrong: rope(d_model, ...)  # RoPE needs d_head!
+   Right: rope(d_head, ...)   # d_head = d_model / num_heads
+
+❌ **Loop over heads**:
+   Wrong: for h in range(num_heads): ...
+   Right: Batch all heads, no loop needed!
+
+❌ **Reshape before transpose**:
+   Order matters! Reshape to split heads, THEN transpose to batch them
+
+Testing
+───────
+Your implementation will be tested against:
+• Various num_heads (1, 4, 8, 16)
+• Different batch dimensions
+• With and without token_positions
+• Numerical accuracy vs reference
+• Gradient correctness
+
+The validator will run: pytest tests/test_model.py::test_multihead_self_attention_with_rope
+
+Performance Considerations
+──────────────────────────
+Multi-head attention is memory-intensive:
+
+For batch=32, seq_len=2048, d_model=4096, num_heads=32:
+- Q/K/V projections: 3 × 32 × 2048 × 4096 floats
+- Attention scores: 32 heads × 32 batch × 2048² ≈ 8.6 GB (fp32)!
+
+This is why:
+- Attention is O(n²) in memory
+- Flash Attention and other optimizations are crucial
+- Long context is expensive
+
+The parallelization across heads is essential - without it, training would
+be impossibly slow!
+
+Integration with Transformer
+────────────────────────────
+This function is the core of every Transformer block:
+
+```python
+# Simplified Transformer block
+x_norm = RMSNorm(x)
+attn_out = multihead_self_attention_with_rope(x_norm)
+x = x + attn_out  # Residual connection
+
+x_norm = RMSNorm(x)
+ffn_out = SwiGLU(x_norm)
+x = x + ffn_out  # Residual connection
+```
+
+You've now implemented most components needed for a full Transformer!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your multi-head attention against reference
+implementations. You'll then answer conceptual questions about why multiple
+heads improve expressiveness, how batching enables efficiency, and how RoPE
+integrates into the attention pipeline.
+
+Hints
+─────
+• Use .view() to reshape, .transpose() to swap dimensions
+• transpose(-3, -2) swaps sequence_length and num_heads
+• @ operator handles batch dimensions automatically
+• Test with num_heads=1 first (simpler case)
+• Draw the tensor shapes on paper!
+
+Remember: Multi-head attention is in EVERY Transformer layer. In GPT-3 175B:
+• 96 layers
+• 96 heads per layer
+• 9,216 attention head computations per forward pass!
+
+Getting this right means you understand the heart of modern AI! 🎯
