@@ -80,6 +80,12 @@
       "name": "Token Embedding Layer",
       "path": "modules/embedding",
       "baseline_perf_seconds": 0.10
+    },
+    {
+      "id": "training_loop",
+      "name": "Training Loop (Complete Integration)",
+      "path": "modules/training_loop",
+      "baseline_perf_seconds": 0.20
     }
   ]
 }

@@ -1,0 +1,453 @@
+Build Challenge: Training Loop
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a complete training loop that integrates ALL the components you've
+built: embeddings, Transformer blocks, AdamW optimizer, cosine LR schedule,
+gradient clipping, and loss computation. You will learn how to orchestrate
+forward passes, backpropagation, gradient updates, and monitoring to actually
+TRAIN a language model. This is where everything comes together!
+
+Background: The Training Process
+─────────────────────────────────
+Training a neural network involves repeatedly:
+1. **Forward pass**: Compute predictions from inputs
+2. **Loss calculation**: Measure how wrong the predictions are
+3. **Backward pass**: Compute gradients via backpropagation
+4. **Parameter update**: Adjust weights to reduce loss
+5. **Monitoring**: Track progress and metrics
+
+This cycle repeats for thousands or millions of iterations until the model
+converges (loss stops decreasing significantly).
+
+**For language modeling:**
+- Input: Token sequence [t₁, t₂, ..., t_n]
+- Target: Next token at each position [t₂, t₃, ..., t_{n+1}]
+- Loss: Cross-entropy between predicted and actual next tokens
+- Goal: Minimize loss = maximize likelihood of correct next tokens
+
+The Training Loop Structure
+────────────────────────────
+A typical training loop looks like:
+
+```python
+for epoch in range(num_epochs):
+    for batch in dataloader:
+        # 1. Forward pass
+        logits = model(batch['input_ids'])
+        
+        # 2. Compute loss
+        loss = cross_entropy(logits, batch['target_ids'])
+        
+        # 3. Backward pass
+        loss.backward()  # Compute gradients
+        
+        # 4. Gradient clipping (optional but recommended)
+        clip_grad_norm(model.parameters(), max_norm=1.0)
+        
+        # 5. Optimizer step
+        optimizer.step()  # Update parameters
+        optimizer.zero_grad()  # Clear gradients
+        
+        # 6. Update learning rate
+        lr = cosine_schedule(step, ...)
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        
+        # 7. Logging
+        if step % log_interval == 0:
+            print(f"Step {step}, Loss: {loss.item():.4f}, LR: {lr:.2e}")
+```
+
+That's the essence! Let's break down each component.
+
+Forward Pass: From Tokens to Logits
+────────────────────────────────────
+Forward pass transforms input tokens to output logits:
+
+**Input**: token_ids ∈ ℤ^(batch × seq_len)
+- Integer token IDs, e.g., [2045, 3421, 9876, ...]
+
+**Step 1: Embedding lookup**
+    x = embedding(token_ids)  # (batch, seq_len, d_model)
+
+**Step 2: Transformer blocks**
+    for block in transformer_blocks:
+        x = block(x)  # Apply attention + FFN
+    # x is now (batch, seq_len, d_model)
+
+**Step 3: Output projection**
+    logits = x @ lm_head_weight.T  # (batch, seq_len, vocab_size)
+
+**Output**: logits ∈ ℝ^(batch × seq_len × vocab_size)
+- Unnormalized log-probabilities for next token at each position
+
+The model predicts the entire next-token distribution at every position!
+
+Loss Calculation: Cross-Entropy
+────────────────────────────────
+Language modeling uses cross-entropy loss:
+
+Given predictions (logits) and targets:
+- logits: (batch, seq_len, vocab_size)
+- targets: (batch, seq_len) - ground truth next token IDs
+
+**Step 1: Shift targets**
+For position i, we predict token at position i+1:
+- Input: [t₀, t₁, t₂, ..., t_{n-1}]
+- Target: [t₁, t₂, t₃, ..., t_n]
+
+**Step 2: Flatten for loss**
+Reshape to (batch × seq_len, vocab_size) and (batch × seq_len,)
+
+**Step 3: Compute cross-entropy**
+    loss = cross_entropy(logits.view(-1, vocab_size), targets.view(-1))
+
+This averages the cross-entropy over all positions and all batch elements.
+
+**Result**: scalar loss value (single number)
+
+Backward Pass: Computing Gradients
+───────────────────────────────────
+PyTorch autograd handles backpropagation automatically:
+
+```python
+loss.backward()
+```
+
+This single line:
+1. Computes ∂loss/∂θ for every parameter θ in the model
+2. Stores gradients in param.grad for each parameter
+3. Uses chain rule to propagate gradients backwards through the graph
+
+After this, every parameter has a .grad attribute containing its gradient!
+
+**Key point**: Gradients ACCUMULATE by default. Must clear them between steps:
+```python
+optimizer.zero_grad()  # Clear previous gradients
+```
+
+Gradient Clipping: Preventing Explosions
+─────────────────────────────────────────
+Gradients can occasionally become very large (gradient explosion), especially
+in deep networks or with long sequences. This causes:
+- NaN parameters (overflow)
+- Training instability
+- Divergence
+
+**Solution: Gradient clipping**
+Limit the global L2 norm of all gradients:
+
+```python
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+```
+
+If ||g|| > max_norm: scale g ← g × (max_norm / ||g||)
+
+This prevents any single large gradient from destroying training!
+
+Typical max_norm values: 0.5 to 5.0 (1.0 is common).
+
+Optimizer Step: Updating Parameters
+────────────────────────────────────
+The optimizer uses gradients to update parameters:
+
+```python
+optimizer.step()
+```
+
+For AdamW, this:
+1. Computes first and second moments (momentum and adaptive LR)
+2. Applies bias correction
+3. Updates parameters: θ ← θ - lr × (m̂ / √v̂ + λθ)
+4. Applies weight decay
+
+After this step, parameters have new values and the model is slightly better!
+
+Learning Rate Schedule
+──────────────────────
+Learning rate changes every step according to the cosine schedule:
+
+```python
+step += 1
+current_lr = cosine_schedule(step, max_lr, min_lr, warmup_steps, max_steps)
+
+for param_group in optimizer.param_groups:
+    param_group['lr'] = current_lr
+```
+
+This dynamically adjusts the learning rate:
+- Steps 0-2000: Warmup (0 → max_lr)
+- Steps 2000-100k: Cosine decay (max_lr → min_lr)
+
+Critical for training success!
+
+Monitoring and Logging
+───────────────────────
+Track training progress:
+
+**Essential metrics:**
+- Loss: Should decrease over time
+- Learning rate: Changes according to schedule
+- Gradient norm: Should stay reasonable (not exploding)
+- Throughput: Tokens/second
+
+**Logging frequency:**
+```python
+if step % log_interval == 0:
+    print(f"Step {step}: loss={loss:.4f}, lr={lr:.2e}, grad_norm={grad_norm:.3f}")
+```
+
+**Checkpointing:**
+Periodically save model state:
+```python
+if step % checkpoint_interval == 0:
+    torch.save({
+        'step': step,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, f'checkpoint-{step}.pt')
+```
+
+This allows resuming training if interrupted!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/training.py
+
+You will implement a `train_loop()` function that orchestrates the entire
+training process. This is the highest-level function, tying everything together.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def train_loop(
+    model: nn.Module,
+    train_dataloader: DataLoader,
+    optimizer: Optimizer,
+    num_epochs: int,
+    max_grad_norm: float = 1.0,
+    log_interval: int = 100,
+    device: str = 'cuda',
+) -> dict:
+    """
+    Train a language model for specified number of epochs.
+    
+    Args:
+        model: Language model to train
+        train_dataloader: DataLoader providing batches
+                         Each batch: {'input_ids': Tensor, 'target_ids': Tensor}
+        optimizer: Optimizer (e.g., AdamW) with LR schedule applied externally
+        num_epochs: Number of passes through dataset
+        max_grad_norm: Maximum gradient norm for clipping
+        log_interval: Log metrics every N steps
+        device: Device to train on ('cuda' or 'cpu')
+    
+    Returns:
+        dict with training statistics: {'losses': [...], 'steps': [...]}
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Device management**:
+   - Move model to device: model.to(device)
+   - Move batch data to device in loop
+   - All operations happen on specified device
+
+2. **Gradient accumulation**:
+   - Clear gradients at start: optimizer.zero_grad()
+   - Accumulate via loss.backward()
+   - Update via optimizer.step()
+
+3. **Gradient clipping**:
+   - Apply after backward, before optimizer step
+   - Use torch.nn.utils.clip_grad_norm_
+
+4. **Loss computation**:
+   - Use cross_entropy loss
+   - Handle shape transformations (flatten logits and targets)
+
+5. **Monitoring**:
+   - Track loss values
+   - Log at specified intervals
+   - Return statistics for analysis
+
+Implementation Steps
+────────────────────
+
+**Step 1: Setup**
+```python
+model.to(device)
+model.train()  # Set to training mode
+step = 0
+losses = []
+```
+
+**Step 2: Epoch loop**
+```python
+for epoch in range(num_epochs):
+    for batch in train_dataloader:
+        step += 1
+```
+
+**Step 3: Move batch to device**
+```python
+input_ids = batch['input_ids'].to(device)
+target_ids = batch['target_ids'].to(device)
+```
+
+**Step 4: Forward pass**
+```python
+logits = model(input_ids)  # (batch, seq_len, vocab_size)
+```
+
+**Step 5: Compute loss**
+```python
+# Flatten for cross-entropy
+loss = F.cross_entropy(
+    logits.view(-1, logits.size(-1)),  # (batch*seq_len, vocab)
+    target_ids.view(-1),                # (batch*seq_len,)
+)
+```
+
+**Step 6: Backward pass**
+```python
+optimizer.zero_grad()  # Clear previous gradients
+loss.backward()        # Compute new gradients
+```
+
+**Step 7: Gradient clipping**
+```python
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+```
+
+**Step 8: Optimizer step**
+```python
+optimizer.step()  # Update parameters
+```
+
+**Step 9: Logging**
+```python
+if step % log_interval == 0:
+    losses.append(loss.item())
+    print(f"Epoch {epoch}, Step {step}, Loss: {loss.item():.4f}")
+```
+
+**Step 10: Return statistics**
+```python
+return {'losses': losses, 'steps': list(range(0, step, log_interval))}
+```
+
+Mathematical Insight: Why This Works
+─────────────────────────────────────
+The training loop implements empirical risk minimization:
+
+θ* = argmin E_{(x,y)~Data}[L(f_θ(x), y)]
+
+Where:
+- θ: Model parameters
+- f_θ: Model function (Transformer)
+- L: Loss function (cross-entropy)
+- (x, y): Input-target pairs
+
+We approximate the expectation with mini-batch samples:
+θ_{t+1} = θ_t - η ∇L(f_θ(x_batch), y_batch)
+
+Over many iterations, this converges to a good solution!
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting to zero gradients**:
+   Without optimizer.zero_grad(), gradients accumulate across steps!
+
+❌ **Wrong loss dimension**:
+   cross_entropy expects (N, C) and (N,), not (N, seq, C) and (N, seq)
+
+❌ **Clipping before backward**:
+   Wrong order: Must backward → clip → step
+
+❌ **Not moving data to device**:
+   If model is on CUDA but data on CPU, will crash!
+
+❌ **Training mode vs eval mode**:
+   Must call model.train() for training, model.eval() for evaluation
+
+Testing
+───────
+Your implementation will be tested against:
+• Convergence on simple datasets
+• Proper gradient flow
+• Loss decreasing over steps
+• Integration with all components
+• Device handling (CPU/CUDA)
+
+The validator will run: pytest tests/test_training.py::test_train_loop
+
+Integration Example: Full Training
+───────────────────────────────────
+Here's how everything fits together:
+
+```python
+# 1. Create model
+model = TransformerLM(vocab_size=50000, d_model=512, num_layers=6, ...)
+
+# 2. Create optimizer
+optimizer = AdamW(model.parameters(), lr=1.0)  # LR will be set by schedule
+
+# 3. Create dataloader
+train_loader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+# 4. Training loop with LR schedule
+max_lr, min_lr = 3e-4, 3e-5
+warmup_steps, max_steps = 2000, 100000
+step = 0
+
+for epoch in range(num_epochs):
+    for batch in train_loader:
+        step += 1
+        
+        # Update LR
+        lr = cosine_schedule(step, max_lr, min_lr, warmup_steps, max_steps)
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        
+        # Forward
+        logits = model(batch['input_ids'])
+        loss = cross_entropy(logits.view(-1, vocab_size), batch['targets'].view(-1))
+        
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        clip_grad_norm(model.parameters(), 1.0)
+        optimizer.step()
+```
+
+This is how GPT-3, LLaMA, and all modern LLMs are trained!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your training loop against reference implementations.
+You'll then answer conceptual questions about the training process, gradient
+flow, why each component is necessary, and how to debug training issues.
+
+Hints
+─────
+• model.train() sets dropout/batchnorm to training mode
+• loss.item() converts loss tensor to Python float for logging
+• Use F.cross_entropy for loss computation
+• Check shapes carefully—most bugs are shape mismatches!
+
+Remember: This is where ALL your work comes together. You're implementing the
+exact training procedure used for GPT, LLaMA, Claude! 🎯
