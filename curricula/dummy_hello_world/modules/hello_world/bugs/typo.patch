@@ -1,0 +1,6 @@
+--- hello_world.py
++++ hello_world.py
+@@ -1,2 +1,2 @@
+ def greet():
+-    return "Hello, Mastery Engine!"
++    return "Hello, Mastery Enginne!"  # Typo introduced

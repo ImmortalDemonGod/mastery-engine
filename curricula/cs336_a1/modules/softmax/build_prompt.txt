@@ -1,0 +1,72 @@
+# Build Challenge: Numerically Stable Softmax
+
+## Objective
+Implement a numerically stable softmax function that avoids overflow and underflow issues with large-magnitude inputs.
+
+## Background
+The softmax function is fundamental to neural networks, converting a vector of logits into a probability distribution. However, the naive implementation `softmax(x) = exp(x) / sum(exp(x))` is numerically unstable: exponentiating large positive values causes overflow (`inf`), and large negative values cause underflow (gradients vanish).
+
+## Requirements
+Implement `softmax(in_features, dim)` in `cs336_basics/utils.py` with the following specifications:
+
+### Function Signature
+```python
+def softmax(
+    in_features: Float[torch.Tensor, " ..."], 
+    dim: int
+) -> Float[torch.Tensor, " ..."]:
+    """
+    Numerically-stable softmax over the specified dimension.
+    
+    Args:
+        in_features: Input tensor of any shape
+        dim: Dimension along which to compute softmax
+        
+    Returns:
+        Probability distribution (sums to 1.0 along dim)
+    """
+```
+
+### Implementation Constraints
+1. **Numerical Stability**: Use the subtract-max trick to prevent overflow
+   - Before exponentiation, subtract `max(x)` from all elements
+   - This shifts the range to `(-inf, 0]`, making `exp(x)` safe
+   
+2. **Precision Policy**: 
+   - Upcast intermediate computations to `float32` for stability
+   - Cast final output back to input's original dtype
+   
+3. **Correctness**:
+   - Output must match `torch.nn.functional.softmax` to within `atol=1e-6`
+   - Must handle extreme inputs: `x + 100`, `x - 100`, mixed magnitudes
+
+### Mathematical Foundation
+**Subtract-Max Trick**:
+```
+softmax(x) = exp(x) / sum(exp(x))
+           = exp(x - max(x)) / sum(exp(x - max(x)))  [numerically equivalent]
+```
+
+**Why this works**:
+- `max(x - max(x)) = 0`, so largest exp is `exp(0) = 1.0` (no overflow)
+- Negative shifts are safe: `exp(-large)` → 0 gracefully (no underflow in sum)
+
+## Testing
+Your implementation will be tested against:
+- Normal inputs (standard range)
+- Large positive shifts: `x + 100`
+- Large negative shifts: `x - 100`  
+- Mixed magnitudes within same tensor
+
+## Submission
+Once implemented, run:
+```bash
+engine submit-build
+```
+
+The validator will run `pytest tests/test_nn_utils.py::test_softmax_matches_pytorch` and measure performance.
+
+## Hints
+- Use `tensor.max(dim=dim, keepdim=True)` to preserve dimensions
+- Remember to subtract max **before** `torch.exp()`
+- The shift doesn't change the mathematical result, only numerical stability

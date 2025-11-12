@@ -1,0 +1,13 @@
+{
+  "curriculum_name": "dummy_hello_world",
+  "author": "Mastery Engine Team",
+  "version": "1.0.0",
+  "modules": [
+    {
+      "id": "hello_world",
+      "name": "Hello World",
+      "path": "modules/hello_world",
+      "baseline_perf_seconds": 0.001
+    }
+  ]
+}

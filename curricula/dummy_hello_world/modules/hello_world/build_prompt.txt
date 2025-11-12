@@ -1,0 +1,22 @@
+# Build Challenge: Hello World
+
+## Objective
+Create a simple Python script that prints "Hello, Mastery Engine!" to the console.
+
+## Requirements
+Create a file at `workspace/hello_world.py` that:
+1. Contains a function `greet()` that returns the string "Hello, Mastery Engine!"
+2. When run as a script, prints the greeting to stdout
+
+## Expected Output
+```
+Hello, Mastery Engine!
+```
+
+## Submission
+Once you've implemented the solution, run:
+```bash
+engine --submit-build
+```
+
+This is a minimal example to validate the Mastery Engine architecture. In real curriculum modules, this would be a substantial engineering challenge.

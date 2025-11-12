@@ -1,0 +1,1149 @@
+"""
+Mastery Engine CLI - Main entry point.
+
+This module provides the command-line interface for the Mastery Engine,
+implementing commands for the Build, Justify, Harden learning loop.
+
+Commands:
+    status: Show current learning progress
+    next: Display the next build prompt
+    submit-build: Submit and validate a build implementation
+    submit-justify: Submit an answer to a justify question
+    submit-harden: Submit a bug fix for the harden challenge
+    flag-issue: Report a problem with the curriculum
+"""
+
+import sys
+import logging
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+
+from engine.state import StateManager, StateFileCorruptedError
+from engine.curriculum import CurriculumManager, CurriculumNotFoundError, CurriculumInvalidError
+from engine.workspace import WorkspaceManager, PatchApplicationError
+from engine.validator import (
+    ValidationSubsystem,
+    ValidatorNotFoundError,
+    ValidatorTimeoutError,
+    ValidatorExecutionError
+)
+from engine.stages.harden import HardenRunner, HardenChallengeError
+from engine.stages.justify import JustifyRunner, JustifyQuestionsError
+from engine.services.llm_service import LLMService, ConfigurationError, LLMAPIError, LLMResponseError
+import subprocess
+
+
+# Initialize Typer app and Rich console
+app = typer.Typer(
+    name="engine",
+    help="Mastery Engine - A sophisticated pedagogical framework for deep technical learning",
+    add_completion=False,
+)
+console = Console()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(Path.home() / '.mastery_engine.log'),
+        logging.StreamHandler()
+    ]
+)
+
+# Shadow worktree configuration
+SHADOW_WORKTREE_DIR = Path(".mastery_engine_worktree")
+
+logger = logging.getLogger(__name__)
+
+
+@app.command()
+def next():
+    """
+    Display the next build prompt for the current module.
+    
+    Shows the build challenge specification from build_prompt.txt.
+    Only works when the user is in the "build" stage.
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Check if user has completed all modules
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]🎉 Congratulations![/bold green]\n\n"
+                "You have completed all modules in this curriculum!",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
+            return
+        
+        # Get current module
+        current_module = manifest.modules[progress.current_module_index]
+        
+        # Handle different stages
+        if progress.current_stage == "build":
+            # Display build prompt
+            prompt_path = curr_mgr.get_build_prompt_path(progress.curriculum_id, current_module)
+            
+            if not prompt_path.exists():
+                raise CurriculumInvalidError(
+                    f"Build prompt missing for module '{current_module.id}': {prompt_path}"
+                )
+            
+            prompt_content = prompt_path.read_text(encoding='utf-8')
+            
+            console.print()
+            console.print(Panel(
+                prompt_content,
+                title=f"📝 Build Challenge: {current_module.name}",
+                border_style="cyan",
+                padding=(1, 2)
+            ))
+            console.print()
+            
+            logger.info(f"Displayed build prompt for module '{current_module.id}'")
+            
+        elif progress.current_stage == "harden":
+            # Present harden challenge
+            workspace_mgr = WorkspaceManager()
+            harden_runner = HardenRunner(curr_mgr, workspace_mgr)
+            
+            harden_file, symptom = harden_runner.present_challenge(
+                progress.curriculum_id,
+                current_module,
+                "hello_world.py"  # TODO: Make this dynamic based on module
+            )
+            
+            console.print()
+            console.print(Panel(
+                symptom,
+                title=f"🐛 Debug Challenge: {current_module.name}",
+                border_style="yellow",
+                padding=(1, 2)
+            ))
+            console.print()
+            console.print(f"[dim]Harden workspace created at: {harden_file}[/dim]")
+            console.print()
+            
+            logger.info(f"Displayed harden challenge for module '{current_module.id}'")
+            
+        elif progress.current_stage == "justify":
+            # Present justify questions
+            justify_runner = JustifyRunner(curr_mgr)
+            questions = justify_runner.load_questions(progress.curriculum_id, current_module)
+            
+            if not questions:
+                raise CurriculumInvalidError(
+                    f"No justify questions found for module '{current_module.id}'"
+                )
+            
+            # For now, just show the first question (stub)
+            question = questions[0]
+            
+            console.print()
+            console.print(Panel(
+                f"[bold]Question:[/bold]\n\n{question.question}\n\n"
+                "[dim italic]Note: This is stub mode. Any non-empty answer will be accepted.\n"
+                "In the full version, your answer will be evaluated by an LLM for conceptual correctness.[/dim]",
+                title=f"💭 Justify Challenge: {current_module.name}",
+                border_style="magenta",
+                padding=(1, 2)
+            ))
+            console.print()
+            console.print("[bold cyan]To submit your answer:[/bold cyan] engine submit-justification \"<your answer>\"")
+            console.print()
+            
+            logger.info(f"Displayed justify question for module '{current_module.id}'")
+            
+        else:
+            # Unknown stage or complete
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]No Prompt Available[/bold yellow]\n\n"
+                f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
+                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                title="Wrong Stage",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except HardenChallengeError as e:
+        console.print(Panel(
+            f"[bold red]Harden Challenge Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except JustifyQuestionsError as e:
+        console.print(Panel(
+            f"[bold red]Justify Questions Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in next command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command()
+def submit_build():
+    """
+    Submit and validate your Build stage implementation.
+    
+    Runs the validator script against your code, shows results,
+    and advances your progress if validation passes.
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        workspace_mgr = WorkspaceManager()
+        validator_subsys = ValidationSubsystem()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Check if user has completed all modules
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]All modules completed![/bold green]\n\n"
+                "There are no more build challenges to submit.",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
+            return
+        
+        # Check if user is in build stage
+        if progress.current_stage != "build":
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Not in Build Stage[/bold yellow]\n\n"
+                f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
+                f"You can only submit build implementations when in the BUILD stage.\n\n"
+                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                title="Wrong Stage",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+        # Get current module
+        current_module = manifest.modules[progress.current_module_index]
+        
+        # Get validator and workspace paths
+        validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
+        workspace_path = workspace_mgr.get_workspace_path()
+        
+        # Ensure workspace exists
+        workspace_mgr.ensure_workspace_exists()
+        
+        console.print()
+        console.print(f"[bold cyan]Running validator for {current_module.name}...[/bold cyan]")
+        console.print()
+        
+        # Execute validator
+        result = validator_subsys.execute(validator_path, workspace_path)
+        
+        if result.exit_code == 0:
+            # Success!
+            console.print(Panel(
+                "[bold green]✅ Validation Passed![/bold green]\n\n"
+                "Your implementation passed all tests.",
+                title="Success",
+                border_style="green"
+            ))
+            
+            # Show performance if available
+            if result.performance_seconds is not None:
+                console.print()
+                console.print(f"[dim]Performance: {result.performance_seconds:.3f} seconds[/dim]")
+                
+                # Check for performance anomaly (novelty detection placeholder)
+                if current_module.baseline_perf_seconds:
+                    speedup = current_module.baseline_perf_seconds / result.performance_seconds
+                    if speedup > 2.0:
+                        console.print(f"[yellow]⚡ Impressive! {speedup:.1f}x faster than baseline![/yellow]")
+            
+            console.print()
+            
+            # Advance state to next stage
+            progress.mark_stage_complete("build")
+            state_mgr.save(progress)
+            
+            logger.info(f"Build stage completed for module '{current_module.id}', "
+                       f"advanced to '{progress.current_stage}' stage")
+            
+            # Show next action
+            console.print(Panel(
+                "Next step: Answer conceptual questions about your implementation.\n\n"
+                "Run [bold cyan]engine --submit-justify[/bold cyan] to continue.",
+                title="Next Action",
+                border_style="blue"
+            ))
+            console.print()
+        else:
+            # Failure - show raw pytest output
+            console.print(Panel(
+                "[bold red]❌ Validation Failed[/bold red]\n\n"
+                "Your implementation did not pass all tests. See details below:",
+                title="Failure",
+                border_style="red"
+            ))
+            console.print()
+            console.print("[bold]Test Output:[/bold]")
+            console.print(result.stderr if result.stderr else result.stdout)
+            console.print()
+            
+            logger.info(f"Build validation failed for module '{current_module.id}'")
+            
+    except ValidatorNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Validator Not Found[/bold red]\n\n{str(e)}\n\n"
+            "This is a curriculum configuration error. Please report it.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except ValidatorTimeoutError as e:
+        console.print(Panel(
+            f"[bold red]Validator Timeout[/bold red]\n\n{str(e)}\n\n"
+            "Your code may have an infinite loop or is taking too long to run.",
+            title="TIMEOUT ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except ValidatorExecutionError as e:
+        console.print(Panel(
+            f"[bold red]Validator Execution Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in submit-build command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command()
+def submit_justification(answer: str):
+    """
+    Submit your answer to a Justify stage question.
+    
+    Implements the Validation Chain:
+    1. Fast keyword filter (catches shallow/vague answers)
+    2. LLM semantic evaluation (if no keyword match)
+    
+    Args:
+        answer: Your conceptual explanation
+    """
+    # For testing: allow dependency injection via internal mechanism
+    llm_service = None  # Will be initialized when needed
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Check if user has completed all modules
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]All modules completed![/bold green]\n\n"
+                "There are no more justify questions to answer.",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
+            return
+        
+        # Check if user is in justify stage
+        if progress.current_stage != "justify":
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Not in Justify Stage[/bold yellow]\n\n"
+                f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
+                f"You can only submit justifications when in the JUSTIFY stage.\n\n"
+                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                title="Wrong Stage",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+        # Check for empty answer
+        if not answer or not answer.strip():
+            console.print()
+            console.print(Panel(
+                "[bold yellow]Empty Answer[/bold yellow]\n\n"
+                "Please provide a non-empty response to the justify question.",
+                title="Invalid Input",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+        # Get current module and questions
+        current_module = manifest.modules[progress.current_module_index]
+        justify_runner = JustifyRunner(curr_mgr)
+        questions = justify_runner.load_questions(progress.curriculum_id, current_module)
+        
+        if not questions:
+            raise CurriculumInvalidError(
+                f"No justify questions found for module '{current_module.id}'"
+            )
+        
+        question = questions[0]  # For now, use first question
+        
+        # VALIDATION CHAIN
+        # Step A: Fast keyword filter
+        matched, fast_feedback = justify_runner.check_fast_filter(question, answer)
+        
+        if matched:
+            # Fast filter caught a shallow/vague answer
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]{fast_feedback}[/bold yellow]",
+                title="Needs More Depth",
+                border_style="yellow"
+            ))
+            console.print()
+            logger.info(f"Justify response rejected by fast filter for module '{current_module.id}'")
+            return
+        
+        # Step B: LLM semantic evaluation
+        try:
+            # Initialize LLM service if not provided (dependency injection for testing)
+            if llm_service is None:
+                llm_service = LLMService()
+            
+            console.print()
+            console.print("[dim]Evaluating your answer...[/dim]")
+            
+            evaluation = llm_service.evaluate_justification(question, answer)
+            
+            # Step C: Feedback and state transition
+            console.print()
+            if evaluation.is_correct:
+                console.print(Panel(
+                    f"[bold green]{evaluation.feedback}[/bold green]",
+                    title="✓ Correct Understanding",
+                    border_style="green"
+                ))
+                console.print()
+                
+                # Advance state to harden
+                progress.mark_stage_complete("justify")
+                state_mgr.save(progress)
+                
+                logger.info(f"Justify stage completed for module '{current_module.id}', "
+                           f"advanced to '{progress.current_stage}' stage")
+                
+                # Show next action
+                console.print(Panel(
+                    "Next step: Debug a bug in your implementation to harden your knowledge.\n\n"
+                    "Run [bold cyan]engine next[/bold cyan] to see the debug challenge.",
+                    title="Next Action",
+                    border_style="blue"
+                ))
+                console.print()
+            else:
+                console.print(Panel(
+                    f"[bold yellow]{evaluation.feedback}[/bold yellow]",
+                    title="Not Quite - Try Again",
+                    border_style="yellow"
+                ))
+                console.print()
+                logger.info(f"Justify response marked incorrect by LLM for module '{current_module.id}'")
+                
+        except ConfigurationError as e:
+            console.print()
+            console.print(Panel(
+                f"[bold red]Configuration Error[/bold red]\n\n{str(e)}",
+                title="ENGINE ERROR",
+                border_style="red"
+            ))
+            console.print()
+            sys.exit(1)
+        except (LLMAPIError, LLMResponseError) as e:
+            console.print()
+            console.print(Panel(
+                f"[bold red]LLM Service Error[/bold red]\n\n{str(e)}\n\n"
+                "Your answer was not evaluated. Please try again.",
+                title="ENGINE ERROR",
+                border_style="red"
+            ))
+            console.print()
+            sys.exit(1)
+            
+    except JustifyQuestionsError as e:
+        console.print(Panel(
+            f"[bold red]Justify Questions Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in submit-justification command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command()
+def submit_fix():
+    """
+    Submit and validate your Harden stage bug fix.
+    
+    Runs the validator against your debugged code, shows results,
+    and advances your progress if the fix is correct.
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        workspace_mgr = WorkspaceManager()
+        validator_subsys = ValidationSubsystem()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Check if user has completed all modules
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]All modules completed![/bold green]\n\n"
+                "There are no more harden challenges to submit.",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
+            return
+        
+        # Check if user is in harden stage
+        if progress.current_stage != "harden":
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Not in Harden Stage[/bold yellow]\n\n"
+                f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
+                f"You can only submit bug fixes when in the HARDEN stage.\n\n"
+                f"Run [bold cyan]engine --status[/bold cyan] to see your current progress.",
+                title="Wrong Stage",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+        # Get current module
+        current_module = manifest.modules[progress.current_module_index]
+        
+        # Get validator and harden workspace paths
+        validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
+        harden_workspace = workspace_mgr.workspace_root / "harden"
+        
+        if not harden_workspace.exists():
+            console.print()
+            console.print(Panel(
+                "[bold red]Harden Workspace Not Found[/bold red]\n\n"
+                "You must first view the harden challenge using [bold cyan]engine next[/bold cyan].",
+                title="ERROR",
+                border_style="red"
+            ))
+            console.print()
+            return
+        
+        console.print()
+        console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
+        console.print()
+        
+        # Execute validator against harden workspace
+        result = validator_subsys.execute(validator_path, harden_workspace)
+        
+        if result.exit_code == 0:
+            # Success!
+            console.print(Panel(
+                "[bold green]✅ Bug Fixed![/bold green]\n\n"
+                "Your fix passes all tests. Well done!",
+                title="Success",
+                border_style="green"
+            ))
+            console.print()
+            
+            # Advance state to complete (finish module)
+            progress.mark_stage_complete("harden")
+            state_mgr.save(progress)
+            
+            logger.info(f"Harden stage completed for module '{current_module.id}'")
+            
+            # Show next action
+            if progress.current_module_index < len(manifest.modules):
+                console.print(Panel(
+                    f"Module '{current_module.name}' complete!\n\n"
+                    "Run [bold cyan]engine next[/bold cyan] to start the next module.",
+                    title="Next Action",
+                    border_style="blue"
+                ))
+            else:
+                console.print(Panel(
+                    "[bold green]🎉 Curriculum Complete![/bold green]\n\n"
+                    "You have finished all modules!",
+                    title="Congratulations",
+                    border_style="green"
+                ))
+            console.print()
+        else:
+            # Failure - show raw output
+            console.print(Panel(
+                "[bold red]❌ Fix Incomplete[/bold red]\n\n"
+                "The bug is not yet fixed. See test output below:",
+                title="Failure",
+                border_style="red"
+            ))
+            console.print()
+            console.print("[bold]Test Output:[/bold]")
+            console.print(result.stderr if result.stderr else result.stdout)
+            console.print()
+            
+            logger.info(f"Harden validation failed for module '{current_module.id}'")
+            
+    except ValidatorNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Validator Not Found[/bold red]\n\n{str(e)}\n\n"
+            "This is a curriculum configuration error. Please report it.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except ValidatorTimeoutError as e:
+        console.print(Panel(
+            f"[bold red]Validator Timeout[/bold red]\n\n{str(e)}\n\n"
+            "Your code may have an infinite loop or is taking too long to run.",
+            title="TIMEOUT ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except ValidatorExecutionError as e:
+        console.print(Panel(
+            f"[bold red]Validator Execution Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in submit-fix command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command()
+def init(curriculum_id: str):
+    """
+    Initialize the Mastery Engine for a curriculum.
+    
+    Creates a shadow Git worktree for safe, isolated validation.
+    This is the required first step before using the engine.
+    
+    Args:
+        curriculum_id: ID of the curriculum to start (e.g., 'cs336_a1')
+    """
+    try:
+        console.print()
+        console.print("[bold]Initializing Mastery Engine...[/bold]")
+        console.print()
+        
+        # 1. Check that we're in a Git repository
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except subprocess.CalledProcessError:
+            console.print(Panel(
+                "[bold red]Not a Git Repository[/bold red]\n\n"
+                "The Mastery Engine must be run from within a Git repository.\n"
+                "Please ensure you are in the correct directory.",
+                title="INITIALIZATION ERROR",
+                border_style="red"
+            ))
+            sys.exit(1)
+        
+        # 2. Check for clean working directory
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        if result.stdout.strip():
+            console.print(Panel(
+                "[bold yellow]Uncommitted Changes Detected[/bold yellow]\n\n"
+                "The Mastery Engine requires a clean Git working directory to initialize.\n\n"
+                "Please commit or stash your current changes first:\n"
+                "  [cyan]git add -A && git commit -m 'Pre-mastery checkpoint'[/cyan]\n"
+                "  or\n"
+                "  [cyan]git stash push -m 'Pre-mastery work'[/cyan]",
+                title="INITIALIZATION ERROR",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+        
+        # 3. Check if shadow worktree already exists
+        if SHADOW_WORKTREE_DIR.exists():
+            console.print(Panel(
+                "[bold yellow]Already Initialized[/bold yellow]\n\n"
+                f"The shadow worktree already exists at {SHADOW_WORKTREE_DIR}.\n\n"
+                "If you want to re-initialize, first run:\n"
+                "  [cyan]engine cleanup[/cyan]",
+                title="INITIALIZATION ERROR",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+        
+        # 4. Verify curriculum exists
+        curr_mgr = CurriculumManager()
+        try:
+            manifest = curr_mgr.load_manifest(curriculum_id)
+        except (CurriculumNotFoundError, CurriculumInvalidError) as e:
+            console.print(Panel(
+                f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+                title="INITIALIZATION ERROR",
+                border_style="red"
+            ))
+            sys.exit(1)
+        
+        # 5. Create shadow worktree
+        console.print("Creating shadow worktree for safe validation...")
+        subprocess.run(
+            ["git", "worktree", "add", str(SHADOW_WORKTREE_DIR), "--detach"],
+            check=True,
+            capture_output=True
+        )
+        logger.info(f"Created shadow worktree at {SHADOW_WORKTREE_DIR}")
+        
+        # 6. Create workspace directory in shadow worktree
+        workspace_dir = SHADOW_WORKTREE_DIR / "workspace"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 7. Initialize state file
+        state_mgr = StateManager()
+        initial_state = UserProgress(
+            curriculum_id=curriculum_id,
+            current_module_index=0,
+            current_stage="build",
+            completed_modules=[]
+        )
+        state_mgr.save(initial_state)
+        
+        # Success!
+        console.print()
+        console.print(Panel(
+            f"[bold green]✓ Initialization Complete![/bold green]\n\n"
+            f"Curriculum: [bold]{manifest.name}[/bold]\n"
+            f"Modules: {len(manifest.modules)}\n\n"
+            f"Shadow worktree created at: [cyan]{SHADOW_WORKTREE_DIR}[/cyan]\n\n"
+            f"You are now ready to begin learning!\n\n"
+            f"Next step: Run [bold cyan]engine next[/bold cyan] to see your first challenge.",
+            title="🎓 Mastery Engine Ready",
+            border_style="green"
+        ))
+        console.print()
+        
+        logger.info(f"Initialized Mastery Engine with curriculum '{curriculum_id}'")
+        
+    except subprocess.CalledProcessError as e:
+        console.print(Panel(
+            f"[bold red]Git Error[/bold red]\n\n"
+            f"Failed to create shadow worktree: {e}\n\n"
+            f"Error output: {e.stderr if e.stderr else 'None'}",
+            title="INITIALIZATION ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}",
+            title="INITIALIZATION ERROR",
+            border_style="red"
+        ))
+        logger.exception("Initialization failed")
+        sys.exit(1)
+
+
+@app.command()
+def reset(module_id: str = None, hard: bool = False):
+    """
+    Reset progress for a module or the entire curriculum.
+    
+    Args:
+        module_id: Specific module to reset (optional)
+        hard: If True, reset entire curriculum to pristine state
+    """
+    try:
+        # Verify shadow worktree exists
+        if not SHADOW_WORKTREE_DIR.exists():
+            console.print(Panel(
+                "[bold yellow]Not Initialized[/bold yellow]\n\n"
+                "The Mastery Engine has not been initialized.\n\n"
+                "Please run [bold cyan]engine init <curriculum_id>[/bold cyan] first.",
+                title="RESET ERROR",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+        
+        if hard:
+            # Hard reset: restore all files from pristine state
+            console.print()
+            console.print("[bold red]WARNING: Hard reset will discard ALL your work![/bold red]")
+            console.print()
+            
+            from rich.prompt import Confirm
+            if not Confirm.ask("Are you sure you want to continue?"):
+                console.print("Reset cancelled.")
+                return
+            
+            # Get list of tracked files from shadow worktree
+            result = subprocess.run(
+                ["git", "ls-files"],
+                cwd=str(SHADOW_WORKTREE_DIR),
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            files_to_restore = result.stdout.strip().split('\n')
+            
+            # Copy each file from shadow worktree to main directory
+            for file_path in files_to_restore:
+                if not file_path:
+                    continue
+                src = SHADOW_WORKTREE_DIR / file_path
+                dst = Path(file_path)
+                if src.exists() and dst.exists():
+                    import shutil
+                    shutil.copy2(src, dst)
+                    logger.info(f"Restored {file_path} to pristine state")
+            
+            # Reset state file
+            state_mgr = StateManager()
+            progress = state_mgr.load()
+            progress.current_module_index = 0
+            progress.current_stage = "build"
+            progress.completed_modules = []
+            state_mgr.save(progress)
+            
+            console.print()
+            console.print(Panel(
+                "[bold green]✓ Hard Reset Complete[/bold green]\n\n"
+                "All files have been restored to their pristine state.\n"
+                "Your progress has been reset to the beginning.",
+                title="Reset Successful",
+                border_style="green"
+            ))
+            console.print()
+            
+        elif module_id:
+            # Module-specific reset
+            console.print(Panel(
+                "[bold yellow]Module Reset Not Yet Implemented[/bold yellow]\n\n"
+                "Module-specific reset requires mapping modules to their affected files.\n"
+                "For now, use [bold cyan]--hard[/bold cyan] to reset the entire curriculum.",
+                title="RESET ERROR",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+        else:
+            console.print(Panel(
+                "[bold yellow]Invalid Reset Options[/bold yellow]\n\n"
+                "Please specify either:\n"
+                "  • [cyan]--hard[/cyan] to reset the entire curriculum, or\n"
+                "  • [cyan]<module_id>[/cyan] to reset a specific module",
+                title="RESET ERROR",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+            
+    except Exception as e:
+        console.print(Panel(
+            f"[bold red]Reset Failed[/bold red]\n\n{str(e)}",
+            title="RESET ERROR",
+            border_style="red"
+        ))
+        logger.exception("Reset failed")
+        sys.exit(1)
+
+
+@app.command()
+def cleanup():
+    """
+    Clean up the Mastery Engine shadow worktree.
+    
+    Use this when you are completely finished with the curriculum.
+    """
+    try:
+        if not SHADOW_WORKTREE_DIR.exists():
+            console.print("No shadow worktree found. Nothing to clean up.")
+            return
+        
+        console.print()
+        console.print("[bold]Cleaning up Mastery Engine...[/bold]")
+        
+        # Remove the worktree
+        subprocess.run(
+            ["git", "worktree", "remove", str(SHADOW_WORKTREE_DIR), "--force"],
+            check=True,
+            capture_output=True
+        )
+        
+        console.print()
+        console.print(Panel(
+            "[bold green]✓ Cleanup Complete[/bold green]\n\n"
+            f"Shadow worktree removed.\n"
+            f"State file preserved at: ~/.mastery_progress.json\n\n"
+            f"You can re-initialize at any time with [cyan]engine init[/cyan].",
+            title="Cleanup Successful",
+            border_style="green"
+        ))
+        console.print()
+        
+        logger.info("Removed shadow worktree")
+        
+    except subprocess.CalledProcessError as e:
+        console.print(Panel(
+            f"[bold red]Git Error[/bold red]\n\n"
+            f"Failed to remove shadow worktree: {e}\n\n"
+            f"You may need to remove it manually: [cyan]git worktree remove {SHADOW_WORKTREE_DIR} --force[/cyan]",
+            title="CLEANUP ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        console.print(Panel(
+            f"[bold red]Cleanup Failed[/bold red]\n\n{str(e)}",
+            title="CLEANUP ERROR",
+            border_style="red"
+        ))
+        logger.exception("Cleanup failed")
+        sys.exit(1)
+
+
+@app.command()
+def status():
+    """
+    Display current learning progress.
+    
+    Shows the active curriculum, current module, current stage in the BJH loop,
+    and the list of completed modules.
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Determine current module
+        if progress.current_module_index < len(manifest.modules):
+            current_module = manifest.modules[progress.current_module_index]
+            module_display = f"{current_module.name} ({progress.current_module_index + 1}/{len(manifest.modules)})"
+        else:
+            module_display = "All modules completed! 🎉"
+        
+        # Create status table
+        table = Table(title="🎓 Mastery Engine Progress", show_header=False, title_style="bold cyan")
+        table.add_column("Field", style="bold")
+        table.add_column("Value")
+        
+        table.add_row("Curriculum", manifest.curriculum_name)
+        table.add_row("Author", manifest.author)
+        table.add_row("Version", manifest.version)
+        table.add_row("Current Module", module_display)
+        table.add_row("Current Stage", progress.current_stage.upper())
+        table.add_row("Completed Modules", str(len(progress.completed_modules)))
+        
+        console.print()
+        console.print(table)
+        console.print()
+        
+        # Show next action hint
+        if progress.current_module_index < len(manifest.modules):
+            if progress.current_stage == "build":
+                hint = "Run [bold cyan]engine next[/bold cyan] to see the build prompt"
+            elif progress.current_stage == "justify":
+                hint = "Run [bold cyan]engine submit-justify[/bold cyan] to answer the justify questions"
+            elif progress.current_stage == "harden":
+                hint = "Run [bold cyan]engine submit-harden[/bold cyan] to fix the injected bug"
+            else:
+                hint = "Unknown stage"
+            
+            console.print(Panel(hint, title="Next Action", border_style="green"))
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in status command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+def main():
+    """Entry point for the engine CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    main()
