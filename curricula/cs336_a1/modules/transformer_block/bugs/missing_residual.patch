@@ -1,0 +1,12 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -450,7 +450,8 @@ class TransformerBlock(nn.Module):
+         )
+         
+         # Residual connection
+-        x = x + attn_out
++        # BUG: Missing residual connection! Without this, gradient highway is broken.
++        x = attn_out  # Should be: x = x + attn_out
+         
+         # Feed-forward sublayer
+         normed = self.norm2(x)

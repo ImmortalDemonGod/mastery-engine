@@ -56,6 +56,12 @@
       "name": "Multi-Head Self-Attention with RoPE",
       "path": "modules/multihead_attention",
       "baseline_perf_seconds": 0.22
+    },
+    {
+      "id": "transformer_block",
+      "name": "Transformer Block (Complete Integration)",
+      "path": "modules/transformer_block",
+      "baseline_perf_seconds": 0.25
     }
   ]
 }

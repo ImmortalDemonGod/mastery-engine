@@ -1,0 +1,449 @@
+Build Challenge: Transformer Block - The Complete Architecture
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a complete Transformer block, integrating ALL the components you've
+built: RMSNorm, Multi-head Self-Attention with RoPE, and SwiGLU. This is THE
+fundamental building block of modern LLMs - stack 32-96 of these blocks and
+you have GPT, LLaMA, or Mistral. You will learn how residual connections enable
+deep networks, why pre-norm architecture is critical for stability, and how
+information flows through the Transformer.
+
+Background: The Transformer Revolution
+───────────────────────────────────────
+The Transformer block (Vaswani et al., 2017) replaced RNNs as the dominant
+architecture in deep learning. Its key innovations:
+
+1. **Parallelization**: Process entire sequences simultaneously (vs sequential RNNs)
+2. **Attention**: Direct connections between any two positions  
+3. **Residual connections**: Enable training of very deep networks (100+ layers)
+4. **Layer normalization**: Stabilize training
+
+Modern variants (LLaMA, PaLM, GPT-4) use:
+- **Pre-norm** architecture (normalize BEFORE sublayers)
+- **RMSNorm** instead of LayerNorm (simpler, faster)
+- **SwiGLU** instead of traditional FFN (gated, more expressive)
+- **RoPE** for position encoding (relative positions)
+
+You're about to implement the state-of-the-art version!
+
+Architecture: Pre-Norm Transformer Block
+─────────────────────────────────────────
+Modern Transformers use pre-norm architecture:
+
+```
+Input: x ∈ ℝ^(batch × seq_len × d_model)
+
+# Attention sublayer
+norm1_out = RMSNorm(x)
+attn_out = MultiHeadSelfAttention(norm1_out)  # with RoPE
+x = x + attn_out  # Residual connection
+
+# Feed-forward sublayer  
+norm2_out = RMSNorm(x)
+ffn_out = SwiGLU(norm2_out)
+x = x + ffn_out  # Residual connection
+
+Output: x ∈ ℝ^(batch × seq_len × d_model)
+```
+
+Key points:
+- Normalize BEFORE each sublayer (pre-norm)
+- Residual connections around each sublayer
+- Same dimension throughout (d_model)
+
+Why Pre-Norm vs Post-Norm?
+───────────────────────────
+Original Transformer (2017) used post-norm:
+```
+x = LayerNorm(x + Attention(x))  # Normalize AFTER residual
+x = LayerNorm(x + FFN(x))
+```
+
+Problems with post-norm:
+- Attention/FFN outputs can grow unbounded before normalization
+- Activation magnitudes explode in deep networks
+- Requires careful learning rate warmup
+- Gradient flow issues (gradients through norm after residual)
+
+Pre-norm advantages:
+- Bounded inputs to each sublayer (always normalized)
+- More stable training (no warmup needed)
+- Better gradient flow (residual bypasses norm)
+- Enables deeper networks (100+ layers)
+
+Empirically: Pre-norm models train faster and reach better performance,
+especially for deep networks. All modern LLMs use pre-norm!
+
+Residual Connections: The Secret to Deep Networks
+──────────────────────────────────────────────────
+Residual connections: `x = x + f(x)` where f is a sublayer.
+
+Why they're critical:
+
+**Without residuals** (x = f(x)):
+- Information must transform through every layer
+- Gradients multiply through all layers → vanishing gradients
+- Deep networks (>10 layers) fail to train
+
+**With residuals** (x = x + f(x)):
+- Identity path: information can skip any layer
+- Gradient highway: ∂L/∂x = ∂L/∂output × (1 + ∂f/∂x)
+  - The "+1" ensures gradient flow even if ∂f/∂x→0
+- Layers learn "refinements" not complete transformations
+- Can train 100+ layer networks!
+
+Key insight: Residuals provide a gradient highway for backpropagation.
+Even if a layer learns poorly, gradients still flow through the identity path.
+
+Mathematical Foundation
+───────────────────────
+The Transformer block computes:
+
+1. **Attention sublayer**:
+   ```
+   x₁ = RMSNorm(x₀)
+   attn = MultiHeadSelfAttention(x₁)  
+   x₂ = x₀ + attn  # First residual
+   ```
+
+2. **Feed-forward sublayer**:
+   ```
+   x₃ = RMSNorm(x₂)
+   ffn = SwiGLU(x₃)
+   x₄ = x₂ + ffn  # Second residual
+   ```
+
+Dimensions stay constant: all intermediate values are (batch, seq_len, d_model).
+
+This is called the "pre-LN" (pre-LayerNorm) or "pre-norm" Transformer.
+
+Information Flow
+────────────────
+Think of the Transformer block as two refinement steps:
+
+**Attention sublayer**: "Look at other tokens, gather relevant context"
+- Input: current representation of each token
+- Output: refined representation informed by other tokens
+- Residual: keep original information, add context
+
+**FFN sublayer**: "Process each token independently with non-linear transformation"
+- Input: context-aware representation
+- Output: further processed representation  
+- Residual: keep previous information, add refinement
+
+The residuals mean each sublayer ADDS information rather than replacing it.
+This cumulative refinement is key to Transformer success!
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the TransformerBlock class. This is a nn.Module that
+contains RMSNorm, attention, and SwiGLU components.
+
+Requirements
+────────────
+Implement the class with the following specification:
+
+Class Signature
+───────────────
+
+class TransformerBlock(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        max_seq_len: int = 2048,
+        rope_theta: float = 10000.0,
+        eps: float = 1e-6,
+        device=None,
+        dtype=None,
+    ):
+        """
+        A single Transformer block with pre-norm architecture.
+        
+        Architecture:
+            x = x + MultiHeadAttention(RMSNorm(x))  # with RoPE
+            x = x + SwiGLU(RMSNorm(x))
+        
+        Args:
+            d_model: Model dimension
+            num_heads: Number of attention heads
+            d_ff: Feed-forward hidden dimension (typically (8/3)*d_model)
+            max_seq_len: Maximum sequence length for RoPE
+            rope_theta: RoPE base parameter
+            eps: RMSNorm epsilon for numerical stability
+            device: Device for parameters
+            dtype: Data type for parameters
+        """
+    
+    def forward(
+        self,
+        x: Float[Tensor, " ... sequence_length d_model"],
+        token_positions: Int[Tensor, " ... sequence_length"] | None = None,
+    ) -> Float[Tensor, " ... sequence_length d_model"]:
+        """
+        Apply Transformer block to input.
+        
+        Args:
+            x: Input of shape (..., seq_len, d_model)
+            token_positions: Optional token positions for RoPE
+        
+        Returns:
+            Output of shape (..., seq_len, d_model)
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Use your implementations**:
+   - Your RMSNorm class
+   - Your MultiHeadSelfAttention (you'll need projection weights)
+   - Your SwiGLU class
+   - This is the ultimate integration!
+
+2. **Pre-norm architecture**:
+   - Normalize BEFORE each sublayer
+   - Residual connections around sublayers
+   - x = x + sublayer(norm(x))
+
+3. **Projection weights for attention**:
+   - Q, K, V projections: Linear(d_model → d_model)
+   - Output projection: Linear(d_model → d_model)
+   - Store as nn.Parameter or create Linear layers
+
+4. **No causal masking** (for now):
+   - We'll add masking in the full model
+   - This block is the basic building unit
+
+5. **Arbitrary batch dimensions**:
+   - Must handle any leading dimensions
+   - Single: (seq_len, d_model)
+   - Batched: (batch, seq_len, d_model)
+   - Multi: (batch, num_samples, seq_len, d_model)
+
+Implementation Steps
+────────────────────
+
+**In __init__:**
+
+Step 1: Create first RMSNorm for attention sublayer
+```python
+self.norm1 = RMSNorm(d_model, eps=eps, device=device, dtype=dtype)
+```
+
+Step 2: Create attention projection weights
+```python
+# You have several options:
+# Option A: Create Linear layers for Q/K/V/O projections
+self.q_proj = Linear(d_model, d_model, bias=False, device=device, dtype=dtype)
+self.k_proj = Linear(d_model, d_model, bias=False, device=device, dtype=dtype)
+self.v_proj = Linear(d_model, d_model, bias=False, device=device, dtype=dtype)
+self.o_proj = Linear(d_model, d_model, bias=False, device=device, dtype=dtype)
+
+# Option B: Create weight matrices directly as Parameters
+# (Depends on your implementation choice)
+```
+
+Step 3: Create second RMSNorm for FFN sublayer
+```python
+self.norm2 = RMSNorm(d_model, eps=eps, device=device, dtype=dtype)
+```
+
+Step 4: Create SwiGLU
+```python
+self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+```
+
+Step 5: Store hyperparameters for forward pass
+```python
+self.d_model = d_model
+self.num_heads = num_heads
+self.max_seq_len = max_seq_len
+self.rope_theta = rope_theta
+```
+
+**In forward:**
+
+Step 1: Attention sublayer with residual
+```python
+# Normalize
+normed = self.norm1(x)
+
+# Get Q/K/V projection weights
+q_weight = self.q_proj.weight  # or however you stored them
+k_weight = self.k_proj.weight
+v_weight = self.v_proj.weight
+o_weight = self.o_proj.weight
+
+# Multi-head attention with RoPE
+attn_out = multihead_self_attention_with_rope(
+    d_model=self.d_model,
+    num_heads=self.num_heads,
+    max_seq_len=self.max_seq_len,
+    theta=self.rope_theta,
+    q_proj_weight=q_weight,
+    k_proj_weight=k_weight,
+    v_proj_weight=v_weight,
+    o_proj_weight=o_weight,
+    in_features=normed,
+    token_positions=token_positions,
+)
+
+# Residual connection
+x = x + attn_out
+```
+
+Step 2: Feed-forward sublayer with residual
+```python
+# Normalize
+normed = self.norm2(x)
+
+# SwiGLU
+ffn_out = self.ffn(normed)
+
+# Residual connection
+x = x + ffn_out
+```
+
+Step 3: Return
+```python
+return x
+```
+
+That's it! Just two residual sublayers.
+
+Mathematical Insight: Why Same Dimension?
+──────────────────────────────────────────
+Notice d_model stays constant throughout. Why?
+
+**Residual connections require it**: x + f(x) only works if x and f(x) have
+the same shape. This constrains all sublayers to be d_model → d_model.
+
+**Benefits**:
+- Simplicity: no dimension matching headaches
+- Gradient flow: residuals work at every layer
+- Memory: consistent memory usage per layer
+
+**How do we increase capacity then?**
+- More layers (stack blocks)
+- Larger d_model
+- Larger d_ff (within each block)
+
+Modern LLMs: 32-96 layers × d_model of 4096-16384.
+
+Integration with Full Model
+────────────────────────────
+A complete Transformer LM stacks many blocks:
+
+```python
+# Embedding layer
+x = token_embeddings + position_embeddings
+
+# Stack of Transformer blocks
+for block in transformer_blocks:
+    x = block(x)  # Each block: attention + FFN
+
+# Final layer norm
+x = final_norm(x)
+
+# Output projection to vocabulary
+logits = x @ lm_head_weight.T
+```
+
+Each block refines the representation. Early blocks might learn syntax,
+middle blocks semantics, late blocks task-specific reasoning.
+
+Common Pitfalls
+───────────────
+
+❌ **Post-norm instead of pre-norm**:
+   Wrong: x = norm(x + attention(x))
+   Right: x = x + attention(norm(x))
+
+❌ **Forgetting residual connections**:
+   Wrong: x = attention(norm(x))  # No residual!
+   Right: x = x + attention(norm(x))
+
+❌ **Wrong dimension for SwiGLU**:
+   Remember d_ff ≠ d_model (typically d_ff = (8/3) × d_model)
+
+❌ **Applying RoPE in block instead of attention**:
+   RoPE is applied inside multi-head attention, not in the block!
+
+❌ **Creating new norms for each call**:
+   RMSNorm modules should be created in __init__, not forward
+
+❌ **Dimension mismatch in residuals**:
+   All outputs must be d_model to add to input
+
+Testing
+───────
+Your implementation will be tested against:
+• Various d_model, num_heads, d_ff combinations
+• Different sequence lengths and batch sizes
+• With and without token_positions
+• Gradient correctness through entire block
+• Numerical accuracy vs reference implementation
+
+The validator will run: pytest tests/test_model.py::test_transformer_block
+
+Performance Considerations
+──────────────────────────
+Transformer blocks are computationally expensive:
+
+For d_model=4096, num_heads=32, d_ff=11008, seq_len=2048:
+- Attention: O(seq_len² × d_model) ≈ 34B FLOPs
+- FFN: O(seq_len × d_model × d_ff) ≈ 185B FLOPs
+- Total: ~220B FLOPs per block per forward pass!
+
+In GPT-3 (96 layers): 96 × 220B = 21 TFLOPs per forward pass.
+For a single token generation with batch_size=1024, that's ~20 PFLOPs!
+
+This is why training LLMs requires massive compute.
+
+Stacking Blocks: Deep Networks
+───────────────────────────────
+Modern models stack many blocks:
+- GPT-2 small: 12 blocks
+- GPT-3: 96 blocks  
+- LLaMA-2 70B: 80 blocks
+- PaLM: 118 blocks
+
+Each block refines the representation. Remarkably, with pre-norm and
+residuals, gradients flow well through 100+ layers!
+
+The deepest models (100+ blocks) require careful initialization and
+sometimes techniques like:
+- Gradient checkpointing (trade compute for memory)
+- Mixed precision training (fp16/bf16)
+- Model parallelism (split across GPUs)
+
+But the basic architecture—the Transformer block you're implementing—
+stays the same!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your Transformer block against reference implementations.
+You'll then answer conceptual questions about residual connections, pre-norm
+architecture, why dimension stays constant, and how blocks compose into
+full models.
+
+Hints
+─────
+• Store all submodules in __init__ (norm1, norm2, attention layers, ffn)
+• Forward is just: norm → sublayer → residual, twice
+• Don't overthink it—the elegance is in the simplicity!
+• Test with d_model=256, num_heads=4, d_ff=684 first
+
+Remember: You're implementing THE building block of modern AI. Stack 32-96 of
+these, and you have GPT/LLaMA/Claude. This is the culmination of everything
+you've learned! 🎯
