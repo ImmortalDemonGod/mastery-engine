@@ -332,51 +332,38 @@ def transformer_lm(
     in_indices: Tensor,
 ) -> Tensor:
     """
-    Transformer language model forward pass using provided state dict weights.
-
+    TODO: Implement complete Transformer language model assembly.
+    
+    This is the final integration - assembling all components into a full LM.
+    NOTE: A 'transformer_lm' curriculum module needs to be created for this.
+    
     Pipeline:
-      - Token embedding lookup
-      - N x [pre-norm block with RoPE-attn + SwiGLU FFN]
-      - Final RMSNorm
-      - LM head projection to vocab size
+      1. Token embedding lookup
+      2. Stack of N transformer blocks
+      3. Final RMSNorm
+      4. LM head projection to vocabulary
+    
+    Args:
+        vocab_size: Size of vocabulary
+        context_length: Maximum sequence length
+        d_model: Model dimension
+        num_layers: Number of transformer blocks
+        num_heads: Number of attention heads per block
+        d_ff: Feed-forward hidden dimension
+        rope_theta: RoPE base frequency
+        weights: Dictionary containing all model weights
+        in_indices: Input token IDs (..., seq_len)
+    
+    Returns:
+        Logits tensor (..., seq_len, vocab_size)
+    
+    Implementation requirements:
+    - Lookup embeddings: weights["token_embeddings.weight"][in_indices]
+    - Apply num_layers transformer blocks with appropriate weight extraction
+    - Apply final RMSNorm with weights["ln_final.weight"]
+    - Project to vocab: x @ weights["lm_head.weight"]^T
     """
-    # Embedding lookup
-    token_emb = weights["token_embeddings.weight"]  # (vocab_size, d_model)
-    x = token_emb[in_indices]  # (B, S, d_model)
-
-    # Apply Transformer blocks
-    for i in range(int(num_layers)):
-        block_weights = {
-            "ln1.weight": weights[f"layers.{i}.ln1.weight"],
-            "attn.q_proj.weight": weights[f"layers.{i}.attn.q_proj.weight"],
-            "attn.k_proj.weight": weights[f"layers.{i}.attn.k_proj.weight"],
-            "attn.v_proj.weight": weights[f"layers.{i}.attn.v_proj.weight"],
-            "attn.output_proj.weight": weights[f"layers.{i}.attn.output_proj.weight"],
-            "ln2.weight": weights[f"layers.{i}.ln2.weight"],
-            "ffn.w1.weight": weights[f"layers.{i}.ffn.w1.weight"],
-            "ffn.w2.weight": weights[f"layers.{i}.ffn.w2.weight"],
-            "ffn.w3.weight": weights[f"layers.{i}.ffn.w3.weight"],
-        }
-        x = transformer_block(
-            d_model=d_model,
-            num_heads=num_heads,
-            d_ff=d_ff,
-            max_seq_len=context_length,
-            theta=rope_theta,
-            weights=block_weights,
-            in_features=x,
-        )
-
-    # Final RMSNorm
-    ln_final = RMSNorm(d_model=d_model, eps=1e-5)
-    with torch.no_grad():
-        ln_final.weight.copy_(weights["ln_final.weight"])  # (d_model,)
-    x = ln_final(x)
-
-    # LM head projection
-    lm_head_w = weights["lm_head.weight"]  # (vocab_size, d_model)
-    logits = x.matmul(lm_head_w.t())  # (B, S, vocab_size)
-    return logits
+    raise NotImplementedError("TODO: Implement transformer_lm - full model assembly")
 
 
 def multihead_self_attention_with_rope(
