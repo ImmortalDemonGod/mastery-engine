@@ -1,0 +1,18 @@
+--- a/cs336_basics/generation.py
++++ b/cs336_basics/generation.py
+@@ -35,11 +35,12 @@ def generate(
+         # Get logits for next token
+         logits = model(tokens)  # (1, seq_len, vocab_size)
+         next_logits = logits[0, -1, :]  # (vocab_size,)
+         
+-        # Apply temperature to logits BEFORE softmax
+-        next_logits = next_logits / temperature
+-        probs = F.softmax(next_logits, dim=-1)
++        # BUG: Applying temperature AFTER softmax instead of before!
++        # This doesn't properly scale the distribution - temperature must scale logits.
++        # Should be: next_logits = next_logits / temperature; probs = F.softmax(next_logits)
++        probs = F.softmax(next_logits, dim=-1)
++        probs = probs / temperature  # Wrong! Temperature after softmax has no effect!
+         
+         # Apply sampling strategy
+         if top_p is not None:

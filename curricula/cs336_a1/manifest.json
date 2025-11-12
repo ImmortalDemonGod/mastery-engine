@@ -92,6 +92,12 @@
       "name": "BPE Tokenizer Training",
       "path": "modules/bpe_tokenizer",
       "baseline_perf_seconds": 0.18
+    },
+    {
+      "id": "text_generation",
+      "name": "Text Generation with Sampling Strategies",
+      "path": "modules/text_generation",
+      "baseline_perf_seconds": 0.25
     }
   ]
 }

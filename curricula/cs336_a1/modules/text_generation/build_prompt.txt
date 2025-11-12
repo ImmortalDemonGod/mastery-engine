@@ -1,0 +1,417 @@
+Build Challenge: Text Generation with Sampling Strategies
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement autoregressive text generation with multiple sampling strategies:
+greedy decoding, temperature sampling, top-k sampling, and nucleus (top-p) sampling.
+You will learn how language models generate text token-by-token, why different
+sampling strategies produce different quality/diversity trade-offs, how temperature
+controls randomness, and why top-p is the modern standard used by ChatGPT and
+Claude. This is where trained models become useful tools!
+
+Background: Autoregressive Generation
+──────────────────────────────────────
+Language models predict the next token given previous tokens:
+    P(token_t | token_1, ..., token_{t-1})
+
+**Autoregressive generation** repeatedly samples from this distribution:
+1. Start with prompt: [token_1, ..., token_n]
+2. Model predicts: P(token_{n+1} | prompt)
+3. Sample token_{n+1} from this distribution
+4. Append to sequence: [token_1, ..., token_n, token_{n+1}]
+5. Repeat until stopping condition (max length, EOS token, etc.)
+
+This is how ChatGPT, Claude, LLaMA generate responses token-by-token!
+
+The Sampling Problem
+────────────────────
+Given logits (unnormalized scores) for next token, how do we choose?
+
+**Model output**: logits ∈ ℝ^vocab_size
+- logits[i] = score for token i
+- Higher score = model thinks token i is more likely
+
+**Convert to probabilities**:
+    probs = softmax(logits)
+    probs[i] = exp(logits[i]) / Σ exp(logits[j])
+
+**Now what?** Multiple strategies exist, each with trade-offs!
+
+Strategy 1: Greedy Decoding
+────────────────────────────
+Always pick the most likely token:
+    next_token = argmax(probs)
+
+**Example:**
+    probs = [0.6, 0.3, 0.1] for tokens ["the", "a", "one"]
+    Greedy chooses: "the" (highest probability)
+
+**Advantages:**
+- Deterministic (same prompt → same output)
+- Fast (no sampling required)
+- Coherent (high-probability choices)
+
+**Disadvantages:**
+- Boring! No creativity or diversity
+- Repetitive (falls into loops: "the the the...")
+- Gets stuck in local optima
+
+**When to use:** When you need deterministic, safe outputs. Rarely used in practice.
+
+Strategy 2: Temperature Sampling
+─────────────────────────────────
+Scale logits by temperature before softmax:
+    probs = softmax(logits / temperature)
+
+**Temperature T:**
+- T = 1.0: Normal probabilities (no change)
+- T → 0: Sharper distribution (more greedy)
+- T → ∞: Flatter distribution (more random)
+
+**Mathematical effect:**
+    Low T (e.g., 0.5): Amplifies differences in logits
+        High-prob tokens become MUCH higher
+        Low-prob tokens become MUCH lower
+    
+    High T (e.g., 2.0): Compresses differences
+        High-prob tokens become less dominant
+        Low-prob tokens get more chance
+
+**Example:**
+    logits = [2.0, 1.0, 0.0]
+    
+    T=0.5: softmax([4.0, 2.0, 0.0]) = [0.84, 0.14, 0.02] (sharp!)
+    T=1.0: softmax([2.0, 1.0, 0.0]) = [0.66, 0.24, 0.10] (normal)
+    T=2.0: softmax([1.0, 0.5, 0.0]) = [0.48, 0.29, 0.23] (flat!)
+
+**Advantages:**
+- Tunable creativity (single parameter)
+- Stochastic (same prompt → different outputs)
+- Simple to implement
+
+**Disadvantages:**
+- High T can sample very unlikely tokens (incoherent)
+- Doesn't adapt to how "certain" model is
+
+**When to use:** Quick-and-dirty sampling. T=0.7-0.9 typical for balanced outputs.
+
+Strategy 3: Top-k Sampling
+───────────────────────────
+Only sample from the k most likely tokens:
+
+1. Sort probabilities in descending order
+2. Keep only top k tokens
+3. Renormalize these k probabilities
+4. Sample from this restricted distribution
+
+**Example (k=2):**
+    probs = [0.6, 0.3, 0.08, 0.02] for ["the", "a", "this", "one"]
+    
+    Keep top 2: ["the" (0.6), "a" (0.3)]
+    Renormalize: [0.6/(0.6+0.3), 0.3/(0.6+0.3)] = [0.67, 0.33]
+    Sample from: {"the": 0.67, "a": 0.33}
+    Discard: "this" and "one" (can never be sampled)
+
+**Advantages:**
+- Prevents sampling very unlikely tokens
+- More reliable than pure temperature
+- Fixed computational cost (always consider k tokens)
+
+**Disadvantages:**
+- Fixed k doesn't adapt to distribution shape
+- When model is VERY certain (one token >> others), k=10 may include nonsense
+- When model is VERY uncertain (flat distribution), k=10 may exclude reasonable options
+
+**When to use:** When you want bounded creativity. k=40-50 typical.
+
+Strategy 4: Nucleus (Top-p) Sampling
+─────────────────────────────────────
+Sample from the smallest set of tokens whose cumulative probability ≥ p:
+
+1. Sort probabilities in descending order
+2. Compute cumulative sum
+3. Keep tokens until cumsum ≥ p
+4. Renormalize and sample
+
+**Example (p=0.9):**
+    probs = [0.6, 0.25, 0.10, 0.03, 0.02] for tokens [A, B, C, D, E]
+    Cumulative: [0.6, 0.85, 0.95, 0.98, 1.00]
+    
+    Keep until cumsum ≥ 0.9: [A, B, C] (cumsum = 0.95)
+    Renormalize: [0.6/0.95, 0.25/0.95, 0.10/0.95] = [0.63, 0.26, 0.11]
+    Sample from: {A: 0.63, B: 0.26, C: 0.11}
+    Discard: D and E
+
+**Dynamic adaptation:**
+- Model very certain: [0.95, 0.03, 0.02, ...] → only 1 token (the 0.95 one)
+- Model uncertain: [0.2, 0.18, 0.15, 0.12, ...] → many tokens
+
+**Advantages:**
+- Adapts to model confidence!
+- Prevents low-prob tokens (like top-k)
+- Variable set size matches distribution shape
+- BEST QUALITY in practice!
+
+**Disadvantages:**
+- Slightly more complex than top-k
+- Variable computational cost (set size varies)
+
+**When to use:** ALWAYS! This is the modern standard. p=0.9-0.95 typical (ChatGPT, Claude use this).
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/generation.py
+
+You will implement `generate()`, a function that performs autoregressive generation
+with selectable sampling strategy.
+
+Requirements
+────────────
+Implement the function with the following specification:
+
+Function Signature
+──────────────────
+
+def generate(
+    model: nn.Module,
+    tokenizer: Tokenizer,
+    prompt: str,
+    max_length: int = 100,
+    temperature: float = 1.0,
+    top_k: int | None = None,
+    top_p: float | None = None,
+    device: str = 'cuda',
+) -> str:
+    """
+    Generate text autoregressively from prompt.
+    
+    Args:
+        model: Trained language model
+        tokenizer: BPE tokenizer for encoding/decoding
+        prompt: Initial text to condition on
+        max_length: Maximum number of tokens to generate
+        temperature: Temperature for scaling logits (default 1.0)
+        top_k: If not None, sample from top k tokens
+        top_p: If not None, use nucleus sampling with probability p
+        device: Device for inference
+    
+    Returns:
+        Generated text (prompt + generated continuation)
+    """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Autoregressive loop**:
+   - Encode prompt → token IDs
+   - For each generation step:
+     * Forward pass through model
+     * Apply sampling strategy
+     * Append sampled token
+     * Continue until max_length or EOS
+
+2. **Sampling priority**:
+   - If top_p specified: use nucleus sampling
+   - Elif top_k specified: use top-k sampling  
+   - Else: use temperature sampling
+   - Temperature always applies (scales logits first)
+
+3. **Efficient generation**:
+   - Use model.eval() mode
+   - torch.no_grad() context (no gradients needed)
+   - Consider KV-caching for real implementations (not required here)
+
+4. **Handle edge cases**:
+   - Empty prompt
+   - EOS token (stop generating)
+   - max_length reached
+
+Implementation Steps
+────────────────────
+
+**Step 1: Setup**
+```python
+model.eval()
+model.to(device)
+
+# Encode prompt
+token_ids = tokenizer.encode(prompt)
+tokens = torch.tensor(token_ids, device=device).unsqueeze(0)  # (1, seq_len)
+```
+
+**Step 2: Generation loop**
+```python
+with torch.no_grad():
+    for _ in range(max_length):
+        # Forward pass: get logits for next token
+        logits = model(tokens)  # (1, seq_len, vocab_size)
+        next_logits = logits[0, -1, :]  # (vocab_size,) - logits for next token
+        
+        # Apply temperature
+        next_logits = next_logits / temperature
+        
+        # Apply sampling strategy
+        if top_p is not None:
+            next_token = nucleus_sample(next_logits, top_p)
+        elif top_k is not None:
+            next_token = top_k_sample(next_logits, top_k)
+        else:
+            next_token = temperature_sample(next_logits)
+        
+        # Append to sequence
+        tokens = torch.cat([tokens, next_token.unsqueeze(0).unsqueeze(0)], dim=1)
+        
+        # Check for EOS
+        if next_token.item() == tokenizer.eos_token_id:
+            break
+```
+
+**Step 3: Decode and return**
+```python
+generated_ids = tokens[0].tolist()
+return tokenizer.decode(generated_ids)
+```
+
+**Sampling implementations:**
+
+**Temperature sampling:**
+```python
+def temperature_sample(logits):
+    probs = F.softmax(logits, dim=-1)
+    return torch.multinomial(probs, num_samples=1)
+```
+
+**Top-k sampling:**
+```python
+def top_k_sample(logits, k):
+    # Get top k logits and indices
+    top_logits, top_indices = torch.topk(logits, k)
+    
+    # Softmax over top k
+    top_probs = F.softmax(top_logits, dim=-1)
+    
+    # Sample from top k
+    sampled_index = torch.multinomial(top_probs, num_samples=1)
+    return top_indices[sampled_index]
+```
+
+**Nucleus sampling:**
+```python
+def nucleus_sample(logits, p):
+    # Sort probabilities descending
+    probs = F.softmax(logits, dim=-1)
+    sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+    
+    # Cumulative sum
+    cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
+    
+    # Find cutoff: first index where cumsum >= p
+    mask = cumsum_probs >= p
+    # Keep at least one token
+    mask[0] = True
+    
+    # Zero out excluded tokens
+    filtered_probs = sorted_probs.clone()
+    filtered_probs[~mask] = 0.0
+    
+    # Renormalize
+    filtered_probs = filtered_probs / filtered_probs.sum()
+    
+    # Sample
+    sampled_index = torch.multinomial(filtered_probs, num_samples=1)
+    return sorted_indices[sampled_index]
+```
+
+Mathematical Insight: Probability Distributions
+────────────────────────────────────────────────
+Sampling strategies shape the probability distribution:
+
+**Entropy H = -Σ p(x) log p(x)** measures uncertainty:
+- Low H: Model is certain (peaked distribution)
+- High H: Model is uncertain (flat distribution)
+
+**Temperature T affects entropy:**
+- T < 1: Reduces entropy (more certain)
+- T > 1: Increases entropy (less certain)
+
+**Top-k/top-p set support** (which tokens can be sampled):
+- Full sampling: support = all vocab (wasteful)
+- Top-k: support = k tokens (fixed)
+- Top-p: support = adaptive (better!)
+
+The goal: High probability mass on good tokens, zero on bad tokens.
+
+Common Pitfalls
+───────────────
+
+❌ **Not using model.eval()**:
+   Dropout/batchnorm behave differently in training mode!
+
+❌ **Forgetting torch.no_grad()**:
+   Wastes memory storing gradients we don't need.
+
+❌ **Temperature after softmax**:
+   Wrong: probs = softmax(logits); probs = probs / T
+   Right: logits = logits / T; probs = softmax(logits)
+
+❌ **Not handling EOS token**:
+   Model generates EOS but keeps going → garbage after EOS.
+
+❌ **Index errors in top-k**:
+   If vocab_size < k, torch.topk fails!
+
+Testing
+───────
+Your implementation will be tested against:
+• Various prompts and lengths
+• Different sampling strategies
+• Temperature values
+• Edge cases (short prompts, EOS handling)
+• Output quality and diversity
+
+The validator will run: pytest tests/test_generation.py::test_generate
+
+Sampling Strategy Comparison
+─────────────────────────────
+**Prompt:** "The future of AI is"
+
+**Greedy (deterministic):**
+"The future of AI is the future of the world and the future of the world..."
+→ Repetitive, boring
+
+**Temperature=1.5 (high randomness):**
+"The future of AI is pancakes dolphins whenever... "
+→ Creative but incoherent
+
+**Top-k=50:**
+"The future of AI is promising, with rapid advances in..."
+→ Diverse but reasonable
+
+**Top-p=0.9 (BEST):**
+"The future of AI is both exciting and concerning, as we navigate..."
+→ Creative, coherent, adapts to model confidence
+
+Modern systems use: **temperature=0.7 + top_p=0.9** for best results!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your generation against reference implementations.
+You'll then answer conceptual questions about autoregressive generation, why
+different sampling strategies matter, the temperature/creativity trade-off,
+and why nucleus sampling is superior to top-k.
+
+Hints
+─────
+• Use torch.multinomial() for sampling from probability distributions
+• torch.topk() gets top k values efficiently
+• torch.cumsum() for nucleus sampling
+• Always renormalize after filtering!
+
+Remember: This is how ChatGPT, Claude, every LLM chatbot generates responses!
+You're implementing THE generation algorithm used by billions of people! 🎯
