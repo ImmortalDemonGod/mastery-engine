@@ -1,0 +1,15 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -25,8 +25,9 @@ class Embedding(nn.Module):
+     def __init__(self, num_embeddings, embedding_dim, device=None, dtype=None):
+         super().__init__()
+-        self.embedding = nn.Embedding(
+-            num_embeddings=num_embeddings,
+-            embedding_dim=embedding_dim,
++        # BUG: Swapped dimension order! nn.Embedding expects (num_embeddings, embedding_dim)
++        # not (embedding_dim, num_embeddings). This creates wrong-shaped embedding matrix.
++        self.embedding = nn.Embedding(
++            num_embeddings=embedding_dim,  # Should be num_embeddings!
++            embedding_dim=num_embeddings,  # Should be embedding_dim!
+             device=device,
+             dtype=dtype,

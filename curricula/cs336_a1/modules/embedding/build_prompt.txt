@@ -1,0 +1,365 @@
+Build Challenge: Token Embedding Layer
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a token embedding layer, the fundamental component that converts
+discrete token IDs into continuous vector representations. You will learn why
+embeddings are necessary for neural networks, how they enable semantic similarity,
+why embedding dimension is critical for model capacity, and how tied embeddings
+save parameters. This is where language enters the Transformer!
+
+Background: The Discreteness Problem
+─────────────────────────────────────
+Text is fundamentally discrete:
+- Words: "cat", "dog", "house" (distinct symbols)
+- Tokens: After tokenization, integers like [2045, 3421, 9876]
+
+Neural networks are fundamentally continuous:
+- Operate on real-valued vectors and matrices
+- Learn through gradient descent (requires differentiability)
+- Need smooth, continuous representations
+
+**The gap**: How do we feed discrete tokens into continuous neural networks?
+
+**Solution**: Embeddings! Map each token ID to a learned vector:
+- Token 2045 → vector [0.23, -0.45, 0.12, ..., 0.67] ∈ ℝ^d
+- Token 3421 → vector [-0.11, 0.89, -0.34, ..., 0.22] ∈ ℝ^d
+
+These vectors are learned parameters, optimized during training!
+
+What Are Embeddings?
+────────────────────
+An embedding layer is essentially a lookup table:
+
+**Embedding Matrix**: E ∈ ℝ^(vocab_size × d_model)
+- vocab_size: Number of possible tokens (e.g., 50,000)
+- d_model: Embedding dimension (e.g., 768, 4096)
+
+**Forward Pass**: Given token ID t:
+    embedding = E[t]  # Look up row t, return d_model-dimensional vector
+
+That's it! Conceptually simple, but profoundly powerful.
+
+Why Embeddings Work
+───────────────────
+Embeddings enable semantic similarity through learned geometry:
+
+**Before training (random):**
+- "cat" → [0.1, 0.2, -0.3, ...]
+- "dog" → [-0.5, 0.8, 0.1, ...]  
+- "car" → [0.2, 0.3, -0.2, ...]
+
+No semantic structure, vectors are random.
+
+**After training (learned):**
+- "cat" → [0.8, 0.7, -0.2, ...]
+- "dog" → [0.75, 0.72, -0.18, ...]  # Close to "cat"!
+- "car" → [-0.3, -0.4, 0.9, ...]    # Far from animals
+
+Similar tokens end up with similar embeddings!
+
+The network learns:
+- "cat" and "dog" should be similar (both animals)
+- "cat" and "car" should be dissimilar (different concepts)
+- Relationships like "king" - "man" + "woman" ≈ "queen"
+
+This emerges from backpropagation optimizing for language modeling!
+
+Embedding Dimension: The Capacity Trade-off
+────────────────────────────────────────────
+Dimension d_model determines representational capacity:
+
+**Small d_model (e.g., 128):**
+- Few dimensions to encode meaning
+- Limited capacity: Can't represent complex semantic relationships
+- Faster (fewer parameters, less compute)
+- Suitable for simple tasks
+
+**Large d_model (e.g., 4096, 8192):**
+- Many dimensions for rich representations
+- High capacity: Can encode subtle semantic distinctions
+- Slower (more parameters, more compute)
+- Necessary for complex tasks like GPT-3
+
+**Modern LLMs:**
+- GPT-2: 768 (small), 1024 (medium), 1280 (large), 1600 (XL)
+- GPT-3: 12,288 (175B model)
+- LLaMA: 4096 (7B), 8192 (70B)
+
+Larger models use larger embeddings for greater expressiveness!
+
+Tied Embeddings: Parameter Efficiency
+──────────────────────────────────────
+A language model has two places where tokens and vectors connect:
+
+**Input**: Token IDs → Embeddings (E_in: vocab_size × d_model)
+**Output**: Hidden states → Logits (W_out: vocab_size × d_model transposed)
+
+These matrices have the same shape! Can we share them?
+
+**Tied Embeddings**: E_in = W_out^T (same parameters)
+
+**Benefits:**
+1. **50% fewer parameters**: vocab_size × d_model parameters saved
+2. **Regularization**: Forces input and output spaces to align
+3. **Improved generalization**: Less overfitting with fewer parameters
+
+**Why it works:**
+- Input embedding learns: "What does this token mean?"
+- Output projection learns: "Which token should come next?"
+- These are related tasks! Sharing weights helps both.
+
+Used in: GPT-2, GPT-3, most modern LLMs.
+
+Mathematical Foundation
+───────────────────────
+Embedding is mathematically a one-hot encoding followed by matrix multiply:
+
+Given token ID t and embedding matrix E:
+
+**One-hot vector**: x_t ∈ ℝ^vocab_size, all zeros except x_t[t] = 1
+
+**Matrix multiply**: E^T x_t = E[t] (selects row t)
+
+In practice: We don't create the one-hot vector! Just index directly:
+    embedding = E[t]
+
+This is much more efficient (no sparse matrix multiply).
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/layers.py
+
+You will implement the Embedding class as a nn.Module. This wraps PyTorch's
+nn.Embedding with our interface.
+
+Requirements
+────────────
+Implement the class with the following specification:
+
+Class Signature
+───────────────
+
+class Embedding(nn.Module):
+    def __init__(
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        device=None,
+        dtype=None,
+    ):
+        """
+        Token embedding layer.
+        
+        Creates a lookup table of shape (num_embeddings, embedding_dim)
+        that maps token IDs to continuous vectors.
+        
+        Args:
+            num_embeddings: Vocabulary size (number of possible tokens)
+            embedding_dim: Dimension of embedding vectors (d_model)
+            device: Device for parameters
+            dtype: Data type for parameters
+        """
+    
+    def forward(
+        self,
+        token_ids: Int[Tensor, " ... sequence_length"],
+    ) -> Float[Tensor, " ... sequence_length embedding_dim"]:
+        """
+        Look up embeddings for token IDs.
+        
+        Args:
+            token_ids: Token IDs of shape (..., seq_len)
+                      Values should be in range [0, num_embeddings)
+        
+        Returns:
+            Embeddings of shape (..., seq_len, embedding_dim)
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Use nn.Embedding**:
+   - PyTorch provides nn.Embedding - use it!
+   - It handles efficient indexing and gradients
+   - Just wrap it with our interface
+
+2. **Initialization**:
+   - Default: nn.Embedding initializes from N(0, 1)
+   - Some models use custom initialization (e.g., N(0, 1/√d_model))
+   - We'll stick with PyTorch defaults for simplicity
+
+3. **Handle arbitrary batch dimensions**:
+   - Input: (..., seq_len) - any leading batch dimensions
+   - Output: (..., seq_len, embedding_dim)
+   - nn.Embedding handles this automatically!
+
+4. **Bounds checking**:
+   - Token IDs must be in [0, num_embeddings)
+   - Out-of-bounds causes indexing error
+   - nn.Embedding raises error automatically
+
+Implementation Steps
+────────────────────
+
+**In __init__:**
+
+```python
+super().__init__()
+self.embedding = nn.Embedding(
+    num_embeddings=num_embeddings,
+    embedding_dim=embedding_dim,
+    device=device,
+    dtype=dtype,
+)
+self.num_embeddings = num_embeddings
+self.embedding_dim = embedding_dim
+```
+
+Store nn.Embedding as a submodule. PyTorch automatically registers it and its
+parameters.
+
+**In forward:**
+
+```python
+return self.embedding(token_ids)
+```
+
+That's it! nn.Embedding handles everything:
+- Indexing into the embedding matrix
+- Broadcasting over batch dimensions
+- Gradient computation during backprop
+
+Mathematical Insight: Why Lookups Are Differentiable
+─────────────────────────────────────────────────────
+You might wonder: "How can we backprop through integer indexing?"
+
+Forward pass: embedding = E[t] (discrete lookup, not differentiable!)
+
+Backward pass: ∂Loss/∂E[t] = ∂Loss/∂embedding
+
+The trick: Only the selected row E[t] receives gradients. Other rows get zero.
+
+Think of it as:
+- Forward: Sparse one-hot × dense matrix
+- Backward: Gradient flows only to selected row
+
+This is automatically handled by autograd!
+
+Integration with Transformer
+─────────────────────────────
+In a full Transformer language model:
+
+```python
+class TransformerLM(nn.Module):
+    def __init__(self, vocab_size, d_model, ...):
+        self.embedding = Embedding(vocab_size, d_model)
+        self.transformer_blocks = nn.ModuleList([...])
+        self.lm_head = Linear(d_model, vocab_size)  # Or tied with embedding
+    
+    def forward(self, token_ids):
+        # Token IDs → Embeddings
+        x = self.embedding(token_ids)  # (batch, seq_len, d_model)
+        
+        # Add position encoding (RoPE applied inside attention)
+        
+        # Transformer blocks
+        for block in self.transformer_blocks:
+            x = block(x)
+        
+        # Output projection → Logits
+        logits = self.lm_head(x)  # (batch, seq_len, vocab_size)
+        return logits
+```
+
+The embedding is the entry point for token IDs into the model!
+
+Parameter Count
+───────────────
+Embeddings can be a significant portion of parameters:
+
+Example: GPT-2 small (124M parameters)
+- Vocabulary: 50,257 tokens
+- Embedding dimension: 768
+- Embedding matrix: 50,257 × 768 = 38.6M parameters
+- **31% of total parameters are embeddings!**
+
+For large vocabularies, embeddings are costly. This is why:
+- Tied embeddings save 50% of embedding parameters
+- Some models use factorized embeddings (E = A × B, lower rank)
+
+Common Pitfalls
+───────────────
+
+❌ **Forgetting nn.Embedding exists**:
+   Don't implement from scratch with nn.Parameter!
+   Use nn.Embedding - it's optimized.
+
+❌ **Wrong dimension order**:
+   nn.Embedding expects (num_embeddings, embedding_dim), not reversed!
+
+❌ **Out-of-bounds token IDs**:
+   If max token ID ≥ num_embeddings, PyTorch raises IndexError.
+   Always ensure tokenizer and embedding vocab sizes match!
+
+❌ **Not registering as submodule**:
+   Wrong: self.embedding_weights = torch.randn(...)  # Not tracked!
+   Right: self.embedding = nn.Embedding(...)  # Automatically tracked
+
+❌ **Modifying embeddings in forward**:
+   Embeddings are parameters, not computed. Just look up and return!
+
+Testing
+───────
+Your implementation will be tested against:
+• Various vocabulary sizes and embedding dimensions
+• Different batch shapes
+• Gradient correctness
+• Parameter initialization
+• Integration with other layers
+
+The validator will run: pytest tests/test_model.py::test_embedding
+
+Embedding Visualization
+───────────────────────
+Fun exercise: Train embeddings and visualize with t-SNE or UMAP:
+
+```python
+# After training
+E = model.embedding.embedding.weight  # (vocab_size, d_model)
+
+# Project to 2D for visualization
+from sklearn.manifold import TSNE
+E_2d = TSNE(n_components=2).fit_transform(E.detach().cpu())
+
+# Plot
+plt.scatter(E_2d[:, 0], E_2d[:, 1])
+# Annotate with words for some tokens
+for i, word in enumerate(token_to_word[:100]):  # First 100 tokens
+    plt.annotate(word, (E_2d[i, 0], E_2d[i, 1]))
+```
+
+You'll see semantic clusters: animals together, numbers together, etc!
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your embedding layer against reference implementations
+and verify all edge cases. You'll then answer conceptual questions about why
+embeddings work, the role of dimension, tied embeddings, and how discrete
+tokens become continuous representations.
+
+Hints
+─────
+• This is one of the simplest modules - mainly a wrapper around nn.Embedding
+• Store the nn.Embedding instance as self.embedding
+• Forward pass is literally: return self.embedding(token_ids)
+• The learning happens during training through backprop!
+
+Remember: This is where language enters the neural network! Every word, every
+token passes through this embedding layer. Getting it right is foundational! 🎯

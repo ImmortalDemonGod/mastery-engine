@@ -74,6 +74,12 @@
       "name": "Cosine Learning Rate Schedule with Warmup",
       "path": "modules/cosine_schedule",
       "baseline_perf_seconds": 0.08
+    },
+    {
+      "id": "embedding",
+      "name": "Token Embedding Layer",
+      "path": "modules/embedding",
+      "baseline_perf_seconds": 0.10
     }
   ]
 }
