@@ -139,6 +139,51 @@ Modified validator script logic to be simpler and correct:
 
 ---
 
+### **2025-11-12 00:24**
+
+**Objective:**
+*   Reset cs336_basics implementations to TODO stubs so students must actually implement code in BUILD stage.
+
+**Problem Discovered:**
+User reported: "it still just copies the correct answer into the workspace like its litterally has all the answers"
+
+BUILD stage was copying complete implementations from `cs336_basics/utils.py` to shadow worktree for validation. Students never had to write code - tests passed immediately.
+
+**Root Cause:**
+The cs336_basics folder had complete implementations because:
+1.  Original CS336 assignment repo started with stubs
+2.  Implementations were added to build/test the Mastery Engine itself
+3.  After engine development, complete code remained in student workspace
+
+This created a "chicken and egg" problem:
+- Needed working code to build the engine
+- But engine expects students to implement from scratch
+
+**Solution:**
+1.  **Archive Reference Code**: Copied complete implementations to `curricula/cs336_a1/reference/utils_complete.py`
+2.  **Reset to Stubs**: Replaced 3 functions with `NotImplementedError` stubs:
+    - `softmax()`: TODO with subtract-max hint
+    - `cross_entropy()`: TODO with log-sum-exp hint  
+    - `gradient_clipping()`: TODO with L2 norm hint
+3.  **Preserve Helper Functions**: Kept implemented functions (get_lr_cosine_schedule, get_batch, etc.) that aren't part of curriculum
+
+**Verification:**
+```bash
+# Reset to softmax BUILD stage
+uv run python -m engine.main submit-build
+# Result: NotImplementedError - students must implement
+```
+
+**Status:** Fixed - BUILD stage now requires actual implementation
+
+**Artifacts:**
+*   **Commit:** `cb3e96c`
+*   **Files Modified:**
+    - `cs336_basics/utils.py`: Reset to TODO stubs with hints
+    - `curricula/cs336_a1/reference/utils_complete.py`: Archived complete implementations
+
+---
+
 ### **2025-11-11 19:35 - Sprint 6: "Production-Ready MVP" - COMPLETE**
 
 **Objective:**
