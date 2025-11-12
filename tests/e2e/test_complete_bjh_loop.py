@@ -23,6 +23,7 @@ This test uses:
 import json
 import subprocess
 import shutil
+import sys
 from pathlib import Path
 from typing import Generator
 
@@ -143,6 +144,23 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
             ["git", "commit", "-m", "Additional files"],
             cwd=test_repo, check=True, capture_output=True
         )
+    
+    # CRITICAL FIX: Install cs336_basics package in editable mode
+    # This allows pytest in shadow worktree to import the package
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-e", "."],
+        cwd=test_repo,
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        # Print error for debugging, but don't fail - some test environments may not support editable installs
+        print(f"Warning: Package installation failed (non-critical): {result.stderr}")
+    
+    # Alternative: Add test_repo to PYTHONPATH for the subprocess
+    # This works even if pip install fails
+    import os
+    os.environ['PYTHONPATH'] = f"{test_repo}:{os.environ.get('PYTHONPATH', '')}"
     
     yield test_repo
     
