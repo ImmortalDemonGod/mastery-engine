@@ -8,8 +8,8 @@ Commands:
     status: Show current learning progress
     next: Display the next build prompt
     submit-build: Submit and validate a build implementation
-    submit-justify: Submit an answer to a justify question
-    submit-harden: Submit a bug fix for the harden challenge
+    submit-justification: Submit an answer to a justify question
+    submit-fix: Submit a bug fix for the harden challenge
     flag-issue: Report a problem with the curriculum
 """
 
@@ -21,6 +21,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.markdown import Markdown
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -143,7 +144,7 @@ def next():
             
             console.print()
             console.print(Panel(
-                prompt_content,
+                Markdown(prompt_content),
                 title=f"📝 Build Challenge: {current_module.name}",
                 border_style="cyan",
                 padding=(1, 2)
@@ -199,10 +200,13 @@ def next():
             question = questions[0]
             
             console.print()
+            _md = (
+                f"**Question:**\n\n{question.question}\n\n"
+                "_Note: This is stub mode. Any non-empty answer will be accepted.\n"
+                "In the full version, your answer will be evaluated by an LLM for conceptual correctness._"
+            )
             console.print(Panel(
-                f"[bold]Question:[/bold]\n\n{question.question}\n\n"
-                "[dim italic]Note: This is stub mode. Any non-empty answer will be accepted.\n"
-                "In the full version, your answer will be evaluated by an LLM for conceptual correctness.[/dim]",
+                Markdown(_md),
                 title=f"💭 Justify Challenge: {current_module.name}",
                 border_style="magenta",
                 padding=(1, 2)
@@ -371,7 +375,8 @@ def submit_build():
             # Show next action
             console.print(Panel(
                 "Next step: Answer conceptual questions about your implementation.\n\n"
-                "Run [bold cyan]engine --submit-justify[/bold cyan] to continue.",
+                "1) [bold cyan]engine next[/bold cyan] — view the justify question\n"
+                "2) [bold cyan]engine submit-justification \"<your answer>\"[/bold cyan] — submit your answer",
                 title="Next Action",
                 border_style="blue"
             ))

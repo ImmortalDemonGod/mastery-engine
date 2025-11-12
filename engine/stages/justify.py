@@ -96,19 +96,24 @@ class JustifyRunner:
             - matched: True if a failure mode was detected
             - feedback: Pre-written feedback for the matched failure mode, or None
         """
-        user_answer_lower = user_answer.lower()
-        
-        for failure_mode in question.failure_modes:
-            # Check if any keyword from this failure mode appears in the answer
-            for keyword in failure_mode.keywords:
-                if keyword.lower() in user_answer_lower:
-                    logger.info(f"Fast filter matched: category='{failure_mode.category}', "
-                               f"keyword='{keyword}'")
-                    return True, failure_mode.feedback
-        
-        # No match found
-        logger.info("No fast filter match, proceeding to LLM evaluation")
+        # TEMPORARILY DISABLED FOR DEBUGGING - Always proceed to LLM evaluation
+        logger.info("Fast filter DISABLED - proceeding directly to LLM evaluation")
         return False, None
+        
+        # Original filter logic (disabled):
+        # user_answer_lower = user_answer.lower()
+        # 
+        # for failure_mode in question.failure_modes:
+        #     # Check if any keyword from this failure mode appears in the answer
+        #     for keyword in failure_mode.keywords:
+        #         if keyword.lower() in user_answer_lower:
+        #             logger.info(f"Fast filter matched: category='{failure_mode.category}', "
+        #                        f"keyword='{keyword}'")
+        #             return True, failure_mode.feedback
+        # 
+        # # No match found
+        # logger.info("No fast filter match, proceeding to LLM evaluation")
+        # return False, None
 
 
 class JustifyQuestionsError(Exception):
