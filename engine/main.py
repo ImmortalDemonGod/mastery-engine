@@ -200,13 +200,8 @@ def next():
             question = questions[0]
             
             console.print()
-            _md = (
-                f"**Question:**\n\n{question.question}\n\n"
-                "_Note: This is stub mode. Any non-empty answer will be accepted.\n"
-                "In the full version, your answer will be evaluated by an LLM for conceptual correctness._"
-            )
             console.print(Panel(
-                Markdown(_md),
+                Markdown(f"**Question:**\n\n{question.question}"),
                 title=f"💭 Justify Challenge: {current_module.name}",
                 border_style="magenta",
                 padding=(1, 2)
