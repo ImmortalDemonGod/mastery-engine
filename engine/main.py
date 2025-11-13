@@ -21,6 +21,7 @@ for backward compatibility.
 import sys
 import logging
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -575,12 +576,16 @@ def submit():
 
 
 @app.command()
-def next():
+def show(module_id: Optional[str] = typer.Argument(None, help="Module ID to display (default: current)")):
     """
-    Display the next build prompt for the current module.
+    Display challenge content for current or specified module (read-only).
     
-    Shows the build challenge specification from build_prompt.txt.
-    Only works when the user is in the "build" stage.
+    This command is ALWAYS safe and never modifies files.
+    Use 'engine start-challenge' to initialize the harden stage workspace.
+    
+    Examples:
+        engine show              # Show current module challenge
+        engine show softmax      # Show softmax module content
     """
     try:
         # Load state and curriculum
@@ -590,23 +595,48 @@ def next():
         progress = state_mgr.load()
         manifest = curr_mgr.load_manifest(progress.curriculum_id)
         
-        # Check if user has completed all modules
-        if progress.current_module_index >= len(manifest.modules):
-            console.print()
-            console.print(Panel(
-                "[bold green]🎉 Congratulations![/bold green]\n\n"
-                "You have completed all modules in this curriculum!",
-                title="Curriculum Complete",
-                border_style="green"
-            ))
-            console.print()
-            return
+        # Determine which module to show
+        if module_id is not None:
+            # Find specified module
+            target_module = None
+            for mod in manifest.modules:
+                if mod.id == module_id:
+                    target_module = mod
+                    break
+            
+            if target_module is None:
+                console.print()
+                console.print(Panel(
+                    f"[bold red]Module Not Found[/bold red]\n\n"
+                    f"Module '{module_id}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                    f"Run [bold cyan]engine curriculum list[/bold cyan] to see available modules.",
+                    title="ERROR",
+                    border_style="red"
+                ))
+                console.print()
+                sys.exit(1)
+            
+            current_module = target_module
+            # For specified modules, default to showing build content
+            display_stage = "build"
+        else:
+            # Show current module
+            if progress.current_module_index >= len(manifest.modules):
+                console.print()
+                console.print(Panel(
+                    "[bold green]🎉 Congratulations![/bold green]\n\n"
+                    "You have completed all modules in this curriculum!",
+                    title="Curriculum Complete",
+                    border_style="green"
+                ))
+                console.print()
+                return
+            
+            current_module = manifest.modules[progress.current_module_index]
+            display_stage = progress.current_stage
         
-        # Get current module
-        current_module = manifest.modules[progress.current_module_index]
-        
-        # Handle different stages
-        if progress.current_stage == "build":
+        # Display content based on stage (READ-ONLY)
+        if display_stage == "build":
             # Display build prompt
             prompt_path = curr_mgr.get_build_prompt_path(progress.curriculum_id, current_module)
             
@@ -628,43 +658,8 @@ def next():
             
             logger.info(f"Displayed build prompt for module '{current_module.id}'")
             
-        elif progress.current_stage == "harden":
-            # Present harden challenge in shadow worktree
-            # Ensure shadow worktree exists (only needed for harden stage)
-            require_shadow_worktree()
-            workspace_mgr = WorkspaceManager()
-            harden_runner = HardenRunner(curr_mgr, workspace_mgr)
-            
-            # Determine source file based on module
-            # For softmax, this is cs336_basics/utils.py in main directory
-            if current_module.id == "softmax":
-                source_file = Path("cs336_basics/utils.py")
-            else:
-                # Fallback for other modules
-                source_file = Path(f"{current_module.id}.py")
-            
-            harden_file, symptom = harden_runner.present_challenge(
-                progress.curriculum_id,
-                current_module,
-                source_file
-            )
-            
-            console.print()
-            console.print(Panel(
-                symptom,
-                title=f"🐛 Debug Challenge: {current_module.name}",
-                border_style="yellow",
-                padding=(1, 2)
-            ))
-            console.print()
-            console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
-            console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
-            console.print()
-            
-            logger.info(f"Displayed harden challenge for module '{current_module.id}'")
-            
-        elif progress.current_stage == "justify":
-            # Present justify questions
+        elif display_stage == "justify":
+            # Display justify question (READ-ONLY)
             justify_runner = JustifyRunner(curr_mgr)
             questions = justify_runner.load_questions(progress.curriculum_id, current_module)
             
@@ -673,7 +668,7 @@ def next():
                     f"No justify questions found for module '{current_module.id}'"
                 )
             
-            # For now, just show the first question (stub)
+            # Show first question
             question = questions[0]
             
             console.print()
@@ -684,23 +679,152 @@ def next():
                 padding=(1, 2)
             ))
             console.print()
-            console.print("[bold cyan]To submit your answer:[/bold cyan] engine submit-justification \"<your answer>\"")
+            console.print("[bold cyan]To submit your answer:[/bold cyan] engine submit")
             console.print()
             
             logger.info(f"Displayed justify question for module '{current_module.id}'")
             
-        else:
-            # Unknown stage or complete
+        elif display_stage == "harden":
+            # Display harden symptom (READ-ONLY - does NOT apply patch)
             console.print()
             console.print(Panel(
-                f"[bold yellow]No Prompt Available[/bold yellow]\n\n"
-                f"You are currently in the [bold]{progress.current_stage.upper()}[/bold] stage.\n"
-                f"Run [bold cyan]engine status[/bold cyan] to see your current progress.",
-                title="Wrong Stage",
+                f"[bold yellow]🐛 Harden Stage: {current_module.name}[/bold yellow]\n\n"
+                f"To initialize the debugging workspace and see the bug symptom:\n"
+                f"Run [bold cyan]engine start-challenge[/bold cyan]\n\n"
+                f"[dim]This will create a buggy version of your code in the shadow worktree.[/dim]",
+                title="Harden Challenge",
+                border_style="yellow",
+                padding=(1, 2)
+            ))
+            console.print()
+            
+            logger.info(f"Displayed harden instructions for module '{current_module.id}'")
+        
+        else:
+            # Unknown stage
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Unknown Stage[/bold yellow]\n\n"
+                f"Current stage: [bold]{display_stage}[/bold]\n\n"
+                f"Run [bold cyan]engine status[/bold cyan] for progress.",
+                title="Info",
                 border_style="yellow"
             ))
             console.print()
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except JustifyQuestionsError as e:
+        console.print(Panel(
+            f"[bold red]Justify Questions Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command(name="start-challenge")
+def start_challenge():
+    """
+    Initialize the Harden stage workspace (applies bug patch).
+    
+    This command MODIFIES FILES by creating a buggy version in the shadow worktree.
+    Only works in the Harden stage.
+    
+    Example:
+        engine start-challenge   # Apply bug patch and show symptom
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Check stage
+        if progress.current_stage != "harden":
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Wrong Stage[/bold yellow]\n\n"
+                f"The [bold cyan]start-challenge[/bold cyan] command only works in the Harden stage.\n\n"
+                f"Current stage: [bold]{progress.current_stage.upper()}[/bold]\n\n"
+                f"Use [bold cyan]engine show[/bold cyan] to view your current challenge.",
+                title="Not in Harden Stage",
+                border_style="yellow"
+            ))
+            console.print()
+            sys.exit(1)
+        
+        # Check completion
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]🎉 Congratulations![/bold green]\n\n"
+                "You have completed all modules in this curriculum!",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
             return
+        
+        # Get current module
+        current_module = manifest.modules[progress.current_module_index]
+        
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        workspace_mgr = WorkspaceManager()
+        harden_runner = HardenRunner(curr_mgr, workspace_mgr)
+        
+        # Determine source file based on module
+        if current_module.id == "softmax":
+            source_file = Path("cs336_basics/utils.py")
+        else:
+            source_file = Path(f"{current_module.id}.py")
+        
+        # Present challenge (WRITES FILES)
+        console.print()
+        console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
+        console.print()
+        
+        harden_file, symptom = harden_runner.present_challenge(
+            progress.curriculum_id,
+            current_module,
+            source_file
+        )
+        
+        console.print(Panel(
+            symptom,
+            title=f"🐛 Debug Challenge: {current_module.name}",
+            border_style="yellow",
+            padding=(1, 2)
+        ))
+        console.print()
+        console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
+        console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
+        console.print()
+        
+        logger.info(f"Initialized harden challenge for module '{current_module.id}'")
         
     except StateFileCorruptedError as e:
         console.print(Panel(
@@ -731,22 +855,35 @@ def next():
             border_style="red"
         ))
         sys.exit(1)
-    except JustifyQuestionsError as e:
-        console.print(Panel(
-            f"[bold red]Justify Questions Error[/bold red]\n\n{str(e)}",
-            title="ENGINE ERROR",
-            border_style="red"
-        ))
-        sys.exit(1)
-    except Exception as e:
-        logger.exception("Unexpected error in next command")
-        console.print(Panel(
-            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
-            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
-            title="ENGINE ERROR",
-            border_style="red"
-        ))
-        sys.exit(1)
+
+
+@app.command()
+def next():
+    """
+    [DEPRECATED] Display the next challenge for the current module.
+    
+    ⚠️  This command is deprecated. Please use:
+        - 'engine show' for read-only viewing (safe, idempotent)
+        - 'engine start-challenge' to initialize Harden stage (explicit write)
+    
+    The 'next' command will be removed in a future version.
+    """
+    console.print()
+    console.print(Panel(
+        "[bold yellow]⚠️  Deprecated Command[/bold yellow]\n\n"
+        "The [bold]next[/bold] command is deprecated and will be removed in a future version.\n\n"
+        "Please use instead:\n"
+        "  • [bold cyan]engine show[/bold cyan] - Display current challenge (read-only, safe)\n"
+        "  • [bold cyan]engine start-challenge[/bold cyan] - Initialize Harden workspace (explicit write)\n\n"
+        "[dim]Running 'engine show' for you...[/dim]",
+        title="Deprecation Warning",
+        border_style="yellow",
+        padding=(1, 2)
+    ))
+    console.print()
+    
+    # Forward to show command
+    show(module_id=None)
 
 
 @app.command()
@@ -1461,6 +1598,230 @@ def init(curriculum_id: str):
             border_style="red"
         ))
         logger.exception("Initialization failed")
+        sys.exit(1)
+
+
+@app.command(name="curriculum-list")
+def curriculum_list():
+    """
+    List all modules in the current curriculum with their status.
+    
+    Shows:
+        - Module ID and name
+        - Status: ✅ Complete, 🔵 In Progress, ⚪ Not Started
+        - Dependencies (if any)
+    
+    Example:
+        engine curriculum-list
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Create status table
+        table = Table(
+            title=f"📚 {manifest.curriculum_name} - All Modules",
+            show_header=True,
+            header_style="bold cyan"
+        )
+        
+        table.add_column("Status", justify="center", style="bold", width=6)
+        table.add_column("Module ID", style="cyan")
+        table.add_column("Name", style="white")
+        table.add_column("Stage", justify="center")
+        
+        # Add rows for each module
+        for idx, module in enumerate(manifest.modules):
+            # Determine status
+            if module.id in progress.completed_modules:
+                status = "✅"
+                stage = "Complete"
+                stage_style = "green"
+            elif idx == progress.current_module_index:
+                status = "🔵"
+                stage = progress.current_stage.upper()
+                stage_style = "yellow"
+            else:
+                status = "⚪"
+                stage = "Not Started"
+                stage_style = "dim"
+            
+            table.add_row(
+                status,
+                module.id,
+                module.name,
+                f"[{stage_style}]{stage}[/{stage_style}]"
+            )
+        
+        # Display table
+        console.print()
+        console.print(table)
+        console.print()
+        
+        # Show summary
+        completed_count = len(progress.completed_modules)
+        total_count = len(manifest.modules)
+        
+        console.print(f"Progress: {completed_count}/{total_count} modules completed")
+        console.print()
+        console.print("[dim]Tip: Use [bold cyan]engine show <module_id>[/bold cyan] to preview any module[/dim]")
+        console.print()
+        
+        logger.info("Displayed curriculum list")
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command(name="progress-reset")
+def progress_reset(module_id: str = typer.Argument(..., help="Module ID to reset")):
+    """
+    Reset progress for a specific module to start over.
+    
+    This allows you to re-attempt a module to solidify understanding.
+    Your work will be preserved but progress will be reset.
+    
+    Example:
+        engine progress-reset softmax    # Reset softmax module
+    """
+    try:
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Find the module
+        target_module = None
+        target_index = None
+        for idx, module in enumerate(manifest.modules):
+            if module.id == module_id:
+                target_module = module
+                target_index = idx
+                break
+        
+        if target_module is None:
+            console.print()
+            console.print(Panel(
+                f"[bold red]Module Not Found[/bold red]\n\n"
+                f"Module '{module_id}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                f"Run [bold cyan]engine curriculum-list[/bold cyan] to see available modules.",
+                title="ERROR",
+                border_style="red"
+            ))
+            console.print()
+            sys.exit(1)
+        
+        # Check if module is completed
+        is_completed = module_id in progress.completed_modules
+        is_current = target_index == progress.current_module_index
+        
+        if not is_completed and not is_current:
+            console.print()
+            console.print(Panel(
+                f"[bold yellow]Module Not Started[/bold yellow]\n\n"
+                f"Module '{module_id}' ({target_module.name}) has not been started yet.\n\n"
+                f"There is nothing to reset.",
+                title="Info",
+                border_style="yellow"
+            ))
+            console.print()
+            return
+        
+        # Confirm reset
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]⚠️  Reset Module: {target_module.name}[/bold yellow]\n\n"
+            f"This will:\n"
+            f"  • Remove '{module_id}' from completed modules\n"
+            f"  • Set '{module_id}' as your current module\n"
+            f"  • Reset stage to 'build'\n\n"
+            f"[dim]Your implementation files will NOT be deleted.[/dim]",
+            title="Confirm Reset",
+            border_style="yellow",
+            padding=(1, 2)
+        ))
+        console.print()
+        
+        from rich.prompt import Confirm
+        if not Confirm.ask(f"Reset module '{module_id}'?", default=False):
+            console.print("Reset cancelled.")
+            console.print()
+            return
+        
+        # Perform reset
+        # Remove from completed modules if present
+        progress.completed_modules = [
+            m for m in progress.completed_modules if m != module_id
+        ]
+        
+        # Set as current module
+        progress.current_module_index = target_index
+        progress.current_stage = "build"
+        
+        # Save state
+        state_mgr.save(progress)
+        
+        # Success message
+        console.print()
+        console.print(Panel(
+            f"[bold green]✅ Module Reset Complete[/bold green]\n\n"
+            f"Module '{module_id}' ({target_module.name}) has been reset.\n\n"
+            f"You are now in the [bold cyan]BUILD[/bold cyan] stage.\n\n"
+            f"Run [bold cyan]engine show[/bold cyan] to see the build challenge.",
+            title="Success",
+            border_style="green"
+        ))
+        console.print()
+        
+        logger.info(f"Reset module '{module_id}' to build stage")
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumInvalidError as e:
+        console.print(Panel(
+            f"[bold red]Invalid Curriculum[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
         sys.exit(1)
 
 

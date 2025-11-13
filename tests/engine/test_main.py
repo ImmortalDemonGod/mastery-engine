@@ -87,16 +87,17 @@ class TestNextCommand:
         assert "Congratulations" in result.stdout
         assert "completed all modules" in result.stdout
     
+    @patch('engine.main.JustifyRunner')
     @patch('engine.main.CurriculumManager')
     @patch('engine.main.StateManager')
-    def test_next_when_wrong_stage(self, mock_state_cls, mock_curr_cls):
-        """Should show error message when not in build stage."""
+    def test_next_deprecated_forwards_to_show(self, mock_state_cls, mock_curr_cls, mock_justify_cls):
+        """Should show deprecation warning and forward to show command."""
         mock_state_mgr = MagicMock()
         mock_state_cls.return_value = mock_state_mgr
         mock_state_mgr.load.return_value = UserProgress(
             curriculum_id="test_curriculum",
             current_module_index=0,
-            current_stage="justify"  # Wrong stage
+            current_stage="justify"
         )
         
         mock_curr_mgr = MagicMock()
@@ -110,11 +111,28 @@ class TestNextCommand:
             ]
         )
         
+        # Mock justify runner
+        mock_justify_runner = MagicMock()
+        mock_justify_cls.return_value = mock_justify_runner
+        from engine.schemas import JustifyQuestion
+        mock_justify_runner.load_questions.return_value = [
+            JustifyQuestion(
+                id="q1",
+                question="Test question",
+                model_answer="Test answer",
+                failure_modes=[],
+                required_concepts=["test"]
+            )
+        ]
+        
         result = runner.invoke(app, ["next"])
         
+        # Should show deprecation warning
         assert result.exit_code == 0
-        assert "Not in Build Stage" in result.stdout
-        assert "JUSTIFY" in result.stdout
+        assert "Deprecated Command" in result.stdout
+        assert "engine show" in result.stdout
+        # And then forward to show which displays justify question
+        assert "Justify Challenge" in result.stdout
     
     @patch('engine.main.CurriculumManager')
     @patch('engine.main.StateManager')
@@ -165,9 +183,10 @@ class TestNextCommand:
 class TestStatusCommand:
     """Test cases for the `engine status` command."""
     
+    @patch('engine.main.require_shadow_worktree')
     @patch('engine.main.CurriculumManager')
     @patch('engine.main.StateManager')
-    def test_status_displays_progress(self, mock_state_cls, mock_curr_cls):
+    def test_status_displays_progress(self, mock_state_cls, mock_curr_cls, mock_shadow):
         """Should display progress table with current state."""
         mock_state_mgr = MagicMock()
         mock_state_cls.return_value = mock_state_mgr
@@ -198,9 +217,10 @@ class TestStatusCommand:
         assert "Module 1" in result.stdout
         assert "BUILD" in result.stdout
     
+    @patch('engine.main.require_shadow_worktree')
     @patch('engine.main.CurriculumManager')
     @patch('engine.main.StateManager')
-    def test_status_shows_completion_message(self, mock_state_cls, mock_curr_cls):
+    def test_status_shows_completion_message(self, mock_state_cls, mock_curr_cls, mock_shadow):
         """Should show completion message when all modules done."""
         mock_state_mgr = MagicMock()
         mock_state_cls.return_value = mock_state_mgr
@@ -226,8 +246,9 @@ class TestStatusCommand:
         assert result.exit_code == 0
         assert "All modules completed" in result.stdout
     
+    @patch('engine.main.require_shadow_worktree')
     @patch('engine.main.StateManager')
-    def test_status_handles_curriculum_not_found(self, mock_state_cls):
+    def test_status_handles_curriculum_not_found(self, mock_state_cls, mock_shadow):
         """Should handle CurriculumNotFoundError gracefully."""
         mock_state_mgr = MagicMock()
         mock_state_cls.return_value = mock_state_mgr

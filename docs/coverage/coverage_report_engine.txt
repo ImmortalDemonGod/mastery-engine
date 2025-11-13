@@ -1,0 +1,16 @@
+Name                             Stmts   Miss  Cover   Missing
+--------------------------------------------------------------
+engine/__init__.py                   0      0   100%
+engine/curriculum.py                39     21    46%   54-79, 94, 98, 102, 106, 110
+engine/main.py                     690    672     3%   48-1718
+engine/schemas.py                   46     10    78%   65-75
+engine/services/__init__.py          0      0   100%
+engine/services/llm_service.py      60     56     7%   19-236
+engine/stages/__init__.py            0      0   100%
+engine/stages/harden.py             47     34    28%   50-51, 81-120, 138-166
+engine/stages/justify.py            38     25    34%   46, 62-81, 103-119
+engine/state.py                     39     24    38%   45-62, 79-96, 105
+engine/validator.py                 54     36    33%   46, 69-131, 147-156
+engine/workspace.py                 53     36    32%   40, 49, 65-69, 78-82, 102-121, 137-163
+--------------------------------------------------------------
+TOTAL                             1066    914    14%
