@@ -171,21 +171,32 @@ class BugAuthor:
 - **Context tracking**: Only use if you need to match based on a computed name from a previous pass
 - **No "id"**: NEVER use this pattern - it will match the wrong variable!
 
-**⚠️ Multiple assignments to the same variable:**
-If the same variable is assigned multiple times (e.g., `scores = ...` appears twice), you MUST specify the operator or value type to distinguish them:
+**⚠️ CRITICAL: Multiple assignments to the same variable:**
 
+If the same variable is assigned multiple times (e.g., `scores` appears TWICE in BEFORE code), you MUST:
+1. **Identify WHICH occurrence** you need to match (first, second, etc.)
+2. **Use the operator from THAT occurrence** to disambiguate
+
+**Example - attention bug:**
+```python
+# BEFORE code has TWO scores assignments:
+scores = Q @ K.T              # First: MatMult operator
+scores = scores / sqrt(d_k)   # Second: Div operator
+```
+
+To match the FIRST occurrence (which needs to be modified):
 ```json
 {
   "node_type": "Assign",
   "targets": [{"node_type": "Name", "id": "scores"}],
   "value": {
     "node_type": "BinOp",
-    "op": "Div"  // ← REQUIRED when multiple scores assignments exist
+    "op": "MatMult"  // ← Use operator from FIRST occurrence!
   }
 }
 ```
 
-Check the BEFORE code carefully - if you see the same variable name assigned multiple times, add the "op" or other distinguishing features!
+**Common mistake:** Using the operator from the wrong occurrence! Always check which one you need to modify.
 
 **⚠️ CRITICAL: Don't Over-Specify Patterns!**
 
