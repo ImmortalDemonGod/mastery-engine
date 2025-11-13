@@ -7,10 +7,15 @@ implementing commands for the Build, Justify, Harden learning loop.
 Commands:
     status: Show current learning progress
     next: Display the next build prompt
-    submit-build: Submit and validate a build implementation
-    submit-justification: Submit an answer to a justify question
-    submit-fix: Submit a bug fix for the harden challenge
+    submit: Submit work for current stage (auto-detects build/justify/harden)
+    submit-build: [LEGACY] Submit and validate a build implementation
+    submit-justification: [LEGACY] Submit an answer to a justify question
+    submit-fix: [LEGACY] Submit a bug fix for the harden challenge
     flag-issue: Report a problem with the curriculum
+
+Note: The unified 'submit' command is the recommended interface. Legacy
+commands (submit-build, submit-justification, submit-fix) are maintained
+for backward compatibility.
 """
 
 import sys
@@ -96,6 +101,479 @@ def require_shadow_worktree() -> Path:
     return SHADOW_WORKTREE_DIR
 
 
+# ============================================================================
+# Helper Functions for Unified Submit Command (P0 CLI Improvement)
+# ============================================================================
+
+def _load_curriculum_state() -> tuple:
+    """
+    Load state and curriculum for submit commands.
+    
+    Returns:
+        Tuple of (state_mgr, curr_mgr, progress, manifest)
+    """
+    state_mgr = StateManager()
+    curr_mgr = CurriculumManager()
+    progress = state_mgr.load()
+    manifest = curr_mgr.load_manifest(progress.curriculum_id)
+    return state_mgr, curr_mgr, progress, manifest
+
+
+def _check_curriculum_complete(progress, manifest) -> bool:
+    """
+    Check if user has completed all modules.
+    
+    Returns:
+        True if complete (and displays message), False otherwise
+    """
+    if progress.current_module_index >= len(manifest.modules):
+        console.print()
+        console.print(Panel(
+            "[bold green]🎉 Curriculum Complete![/bold green]\n\n"
+            "You have finished all modules. Congratulations!",
+            title="All Modules Complete",
+            border_style="green"
+        ))
+        console.print()
+        return True
+    return False
+
+
+def _submit_build_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
+    """
+    Handle Build stage submission.
+    
+    Validates user implementation against test suite.
+    
+    Args:
+        state_mgr: State manager instance
+        curr_mgr: Curriculum manager instance
+        progress: User progress object
+        manifest: Curriculum manifest
+        
+    Returns:
+        True if validation passed and progress advanced, False otherwise
+    """
+    workspace_mgr = WorkspaceManager()
+    validator_subsys = ValidationSubsystem()
+    
+    current_module = manifest.modules[progress.current_module_index]
+    validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
+    workspace_path = Path.cwd()
+    
+    console.print()
+    console.print(f"[bold cyan]Running validator for {current_module.name}...[/bold cyan]")
+    console.print()
+    
+    result = validator_subsys.execute(validator_path, workspace_path)
+    
+    if result.exit_code == 0:
+        # Success!
+        console.print(Panel(
+            "[bold green]✅ Validation Passed![/bold green]\n\n"
+            "Your implementation passed all tests.",
+            title="Success",
+            border_style="green"
+        ))
+        
+        # Show performance if available
+        if result.performance_seconds is not None:
+            console.print()
+            console.print(f"[dim]Performance: {result.performance_seconds:.3f} seconds[/dim]")
+            
+            if current_module.baseline_perf_seconds:
+                speedup = current_module.baseline_perf_seconds / result.performance_seconds
+                if speedup > 2.0:
+                    console.print(f"[yellow]⚡ Impressive! {speedup:.1f}x faster than baseline![/yellow]")
+        
+        console.print()
+        
+        # Advance state to justify stage
+        progress.mark_stage_complete("build")
+        state_mgr.save(progress)
+        
+        logger.info(f"Build stage completed for module '{current_module.id}'")
+        
+        # Show next action
+        console.print(Panel(
+            "Next step: Answer conceptual questions.\n\n"
+            "Run [bold cyan]engine submit[/bold cyan] to continue.",
+            title="Next Action",
+            border_style="blue"
+        ))
+        console.print()
+        return True
+    else:
+        # Failure
+        console.print(Panel(
+            "[bold red]❌ Validation Failed[/bold red]\n\n"
+            "Your implementation did not pass all tests. See details below:",
+            title="Failure",
+            border_style="red"
+        ))
+        console.print()
+        console.print("[bold]Test Output:[/bold]")
+        console.print(result.stderr if result.stderr else result.stdout)
+        console.print()
+        
+        logger.info(f"Build validation failed for module '{current_module.id}'")
+        return False
+
+
+def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
+    """
+    Handle Justify stage submission with $EDITOR integration and full LLM evaluation.
+    
+    Opens user's editor for multi-line answer input, then evaluates response using:
+    1. Fast keyword filter (catches shallow/vague answers)
+    2. LLM semantic evaluation (if no keyword match)
+    
+    Args:
+        state_mgr: State manager instance
+        curr_mgr: Curriculum manager instance
+        progress: User progress object
+        manifest: Curriculum manifest
+        
+    Returns:
+        True if answer accepted and progress advanced, False otherwise
+    """
+    import tempfile
+    import os
+    
+    current_module = manifest.modules[progress.current_module_index]
+    justify_runner = JustifyRunner(curr_mgr)
+    questions = justify_runner.load_questions(progress.curriculum_id, current_module)
+    
+    if not questions:
+        raise CurriculumInvalidError(f"No justify questions for module '{current_module.id}'")
+    
+    question = questions[0]
+    
+    # Open editor for answer
+    editor = os.getenv('EDITOR', os.getenv('VISUAL', 'nano'))
+    
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tf:
+        tf.write("# Justify Question\n\n")
+        tf.write(f"{question.question}\n\n")
+        tf.write("---\n\n")
+        tf.write("# Your Answer\n\n")
+        tf.write("Write your answer below this line.\n\n")
+        temp_path = tf.name
+    
+    try:
+        console.print()
+        console.print(f"[bold cyan]Opening editor for your answer...[/bold cyan]")
+        console.print(f"[dim]Editor: {editor}[/dim]")
+        console.print()
+        
+        result = subprocess.run([editor, temp_path])
+        
+        if result.returncode != 0:
+            console.print(Panel(
+                "[bold yellow]Editor exited with error[/bold yellow]\n\n"
+                "Please try again.",
+                title="Editor Error",
+                border_style="yellow"
+            ))
+            return False
+        
+        with open(temp_path, 'r') as f:
+            lines = f.readlines()
+        
+        # Extract answer (skip header lines, get content after "# Your Answer")
+        answer_lines = []
+        in_answer = False
+        for line in lines:
+            if line.strip() == "# Your Answer":
+                in_answer = True
+                continue
+            if in_answer and not line.strip().startswith('#'):
+                answer_lines.append(line)
+        
+        answer = ''.join(answer_lines).strip()
+        
+        if not answer:
+            console.print()
+            console.print(Panel(
+                "[bold yellow]Empty Answer[/bold yellow]\n\n"
+                "You didn't provide an answer. Please try again.",
+                title="No Answer",
+                border_style="yellow"
+            ))
+            console.print()
+            return False
+        
+    finally:
+        os.unlink(temp_path)
+    
+    # VALIDATION CHAIN
+    # Step A: Fast keyword filter
+    matched, fast_feedback = justify_runner.check_fast_filter(question, answer)
+    
+    if matched:
+        # Fast filter caught a shallow/vague answer
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]{fast_feedback}[/bold yellow]",
+            title="Needs More Depth",
+            border_style="yellow"
+        ))
+        console.print()
+        logger.info(f"Justify response rejected by fast filter for module '{current_module.id}'")
+        return False
+    
+    # Step B: LLM semantic evaluation
+    try:
+        llm_service = LLMService()
+        
+        console.print()
+        console.print("[dim]Evaluating your answer...[/dim]")
+        
+        evaluation = llm_service.evaluate_justification(question, answer)
+        
+        # Step C: Feedback and state transition
+        console.print()
+        if evaluation.is_correct:
+            console.print(Panel(
+                f"[bold green]{evaluation.feedback}[/bold green]",
+                title="✓ Correct Understanding",
+                border_style="green"
+            ))
+            console.print()
+            
+            # Advance state to harden
+            progress.mark_stage_complete("justify")
+            state_mgr.save(progress)
+            
+            logger.info(f"Justify stage completed for module '{current_module.id}'")
+            
+            # Show next action
+            console.print(Panel(
+                "Next step: Debug a buggy implementation.\n\n"
+                "Run [bold cyan]engine submit[/bold cyan] to continue.",
+                title="Next Action",
+                border_style="blue"
+            ))
+            console.print()
+            return True
+        else:
+            console.print(Panel(
+                f"[bold yellow]{evaluation.feedback}[/bold yellow]",
+                title="Not Quite - Try Again",
+                border_style="yellow"
+            ))
+            console.print()
+            logger.info(f"Justify response marked incorrect by LLM for module '{current_module.id}'")
+            return False
+            
+    except ConfigurationError as e:
+        console.print()
+        console.print(Panel(
+            f"[bold red]Configuration Error[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        console.print()
+        raise  # Re-raise to be caught by unified submit's exception handler
+    except (LLMAPIError, LLMResponseError) as e:
+        console.print()
+        console.print(Panel(
+            f"[bold red]LLM Service Error[/bold red]\n\n{str(e)}\n\n"
+            "Your answer was not evaluated. Please try again.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        console.print()
+        raise  # Re-raise to be caught by unified submit's exception handler
+
+
+def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
+    """
+    Handle Harden stage submission.
+    
+    Validates user's bug fix against test suite.
+    
+    Args:
+        state_mgr: State manager instance
+        curr_mgr: Curriculum manager instance
+        progress: User progress object
+        manifest: Curriculum manifest
+        
+    Returns:
+        True if fix validated and progress advanced, False otherwise
+    """
+    validator_subsys = ValidationSubsystem()
+    current_module = manifest.modules[progress.current_module_index]
+    
+    shadow_worktree = Path('.mastery_engine_worktree')
+    harden_workspace = shadow_worktree / "workspace" / "harden"
+    
+    if not harden_workspace.exists():
+        console.print()
+        console.print(Panel(
+            "[bold red]Harden Workspace Not Found[/bold red]\n\n"
+            "You must first prepare the challenge.\n"
+            "This will be done automatically when you reach the harden stage.",
+            title="ERROR",
+            border_style="red"
+        ))
+        console.print()
+        return False
+    
+    validator_path = curr_mgr.get_validator_path(progress.curriculum_id, current_module)
+    
+    console.print()
+    console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
+    console.print()
+    
+    # Determine file locations
+    if current_module.id == "softmax":
+        harden_file = harden_workspace / "utils.py"
+        shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
+    else:
+        harden_file = harden_workspace / f"{current_module.id}.py"
+        shadow_dest = shadow_worktree / f"{current_module.id}.py"
+    
+    # Copy fixed file to shadow worktree
+    import shutil
+    shadow_dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(harden_file, shadow_dest)
+    
+    result = validator_subsys.execute(validator_path, shadow_worktree)
+    
+    if result.exit_code == 0:
+        # Success!
+        console.print(Panel(
+            "[bold green]✅ Bug Fixed![/bold green]\n\n"
+            "Your fix passes all tests. Well done!",
+            title="Success",
+            border_style="green"
+        ))
+        console.print()
+        
+        # Advance to next module
+        progress.mark_stage_complete("harden")
+        state_mgr.save(progress)
+        
+        logger.info(f"Harden stage completed for module '{current_module.id}'")
+        
+        if progress.current_module_index < len(manifest.modules):
+            next_module = manifest.modules[progress.current_module_index]
+            console.print(Panel(
+                f"Module '{current_module.name}' complete!\n\n"
+                f"Next: {next_module.name}\n\n"
+                "Run [bold cyan]engine submit[/bold cyan] to start the next module.",
+                title="Module Complete",
+                border_style="blue"
+            ))
+        else:
+            console.print(Panel(
+                "[bold green]🎉 Curriculum Complete![/bold green]\n\n"
+                "You have finished all modules!",
+                title="Congratulations",
+                border_style="green"
+            ))
+        console.print()
+        return True
+    else:
+        # Failure
+        console.print(Panel(
+            "[bold red]❌ Fix Incomplete[/bold red]\n\n"
+            "The bug is not yet fixed. See test output below:",
+            title="Failure",
+            border_style="red"
+        ))
+        console.print()
+        console.print("[bold]Test Output:[/bold]")
+        console.print(result.stderr if result.stderr else result.stdout)
+        console.print()
+        
+        logger.info(f"Harden validation failed for module '{current_module.id}'")
+        return False
+
+
+# ============================================================================
+# Unified Submit Command (P0 CLI Improvement)
+# ============================================================================
+
+@app.command()
+def submit():
+    """
+    Submit your work for the current stage (auto-detected).
+    
+    This command automatically determines which stage you're in and
+    runs the appropriate validation:
+    
+    \b
+    - Build stage: Validates your implementation
+    - Justify stage: Opens your editor for conceptual answers
+    - Harden stage: Validates your bug fix
+    
+    This replaces the need for separate submit-build, submit-justification,
+    and submit-fix commands, providing a consistent workflow throughout
+    the Build-Justify-Harden loop.
+    """
+    try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
+        # Load state and curriculum
+        state_mgr, curr_mgr, progress, manifest = _load_curriculum_state()
+        
+        # Check if curriculum complete
+        if _check_curriculum_complete(progress, manifest):
+            return
+        
+        # Get current stage and module
+        stage = progress.current_stage
+        current_module = manifest.modules[progress.current_module_index]
+        
+        console.print()
+        console.print(f"[dim]Current stage: {stage.upper()} ({current_module.name})[/dim]")
+        
+        # Route to appropriate handler based on stage
+        if stage == "build":
+            success = _submit_build_stage(state_mgr, curr_mgr, progress, manifest)
+        elif stage == "justify":
+            success = _submit_justify_stage(state_mgr, curr_mgr, progress, manifest)
+        elif stage == "harden":
+            success = _submit_harden_stage(state_mgr, curr_mgr, progress, manifest)
+        else:
+            console.print(Panel(
+                f"[bold red]Unknown Stage[/bold red]\n\n"
+                f"Current stage '{stage}' is not recognized.\n"
+                "This may be a state file corruption issue.",
+                title="ERROR",
+                border_style="red"
+            ))
+            sys.exit(1)
+        
+        if success:
+            logger.info(f"Successfully completed {stage} stage for module '{current_module.id}'")
+    
+    except (StateFileCorruptedError, CurriculumNotFoundError, CurriculumInvalidError,
+            ValidatorNotFoundError, ValidatorTimeoutError, ValidatorExecutionError,
+            JustifyQuestionsError, HardenChallengeError, ConfigurationError,
+            LLMAPIError, LLMResponseError) as e:
+        # Handle all known engine exceptions
+        error_type = type(e).__name__.replace('Error', '')
+        console.print(Panel(
+            f"[bold red]{error_type}[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in submit command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
 @app.command()
 def next():
     """
@@ -105,9 +583,6 @@ def next():
     Only works when the user is in the "build" stage.
     """
     try:
-        # Ensure shadow worktree exists
-        require_shadow_worktree()
-        
         # Load state and curriculum
         state_mgr = StateManager()
         curr_mgr = CurriculumManager()
@@ -155,6 +630,8 @@ def next():
             
         elif progress.current_stage == "harden":
             # Present harden challenge in shadow worktree
+            # Ensure shadow worktree exists (only needed for harden stage)
+            require_shadow_worktree()
             workspace_mgr = WorkspaceManager()
             harden_runner = HardenRunner(curr_mgr, workspace_mgr)
             
