@@ -6,6 +6,30 @@ For a full description of the assignment, see the assignment handout at
 If you see any issues with the assignment handout or code, please feel free to
 raise a GitHub issue or open a pull request with a fix.
 
+## Mastery Engine Workflow
+
+This assignment includes an interactive learning engine. Use the unified `engine submit` command for all stages:
+
+```bash
+# Initialize and start
+engine init
+engine status
+engine next
+
+# Build-Justify-Harden loop - single command!
+engine submit  # Auto-detects your current stage (build/justify/harden)
+
+# Check progress anytime
+engine status
+```
+
+The `submit` command automatically:
+- Validates your implementation in the **build** stage
+- Opens your editor for answers in the **justify** stage
+- Tests your bug fix in the **harden** stage
+
+**Note**: Legacy commands (`submit-build`, `submit-justification`, `submit-fix`) still work but `submit` is recommended.
+
 ## Setup
 
 ### Environment
