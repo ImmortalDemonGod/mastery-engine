@@ -335,12 +335,28 @@ Before generating JSON, verify:
 
 Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
 
+**Step 1: Analyze the BEFORE Code AST**
+For EACH variable/statement you need to modify, identify:
+- The statement type (Assign, Return, etc.)
+- The exact value node_type (BinOp, Call, Name, etc.)
+- The operator if BinOp (Add, Sub, Mult, Div, MatMult, etc.)
+
+Example:
+```python
+scores = Q @ K.transpose(-2, -1)  # Assign with value=BinOp(op=MatMult)
+d_k = Q.shape[-1]                 # Assign with value=Subscript
+step_size = lr / bias_correction1  # Assign with value=BinOp(op=Div)
+denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
+```
+
+**Step 2: Generate Patterns with EXACT Node Types**
+
 **Critical Requirements:**
 1. ⚠️ INCLUDE SPECIFIC VARIABLE NAMES in patterns (e.g., `"id": "bias_correction1"`) - this is REQUIRED!
-2. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
-3. Check if same variable appears multiple times - if so, add "op" to disambiguate
-4. Use direct "id" specification (prefer this over context tracking when possible)
-5. Validate your pattern matches the BEFORE code's exact structure
+2. ⚠️ USE EXACT NODE TYPES from the BEFORE code - don't guess! Parse it carefully!
+3. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
+4. Check if same variable appears multiple times - if so, add "op" to disambiguate
+5. Use direct "id" specification (prefer this over context tracking when possible)
 
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
