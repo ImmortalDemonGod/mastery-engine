@@ -1,0 +1,13 @@
+{
+  "id": "softmax-no-subtract-max",
+  "description": "Removes the subtract-max trick, making softmax numerically unstable.",
+  "injection_type": "ast",
+  "injector_id": "SoftmaxBugInjector_v1",
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "1.0",
+    "targets": ["softmax function"],
+    "semantic_pattern": "variable = tensor - tensor.max(...)",
+    "transformation": "Remove subtraction, keeping only the tensor reference"
+  }
+}

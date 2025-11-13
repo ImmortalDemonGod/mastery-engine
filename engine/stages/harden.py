@@ -91,51 +91,77 @@ class HardenRunner:
             
             # Select a bug
             bugs_dir = self.curriculum_mgr.get_bugs_dir(curriculum_id, module)
-            bug_patch, symptom_file = self._select_bug(bugs_dir)
+            bug_file, symptom_file = self._select_bug(bugs_dir)
             
-            logger.info(f"Selected bug: {bug_patch.name}")
+            logger.info(f"Selected bug: {bug_file.name}")
             
             # Create harden directory in shadow worktree
             harden_dir = shadow_worktree / "workspace" / "harden"
             harden_dir.mkdir(parents=True, exist_ok=True)
-            
-            # CRITICAL FIX: Use DEVELOPER implementation, not student's
-            # Patches require exact byte-for-byte match. Student code may have
-            # different variable names, comments, spacing, causing patch failures.
-            # Developer code matches the patch exactly (patch was created from it).
-            import shutil
-            from pathlib import Path as PathLib
-            
-            # Resolve to developer implementation (not student symlink)
-            # source_file_path might be cs336_basics/utils.py (symlink to student)
-            # We need modes/developer/cs336_basics/utils.py
-            repo_root = PathLib.cwd()
-            
-            # Get relative path from source_file_path
-            # e.g., "cs336_basics/utils.py"
-            try:
-                rel_path = source_file_path.relative_to(repo_root)
-            except ValueError:
-                # source_file_path might already be absolute
-                rel_path = PathLib(source_file_path.name)
-                if len(source_file_path.parts) > 1:
-                    rel_path = PathLib(*source_file_path.parts[-2:])  # e.g., cs336_basics/utils.py
-            
-            # Construct path to developer implementation
-            developer_file = repo_root / "modes" / "developer" / rel_path
-            
-            if not developer_file.exists():
-                raise HardenChallengeError(
-                    f"Developer reference implementation not found: {developer_file}"
-                )
-            
             harden_file = harden_dir / source_file_path.name
-            shutil.copy2(developer_file, harden_file)
             
-            logger.info(f"Copied developer reference implementation to {harden_file}")
-            
-            # Apply bug patch (guaranteed to work since patch created from developer code)
-            self.workspace_mgr.apply_patch(harden_file, bug_patch)
+            # Dispatch based on bug type (.json = AST, .patch = legacy)
+            if bug_file.suffix == '.json':
+                # --- NEW LOGIC: AST-based bug injection ---
+                from engine.services.ast_service import SoftmaxBugInjector
+                
+                logger.info("Using AST-based bug injection")
+                
+                # Load student's OWN code from main workspace
+                student_code_path = Path.cwd() / source_file_path
+                if not student_code_path.exists():
+                    raise HardenChallengeError(
+                        f"Could not find student source file at {student_code_path}"
+                    )
+                
+                student_source_code = student_code_path.read_text(encoding='utf-8')
+                
+                # Inject bug using AST transformation
+                injector = SoftmaxBugInjector()
+                buggy_source_code, success = injector.inject(student_source_code)
+                
+                if not success:
+                    raise HardenChallengeError(
+                        "The AST bug injector failed to find the required semantic pattern in your code. "
+                        "This can happen if your implementation style is highly unusual. "
+                        "Please ensure your implementation follows standard practices or flag this as an issue."
+                    )
+                
+                # Write buggy code to harden workspace
+                harden_file.write_text(buggy_source_code, encoding='utf-8')
+                logger.info(f"AST bug injected successfully into {harden_file}")
+                
+            else:
+                # --- OLD LOGIC: Patch-based bug injection (backward compatibility) ---
+                import shutil
+                from pathlib import Path as PathLib
+                
+                logger.info("Using legacy patch-based bug injection")
+                
+                # Use DEVELOPER implementation for patch-based bugs
+                # (patches require exact byte-for-byte match)
+                repo_root = PathLib.cwd()
+                
+                try:
+                    rel_path = source_file_path.relative_to(repo_root)
+                except ValueError:
+                    rel_path = PathLib(source_file_path.name)
+                    if len(source_file_path.parts) > 1:
+                        rel_path = PathLib(*source_file_path.parts[-2:])
+                
+                developer_file = repo_root / "modes" / "developer" / rel_path
+                
+                if not developer_file.exists():
+                    raise HardenChallengeError(
+                        f"Developer reference implementation not found: {developer_file}"
+                    )
+                
+                shutil.copy2(developer_file, harden_file)
+                logger.info(f"Copied developer reference implementation to {harden_file}")
+                
+                # Apply patch
+                self.workspace_mgr.apply_patch(harden_file, bug_file)
+                logger.info(f"Applied patch {bug_file.name}")
             
             # Read symptom description
             symptom = symptom_file.read_text(encoding='utf-8')
