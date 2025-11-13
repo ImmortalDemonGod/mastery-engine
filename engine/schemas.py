@@ -139,21 +139,60 @@ class ValidationResult(BaseModel):
 
 # Bug Definition Schemas for LLM Authoring Tool
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Literal
+
+
+class ContextReference(BaseModel):
+    """Reference to a tracked context variable"""
+    from_context: str
+    
+    class Config:
+        extra = 'forbid'
+
+
+class NameNode(BaseModel):
+    """Name node in AST pattern"""
+    node_type: Literal["Name"]
+    id: Optional[Union[str, ContextReference]] = None
+    
+    class Config:
+        extra = 'forbid'
+
+
+class NestedPattern(BaseModel):
+    """Nested pattern for value, left, right, func, etc."""
+    node_type: str
+    op: Optional[str] = None
+    attr: Optional[str] = None
+    
+    class Config:
+        extra = 'forbid'
+
+
+class KeywordArg(BaseModel):
+    """Keyword argument pattern"""
+    arg: Optional[str] = None
+    value: Optional[NestedPattern] = None
+    
+    class Config:
+        extra = 'forbid'
 
 
 class Pattern(BaseModel):
     """AST pattern for matching nodes"""
     node_type: str
-    targets: Optional[List[Dict[str, Any]]] = None
-    value: Optional[Dict[str, Any]] = None
+    targets: Optional[List[NameNode]] = None
+    value: Optional[NestedPattern] = None
     attr: Optional[str] = None
     op: Optional[str] = None
-    func: Optional[Dict[str, Any]] = None
-    left: Optional[Dict[str, Any]] = None
-    right: Optional[Dict[str, Any]] = None
-    args: Optional[List[Dict[str, Any]]] = None
-    keywords: Optional[List[Dict[str, Any]]] = None
+    func: Optional[NestedPattern] = None
+    left: Optional[NestedPattern] = None
+    right: Optional[NestedPattern] = None
+    args: Optional[List[NestedPattern]] = None
+    keywords: Optional[List[KeywordArg]] = None
+    
+    class Config:
+        extra = 'forbid'
 
 
 class Condition(BaseModel):
@@ -162,13 +201,19 @@ class Condition(BaseModel):
     value: Optional[Union[int, str]] = None
     index: Optional[int] = None
     name: Optional[str] = None
+    
+    class Config:
+        extra = 'forbid'
 
 
 class Replacement(BaseModel):
     """Replacement specification"""
     type: str
-    source: Optional[Union[str, Dict[str, Any]]] = None
+    source: Optional[Union[str, ContextReference]] = None
     name: Optional[str] = None
+    
+    class Config:
+        extra = 'forbid'
 
 
 class PassDefinition(BaseModel):
@@ -183,6 +228,7 @@ class PassDefinition(BaseModel):
     
     class Config:
         populate_by_name = True
+        extra = 'forbid'
 
 
 class BugMetadata(BaseModel):
@@ -191,6 +237,9 @@ class BugMetadata(BaseModel):
     version: str
     author: str
     tier: str
+    
+    class Config:
+        extra = 'forbid'
 
 
 class BugDefinition(BaseModel):
@@ -202,3 +251,6 @@ class BugDefinition(BaseModel):
     target_function: str
     logic: List[PassDefinition]
     metadata: BugMetadata
+    
+    class Config:
+        extra = 'forbid'

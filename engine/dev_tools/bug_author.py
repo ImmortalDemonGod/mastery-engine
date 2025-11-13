@@ -339,12 +339,22 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
         for attempt in range(max_retries):
             print(f"\n🤖 LLM Attempt {attempt + 1}/{max_retries}...")
             
-            # Generate JSON (Structured Outputs disabled - schema too loose)
-            response = self.llm_service.generate_completion(
-                prompt=user_prompt,
-                system=system_prompt,
-                temperature=0.3
-            )
+            # Generate JSON with Structured Outputs (strict schema enforced)
+            try:
+                from engine.schemas import BugDefinition as BugDefSchema
+                response = self.llm_service.generate_completion(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    temperature=0.3,
+                    response_format=BugDefSchema
+                )
+            except ImportError:
+                # Fall back to unstructured if schema not available
+                response = self.llm_service.generate_completion(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    temperature=0.3
+                )
             
             if debug:
                 print(f"\n📄 LLM Response Preview:")
