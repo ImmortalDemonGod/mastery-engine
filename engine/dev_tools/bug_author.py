@@ -335,19 +335,24 @@ Before generating JSON, verify:
 
 Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
 
-**Step 1: Analyze the BEFORE Code AST**
-For EACH variable/statement you need to modify, identify:
+**Step 1: Analyze the BEFORE Code AST (NOT the AFTER code!)**
+
+⚠️ CRITICAL: Your patterns must match the BEFORE code's AST structure. The AFTER code is only shown for reference.
+
+For EACH variable/statement in the **BEFORE code**, identify:
 - The statement type (Assign, Return, etc.)
-- The exact value node_type (BinOp, Call, Name, etc.)
+- The exact value node_type (BinOp, Call, Name, Subscript, etc.)
 - The operator if BinOp (Add, Sub, Mult, Div, MatMult, etc.)
 
-Example:
+Example from BEFORE code:
 ```python
 scores = Q @ K.transpose(-2, -1)  # Assign with value=BinOp(op=MatMult)
 d_k = Q.shape[-1]                 # Assign with value=Subscript
-step_size = lr / bias_correction1  # Assign with value=BinOp(op=Div)
+step_size = lr / bias_correction1  # Assign with value=BinOp(op=Div) ← NOT Name!
 denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
 ```
+
+⚠️ Common mistake: If AFTER code has `step_size = lr`, don't use that! Use the BEFORE code pattern.
 
 **Step 2: Generate Patterns with EXACT Node Types**
 
