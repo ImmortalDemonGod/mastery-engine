@@ -61,11 +61,14 @@ class HardenRunner:
         
         SHADOW WORKTREE MODEL:
         1. Selects a bug from the module's bugs directory
-        2. Copies user's correct implementation to shadow worktree harden directory
-        3. Applies the bug patch to the shadow worktree copy
+        2. Copies DEVELOPER's reference implementation to shadow worktree harden directory
+        3. Applies the bug patch to the reference implementation (guaranteed to work)
         4. Returns path to buggy file in shadow worktree for user to debug
         
-        The user's original correct implementation in main directory remains untouched.
+        Note: We use the developer's implementation (not student's) because patch files
+        require exact byte-for-byte matches. Student code may have different variable names,
+        comments, or structure, causing patches to fail. This approach ensures consistent,
+        debuggable buggy code for all students regardless of their implementation style.
         
         Args:
             curriculum_id: ID of the current curriculum
@@ -96,15 +99,42 @@ class HardenRunner:
             harden_dir = shadow_worktree / "workspace" / "harden"
             harden_dir.mkdir(parents=True, exist_ok=True)
             
-            # Copy user's correct implementation to shadow worktree harden directory
-            # Preserve directory structure (e.g., cs336_basics/utils.py)
+            # CRITICAL FIX: Use DEVELOPER implementation, not student's
+            # Patches require exact byte-for-byte match. Student code may have
+            # different variable names, comments, spacing, causing patch failures.
+            # Developer code matches the patch exactly (patch was created from it).
             import shutil
+            from pathlib import Path as PathLib
+            
+            # Resolve to developer implementation (not student symlink)
+            # source_file_path might be cs336_basics/utils.py (symlink to student)
+            # We need modes/developer/cs336_basics/utils.py
+            repo_root = PathLib.cwd()
+            
+            # Get relative path from source_file_path
+            # e.g., "cs336_basics/utils.py"
+            try:
+                rel_path = source_file_path.relative_to(repo_root)
+            except ValueError:
+                # source_file_path might already be absolute
+                rel_path = PathLib(source_file_path.name)
+                if len(source_file_path.parts) > 1:
+                    rel_path = PathLib(*source_file_path.parts[-2:])  # e.g., cs336_basics/utils.py
+            
+            # Construct path to developer implementation
+            developer_file = repo_root / "modes" / "developer" / rel_path
+            
+            if not developer_file.exists():
+                raise HardenChallengeError(
+                    f"Developer reference implementation not found: {developer_file}"
+                )
+            
             harden_file = harden_dir / source_file_path.name
-            shutil.copy2(source_file_path, harden_file)
+            shutil.copy2(developer_file, harden_file)
             
-            logger.info(f"Copied correct implementation to {harden_file}")
+            logger.info(f"Copied developer reference implementation to {harden_file}")
             
-            # Apply bug patch to shadow worktree copy
+            # Apply bug patch (guaranteed to work since patch created from developer code)
             self.workspace_mgr.apply_patch(harden_file, bug_patch)
             
             # Read symptom description
