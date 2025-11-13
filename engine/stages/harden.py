@@ -197,29 +197,31 @@ class HardenRunner:
                 "This module may not have harden challenges configured."
             )
         
-        # Find all patch files
+        # Find all bug files (.patch or .json)
         patch_files = list(bugs_dir.glob("*.patch"))
+        json_files = list(bugs_dir.glob("*.json"))
+        bug_files = patch_files + json_files
         
-        if not patch_files:
+        if not bug_files:
             raise HardenChallengeError(
-                f"No bug patches found in {bugs_dir}. "
+                f"No bug files found in {bugs_dir}. "
                 "This is a curriculum configuration error."
             )
         
-        # Select a patch (random for now)
-        selected_patch = random.choice(patch_files)
+        # Select a bug file (random for now)
+        selected_bug = random.choice(bug_files)
         
         # Find corresponding symptom file
-        # Convention: bug.patch → bug_symptom.txt
-        symptom_name = selected_patch.stem + "_symptom.txt"
+        # Convention: bug.patch or bug.json → bug_symptom.txt
+        symptom_name = selected_bug.stem + "_symptom.txt"
         symptom_file = bugs_dir / symptom_name
         
         if not symptom_file.exists():
             raise HardenChallengeError(
-                f"Symptom file missing for {selected_patch.name}: {symptom_file}"
+                f"Symptom file missing for {selected_bug.name}: {symptom_file}"
             )
         
-        return selected_patch, symptom_file
+        return selected_bug, symptom_file
 
 
 class HardenChallengeError(Exception):
