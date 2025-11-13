@@ -137,6 +137,56 @@ class BugAuthor:
 3. **Context references**: Use {"from_context": "var_name"} to reference tracked variables
 4. **Paths**: Use dot notation (e.g., "node.value.left", "pattern.targets[0].id")
 
+# ⚠️ CRITICAL: Matching Specific Variables
+
+**To match a SPECIFIC variable by name, you MUST include the "id" field:**
+
+```json
+{
+  "node_type": "Assign",
+  "targets": [
+    {
+      "node_type": "Name",
+      "id": "bias_correction1"  // ← REQUIRED to match this specific variable
+    }
+  ],
+  "value": { "node_type": "BinOp", "op": "Sub" }
+}
+```
+
+**WRONG - This matches ANY variable assignment:**
+```json
+{
+  "node_type": "Assign",
+  "targets": [
+    {
+      "node_type": "Name"  // ❌ NO "id" - matches first assignment found!
+    }
+  ]
+}
+```
+
+**When to use each approach:**
+- **Direct "id"**: Use when you know the exact variable name (e.g., "bias_correction1", "scores", "d_k")
+- **Context tracking**: Only use if you need to match based on a computed name from a previous pass
+- **No "id"**: NEVER use this pattern - it will match the wrong variable!
+
+**⚠️ Multiple assignments to the same variable:**
+If the same variable is assigned multiple times (e.g., `scores = ...` appears twice), you MUST specify the operator or value type to distinguish them:
+
+```json
+{
+  "node_type": "Assign",
+  "targets": [{"node_type": "Name", "id": "scores"}],
+  "value": {
+    "node_type": "BinOp",
+    "op": "Div"  // ← REQUIRED when multiple scores assignments exist
+  }
+}
+```
+
+Check the BEFORE code carefully - if you see the same variable name assigned multiple times, add the "op" or other distinguishing features!
+
 # Transformation Types
 
 1. **replace_value_with**: Replace the value of an Assign node
@@ -146,9 +196,48 @@ class BugAuthor:
 
 # Multi-Pass Strategy
 
-- Use **find_and_track** when you need to remember variable names for later passes
-- Use **find_and_replace** to perform the actual transformation
+**Simple case (prefer this):**
+- Use **find_and_replace** with direct variable names
+- One pass per variable you need to modify/delete
+
+**Example - Delete two specific variables:**
+```json
+[
+  {
+    "pass": 1,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "Assign",
+      "targets": [{"node_type": "Name", "id": "bias_correction1"}]
+    },
+    "replacement": {"type": "delete_statement"}
+  },
+  {
+    "pass": 2,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "Assign",
+      "targets": [{"node_type": "Name", "id": "bias_correction2"}]
+    },
+    "replacement": {"type": "delete_statement"}
+  }
+]
+```
+
+**Advanced case (only when needed):**
+- Use **find_and_track** ONLY if you don't know the variable name upfront
+- The track pattern MUST include "id" to match the specific variable you want to track
 - Context variables from track passes are available in replace passes via "from_context"
+
+⚠️ **WARNING**: If your track pattern doesn't include "id", it will track the WRONG variable!
+
+# Pre-Generation Checklist
+
+Before generating JSON, verify:
+- [ ] Every pattern that should match a specific variable includes `"id": "variable_name"`
+- [ ] You're using the simplest approach (direct "id" instead of context tracking when possible)
+- [ ] Each pass has a clear, specific purpose
+- [ ] You've checked the BEFORE code to identify exact variable names
 
 """
         
@@ -250,22 +339,12 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
         for attempt in range(max_retries):
             print(f"\n🤖 LLM Attempt {attempt + 1}/{max_retries}...")
             
-            # Generate JSON with Structured Outputs
-            try:
-                from engine.schemas.bug_definition import BugDefinition as BugDefSchema
-                response = self.llm_service.generate_completion(
-                    prompt=user_prompt,
-                    system=system_prompt,
-                    temperature=0.3,
-                    response_format=BugDefSchema
-                )
-            except ImportError:
-                # Fall back to unstructured if schema not available
-                response = self.llm_service.generate_completion(
-                    prompt=user_prompt,
-                    system=system_prompt,
-                    temperature=0.3
-                )
+            # Generate JSON (Structured Outputs disabled - schema too loose)
+            response = self.llm_service.generate_completion(
+                prompt=user_prompt,
+                system=system_prompt,
+                temperature=0.3
+            )
             
             if debug:
                 print(f"\n📄 LLM Response Preview:")
