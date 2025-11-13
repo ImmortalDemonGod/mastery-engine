@@ -19,6 +19,7 @@ for backward compatibility.
 """
 
 import sys
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -2065,6 +2066,79 @@ def status():
             f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
             f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
             title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command(name="create-bug")
+def create_bug(
+    module: str = typer.Argument(..., help="Module name (e.g., 'softmax')"),
+    patch_file: Path = typer.Option(..., "--patch", "-p", help="Path to .patch file"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON path (default: auto)"),
+    symptom_file: Optional[Path] = typer.Option(None, "--symptom", "-s", help="Path to symptom.txt")
+):
+    """
+    [DEV TOOL] Generate JSON bug definition from patch file using LLM.
+    
+    This tool uses few-shot learning with the golden dataset to automatically
+    generate v2.1 JSON bug definitions from legacy .patch files.
+    
+    Example:
+        engine create-bug attention --patch bugs/missing_mask.patch
+    """
+    try:
+        from engine.dev_tools.bug_author import BugAuthor
+        
+        console.print(Panel(
+            "[bold cyan]LLM Bug Authoring Tool[/bold cyan]\n\n"
+            f"Module: {module}\n"
+            f"Patch: {patch_file}\n\n"
+            "Using golden dataset for few-shot learning...",
+            title="🤖 Bug Author",
+            border_style="cyan"
+        ))
+        
+        # Load symptom if provided
+        symptom = ""
+        if symptom_file and symptom_file.exists():
+            symptom = symptom_file.read_text()
+        else:
+            symptom = f"Bug in {module} module"
+        
+        # Initialize bug author
+        author = BugAuthor()
+        
+        # Generate bug definition
+        bug_def, success = author.generate_bug_definition(
+            module_name=module,
+            patch_path=patch_file,
+            symptom=symptom
+        )
+        
+        if not success:
+            console.print("\n[bold red]❌ Failed to generate valid bug definition[/bold red]")
+            sys.exit(1)
+        
+        # Determine output path
+        if output is None:
+            output = patch_file.parent / f"{patch_file.stem}.json"
+        
+        # Write output
+        with open(output, 'w') as f:
+            json.dump(bug_def, f, indent=2)
+        
+        console.print(f"\n[bold green]✅ Success![/bold green]\n\nGenerated: {output}")
+        
+        # Display preview
+        console.print("\n[bold]Preview:[/bold]")
+        console.print(json.dumps(bug_def, indent=2)[:500] + "...")
+        
+    except Exception as e:
+        logger.exception("Error in create-bug command")
+        console.print(Panel(
+            f"[bold red]Error:[/bold red]\n\n{str(e)}",
+            title="Bug Author Error",
             border_style="red"
         ))
         sys.exit(1)

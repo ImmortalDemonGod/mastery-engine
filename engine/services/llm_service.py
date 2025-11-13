@@ -164,6 +164,81 @@ class LLMService:
             logger.exception(f"Unexpected error during LLM evaluation: {e}")
             raise LLMAPIError(f"Unexpected error during evaluation: {e}") from e
     
+    def generate_completion(
+        self,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        max_tokens: int = 4000,
+        response_format = None
+    ) -> str:
+        """
+        Generate a completion for a given prompt.
+        
+        Generic method for LLM generation tasks (e.g., bug authoring).
+        
+        Args:
+            prompt: User prompt
+            system: System prompt (optional)
+            temperature: Sampling temperature (0.0-2.0)
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            Generated text response
+            
+        Raises:
+            LLMAPIError: If API call fails
+        """
+        try:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            
+            # Use Structured Outputs if response_format is a Pydantic model
+            if response_format and hasattr(response_format, '__mro__'):
+                # This is a Pydantic model - use .parse() for Structured Outputs
+                response = self.client.beta.chat.completions.parse(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format=response_format
+                )
+                # Return the JSON string from the parsed response
+                if response.choices[0].message.parsed:
+                    return response.choices[0].message.parsed.model_dump_json(indent=2)
+                else:
+                    # Handle refusal
+                    if response.choices[0].message.refusal:
+                        raise LLMAPIError(f"Model refused: {response.choices[0].message.refusal}")
+                    return response.choices[0].message.content
+            else:
+                # Regular generation without structured outputs
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                return response.choices[0].message.content
+            
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise LLMAPIError(f"Authentication error: {e}") from e
+        except RateLimitError as e:
+            logger.warning(f"Rate limit hit: {e}")
+            raise LLMAPIError(f"Rate limit error: {e}") from e
+        except APIConnectionError as e:
+            logger.error(f"Connection error: {e}")
+            raise LLMAPIError(f"Connection error: {e}") from e
+        except APIError as e:
+            logger.error(f"API error: {e}")
+            raise LLMAPIError(f"API error: {e}") from e
+        except Exception as e:
+            logger.exception("Unexpected error during LLM generation")
+            raise LLMAPIError(f"Unexpected API error: {e}") from e
+    
     def _build_cot_prompt(self, question: JustifyQuestion, user_answer: str) -> str:
         """
         Build Chain-of-Thought prompt for justification evaluation.

@@ -292,4 +292,9 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                 )
                 return new_node
         
+        elif replacement_type == 'delete_statement':
+            # Delete the matched statement by returning None
+            # NodeTransformer will remove it from parent's body
+            return None
+        
         return None
