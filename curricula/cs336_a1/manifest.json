@@ -131,11 +131,19 @@
       "dependencies": ["transformer_lm", "adamw", "cosine_schedule", "data_loader", "checkpointing", "cross_entropy", "gradient_clipping"]
     },
     {
+      "id": "unicode",
+      "name": "Unicode and Text Encoding Foundations",
+      "path": "modules/unicode",
+      "baseline_perf_seconds": 0.15,
+      "dependencies": [],
+      "module_type": "justify_only"
+    },
+    {
       "id": "bpe_tokenizer",
       "name": "BPE Tokenizer Training",
       "path": "modules/bpe_tokenizer",
       "baseline_perf_seconds": 0.18,
-      "dependencies": []
+      "dependencies": ["unicode"]
     },
     {
       "id": "tokenizer_class",
