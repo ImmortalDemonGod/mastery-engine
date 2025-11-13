@@ -187,6 +187,34 @@ If the same variable is assigned multiple times (e.g., `scores = ...` appears tw
 
 Check the BEFORE code carefully - if you see the same variable name assigned multiple times, add the "op" or other distinguishing features!
 
+**⚠️ CRITICAL: Don't Over-Specify Patterns!**
+
+Only include fields that are NECESSARY to uniquely identify the statement:
+
+**WRONG - Over-specified:**
+```json
+{
+  "node_type": "BinOp",
+  "op": "Sub",
+  "left": {"node_type": "Num"},          // ❌ Unnecessary detail
+  "right": {                             // ❌ Too deep
+    "node_type": "Call",
+    "func": {"node_type": "Attribute", "attr": "pow"},
+    "args": [...]
+  }
+}
+```
+
+**CORRECT - Minimal specification:**
+```json
+{
+  "node_type": "BinOp",
+  "op": "Sub"                            // ✅ Just enough!
+}
+```
+
+**Rule:** Start simple. Only add nested details if you need to disambiguate from other similar statements!
+
 # Transformation Types
 
 1. **replace_value_with**: Replace the value of an Assign node
@@ -305,13 +333,14 @@ Before generating JSON, verify:
 
 ## Your Task
 
-Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that would produce this exact transformation when applied to ANY correct implementation (regardless of variable names).
+Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
 
 **Critical Requirements:**
-1. The pattern must match the semantic structure, not specific variable names
-2. Use context tracking if you need to reference variables across multiple operations
-3. Choose the appropriate pass type (find_and_track vs find_and_replace)
-4. Validate that your pattern would match the BEFORE code's AST structure
+1. ⚠️ INCLUDE SPECIFIC VARIABLE NAMES in patterns (e.g., `"id": "bias_correction1"`) - this is REQUIRED!
+2. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
+3. Check if same variable appears multiple times - if so, add "op" to disambiguate
+4. Use direct "id" specification (prefer this over context tracking when possible)
+5. Validate your pattern matches the BEFORE code's exact structure
 
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.

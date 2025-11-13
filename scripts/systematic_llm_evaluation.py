@@ -31,6 +31,17 @@ class AttemptResult:
     response_text: str = ""  # Store full response for comparison
     feedback_given: str = ""  # Store feedback that was provided
     similarity_to_golden: float = 0.0  # How similar patterns are to golden examples
+    pattern_complexity: Dict[str, int] = None  # Track over-specification
+    missing_operators: List[int] = None  # Which passes missing "op" field
+    wrong_node_types: List[str] = None  # Track if wrong AST node type used
+    
+    def __post_init__(self):
+        if self.pattern_complexity is None:
+            self.pattern_complexity = {}
+        if self.missing_operators is None:
+            self.missing_operators = []
+        if self.wrong_node_types is None:
+            self.wrong_node_types = []
 
 
 @dataclass
@@ -144,6 +155,9 @@ class SystematicEvaluator:
             patterns_generated = len(bug_def.get('logic', []))
             has_specific_vars = self._check_for_specific_variable_names(bug_def)
             similarity_to_golden = self._measure_pattern_similarity_to_golden(bug_def)
+            pattern_complexity = self._analyze_pattern_complexity(bug_def)
+            missing_ops = self._find_missing_operators(bug_def, patch_info['before'])
+            wrong_types = self._detect_wrong_node_types(bug_def)
             
             # Test injection
             success, diagnostic = self.author._test_bug_definition_with_diagnostics(
@@ -164,7 +178,10 @@ class SystematicEvaluator:
                     response_length=len(response),
                     response_text=response,
                     feedback_given="",
-                    similarity_to_golden=similarity_to_golden
+                    similarity_to_golden=similarity_to_golden,
+                    pattern_complexity=pattern_complexity,
+                    missing_operators=missing_ops,
+                    wrong_node_types=wrong_types
                 ))
                 final_success = True
                 break
@@ -192,7 +209,10 @@ class SystematicEvaluator:
                     response_length=len(response),
                     response_text=response,
                     feedback_given=feedback_text,
-                    similarity_to_golden=similarity_to_golden
+                    similarity_to_golden=similarity_to_golden,
+                    pattern_complexity=pattern_complexity,
+                    missing_operators=missing_ops,
+                    wrong_node_types=wrong_types
                 ))
                 
                 # Add detailed feedback for next attempt
@@ -225,6 +245,90 @@ class SystematicEvaluator:
                             if not isinstance(target['id'], dict):  # Not a context reference
                                 return True
         return False
+    
+    def _analyze_pattern_complexity(self, bug_def: dict) -> Dict[str, int]:
+        """
+        Analyze if patterns are over-specified with unnecessary nested fields.
+        Returns count of over-specified patterns by type.
+        """
+        complexity = {"over_specified": 0, "simple": 0}
+        
+        for pass_def in bug_def.get('logic', []):
+            if 'pattern' in pass_def and 'value' in pass_def['pattern']:
+                value = pass_def['pattern']['value']
+                if isinstance(value, dict):
+                    # Check if has deep nesting (left/right/args/keywords)
+                    if any(k in value for k in ['left', 'right', 'args', 'keywords']):
+                        complexity["over_specified"] += 1
+                    else:
+                        complexity["simple"] += 1
+        
+        return complexity
+    
+    def _find_missing_operators(self, bug_def: dict, before_code: str) -> List[int]:
+        """
+        Identify which passes are missing operator specifications when needed.
+        Returns list of pass numbers that should have 'op' but don't.
+        """
+        missing = []
+        
+        # Parse before code to find variable assignments
+        try:
+            import ast
+            tree = ast.parse(before_code)
+            # Count assignments per variable
+            var_assignments = {}
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            var_name = target.id
+                            var_assignments[var_name] = var_assignments.get(var_name, 0) + 1
+        except:
+            return missing
+        
+        # Check each pass
+        for i, pass_def in enumerate(bug_def.get('logic', []), 1):
+            if 'pattern' in pass_def:
+                pattern = pass_def['pattern']
+                # Check if targeting a variable with multiple assignments
+                if 'targets' in pattern and isinstance(pattern['targets'], list):
+                    for target in pattern['targets']:
+                        if isinstance(target, dict) and 'id' in target:
+                            var_id = target['id']
+                            if isinstance(var_id, str):  # Direct id, not from_context
+                                # If this variable has multiple assignments and pattern lacks op
+                                if var_assignments.get(var_id, 0) > 1:
+                                    if 'value' not in pattern or 'op' not in pattern.get('value', {}):
+                                        missing.append(i)
+        
+        return missing
+    
+    def _detect_wrong_node_types(self, bug_def: dict) -> List[str]:
+        """
+        Detect if LLM is using wrong AST node types.
+        Returns list of issues found.
+        """
+        issues = []
+        
+        for i, pass_def in enumerate(bug_def.get('logic', []), 1):
+            if 'pattern' in pass_def:
+                pattern = pass_def['pattern']
+                node_type = pattern.get('node_type')
+                
+                # Common mistakes
+                if node_type == 'BinOp' and 'targets' in pattern:
+                    issues.append(f"Pass{i}: BinOp with targets (should be Assign?)")
+                
+                if node_type == 'Return' and 'targets' in pattern:
+                    issues.append(f"Pass{i}: Return with targets (invalid)")
+                    
+                # Check if trying to match operations directly instead of statements
+                if node_type in ['BinOp', 'Call', 'Attribute'] and pass_def.get('type') == 'find_and_replace':
+                    # Likely needs to be wrapped in Assign or Return
+                    issues.append(f"Pass{i}: {node_type} at statement level (wrap in Assign/Return?)")
+        
+        return issues
     
     def _measure_attempt_consistency(self, attempts: List[AttemptResult]) -> float:
         """
@@ -470,6 +574,38 @@ class SystematicEvaluator:
             print(f"  ⚠️  LOW SIMILARITY ({avg_similarity:.2f}) - Patterns very different from golden examples")
         elif avg_similarity > 0.7:
             print(f"  ✅  HIGH SIMILARITY ({avg_similarity:.2f}) - Patterns structurally close to golden")
+        
+        # NEW: Detailed Pattern Analysis for Manual Review
+        print(f"\n📋 DETAILED PATTERN ANALYSIS (For Manual Review):")
+        print(f"="*60)
+        
+        for bug_result in self.results:
+            print(f"\n{bug_result.module} ({bug_result.complexity}):")
+            
+            for attempt in bug_result.attempts:
+                print(f"\n  Attempt {attempt.attempt_num}: {attempt.failure_mode}")
+                print(f"    Has specific vars: {'✅' if attempt.had_specific_var_names else '❌'}")
+                
+                # Pattern complexity
+                if attempt.pattern_complexity:
+                    over_spec = attempt.pattern_complexity.get('over_specified', 0)
+                    simple = attempt.pattern_complexity.get('simple', 0)
+                    if over_spec > 0:
+                        print(f"    ⚠️  Over-specified patterns: {over_spec}/{over_spec+simple}")
+                    else:
+                        print(f"    ✅ Appropriately simple patterns")
+                
+                # Missing operators
+                if attempt.missing_operators:
+                    print(f"    ⚠️  Missing operators in passes: {attempt.missing_operators}")
+                
+                # Wrong node types
+                if attempt.wrong_node_types:
+                    print(f"    ⚠️  Node type issues:")
+                    for issue in attempt.wrong_node_types:
+                        print(f"      - {issue}")
+        
+        print(f"\n{'='*60}")
     
     def save_results(self, output_path: Path):
         """Save detailed results to JSON"""
