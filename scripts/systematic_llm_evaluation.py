@@ -79,9 +79,9 @@ class SystematicEvaluator:
                 '__return__': ('Return', None)  # Special key for return statements
             },
             'attention': {
-                'scores': ('BinOp', 'MatMult'),  # First occurrence
+                # Bug deletes: d_k = Q.shape[-1] and scores = scores / sqrt(d_k)
                 'd_k': ('Subscript', None),
-                'scores_scaled': ('BinOp', 'Div')  # Second occurrence needs disambiguation
+                'scores': ('BinOp', 'Div')  # SECOND occurrence (the one being deleted)
             },
             'rmsnorm': {
                 '__mean_call__': ('Call', None)  # .mean() call with keepdim
