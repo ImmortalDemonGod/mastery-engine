@@ -83,8 +83,8 @@ class GenericBugInjector:
             pass_type = pass_def['type']
             
             if pass_type == 'find_and_track':
-                # Pass 1: Find patterns and extract context
-                visitor = FindAndTrackVisitor(pass_def, context)
+                # Pass 1: Find patterns and extract context from original AST
+                visitor = FindAndTrackVisitor(pass_def, context, original_ast)
                 visitor.visit(canonical_ast)
             
             elif pass_type == 'find_and_replace':

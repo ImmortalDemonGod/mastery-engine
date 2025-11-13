@@ -56,6 +56,14 @@ class PatternMatcher:
             
             node_value = getattr(node, key)
             
+            # Special handling for 'op' attribute (ast operator nodes)
+            if key == 'op' and isinstance(value, str):
+                # Convert AST op node to string for comparison
+                op_name = node_value.__class__.__name__
+                if op_name != value:
+                    return False
+                continue
+            
             if isinstance(value, dict):
                 # Check for context reference
                 if 'from_context' in value:
@@ -108,6 +116,13 @@ class PatternMatcher:
                 if index >= len(node.targets):
                     return False
                 if not isinstance(node.targets[index], ast.Name):
+                    return False
+            
+            elif check_type == 'has_keyword_arg':
+                if not isinstance(node, ast.Call):
+                    return False
+                arg_name = condition['name']
+                if not any(kw.arg == arg_name for kw in node.keywords):
                     return False
             
             # Add more condition types as needed
@@ -167,12 +182,14 @@ class FindAndTrackVisitor(ast.NodeVisitor):
     """
     Visitor for 'find_and_track' pass.
     
-    Traverses the canonical AST to find patterns and extract context variables.
+    Traverses the canonical AST to find patterns and extract context variables
+    from the ORIGINAL AST (to preserve student variable names).
     """
     
-    def __init__(self, pass_def: dict, context: dict[str, Any]):
+    def __init__(self, pass_def: dict, context: dict[str, Any], original_ast: ast.AST):
         self.pass_def = pass_def
         self.context = context
+        self.original_ast = original_ast
         self.pattern_matcher = PatternMatcher(pass_def['pattern'], context)
     
     def visit(self, node: ast.AST):
@@ -184,12 +201,27 @@ class FindAndTrackVisitor(ast.NodeVisitor):
                     self.generic_visit(node)
                     return
             
-            # Extract context variables
-            if 'track_as' in self.pass_def:
-                extracted = self.pattern_matcher.extract_context(node, self.pass_def['track_as'])
+            # Find corresponding node in original AST
+            original_node = self._find_node_at_location(
+                self.original_ast,
+                node.lineno,
+                node.col_offset
+            )
+            
+            # Extract context variables from ORIGINAL AST
+            if 'track_as' in self.pass_def and original_node:
+                extracted = self.pattern_matcher.extract_context(original_node, self.pass_def['track_as'])
                 self.context.update(extracted)
         
         self.generic_visit(node)
+    
+    def _find_node_at_location(self, tree: ast.AST, lineno: int, col_offset: int) -> Optional[ast.AST]:
+        """Find a node in the tree at the given source location."""
+        for node in ast.walk(tree):
+            if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
+                node.lineno == lineno and node.col_offset == col_offset):
+                return node
+        return None
 
 
 class FindAndReplaceTransformer(ast.NodeTransformer):
@@ -233,6 +265,29 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                 # Create a copy of the node with new value
                 new_node = ast.copy_location(
                     ast.Assign(targets=node.targets, value=new_value),
+                    node
+                )
+                return new_node
+        
+        elif replacement_type == 'replace_with':
+            # Replace entire node with another part of itself
+            source_path = replacement_def['source']
+            matcher = PatternMatcher({}, self.context)
+            replacement_node = matcher._evaluate_path(node, source_path)
+            
+            if replacement_node is not None:
+                return replacement_node
+        
+        elif replacement_type == 'remove_keyword_arg':
+            # Remove a keyword argument from a Call node
+            arg_name = replacement_def['name']
+            if isinstance(node, ast.Call):
+                new_node = ast.copy_location(
+                    ast.Call(
+                        func=node.func,
+                        args=node.args,
+                        keywords=[kw for kw in node.keywords if kw.arg != arg_name]
+                    ),
                     node
                 )
                 return new_node
