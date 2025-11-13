@@ -34,6 +34,8 @@ class AttemptResult:
     pattern_complexity: Dict[str, int] = None  # Track over-specification
     missing_operators: List[int] = None  # Which passes missing "op" field
     wrong_node_types: List[str] = None  # Track if wrong AST node type used
+    node_type_accuracy: float = 0.0  # Percentage of correct node types vs expected
+    node_type_details: Dict[str, Dict] = None  # Per-variable accuracy details
     
     def __post_init__(self):
         if self.pattern_complexity is None:
@@ -42,6 +44,8 @@ class AttemptResult:
             self.missing_operators = []
         if self.wrong_node_types is None:
             self.wrong_node_types = []
+        if self.node_type_details is None:
+            self.node_type_details = {}
 
 
 @dataclass
@@ -54,6 +58,11 @@ class BugEvaluationResult:
     attempts: List[AttemptResult]
     final_success: bool
     time_taken: float
+    expected_patterns: Dict[str, tuple] = None  # Expected (node_type, op) per variable
+    
+    def __post_init__(self):
+        if self.expected_patterns is None:
+            self.expected_patterns = {}
 
 
 class SystematicEvaluator:
@@ -62,6 +71,28 @@ class SystematicEvaluator:
     def __init__(self):
         self.author = BugAuthor()
         self.results: List[BugEvaluationResult] = []
+        
+        # Ground truth: Expected patterns for each bug
+        self.expected_patterns = {
+            'silu': {
+                # return in_features * torch.sigmoid(in_features)
+                '__return__': ('Return', None)  # Special key for return statements
+            },
+            'attention': {
+                'scores': ('BinOp', 'MatMult'),  # First occurrence
+                'd_k': ('Subscript', None),
+                'scores_scaled': ('BinOp', 'Div')  # Second occurrence needs disambiguation
+            },
+            'rmsnorm': {
+                '__mean_call__': ('Call', None)  # .mean() call with keepdim
+            },
+            'adamw': {
+                'bias_correction1': ('BinOp', 'Sub'),
+                'bias_correction2': ('BinOp', 'Sub'),
+                'step_size': ('BinOp', 'Div'),
+                'denom': ('Call', None)
+            }
+        }
     
     def evaluate_bug(
         self, 
@@ -158,6 +189,7 @@ class SystematicEvaluator:
             pattern_complexity = self._analyze_pattern_complexity(bug_def)
             missing_ops = self._find_missing_operators(bug_def, patch_info['before'])
             wrong_types = self._detect_wrong_node_types(bug_def)
+            node_accuracy, node_details = self._calculate_node_type_accuracy(bug_def, module)
             
             # Test injection
             success, diagnostic = self.author._test_bug_definition_with_diagnostics(
@@ -181,7 +213,9 @@ class SystematicEvaluator:
                     similarity_to_golden=similarity_to_golden,
                     pattern_complexity=pattern_complexity,
                     missing_operators=missing_ops,
-                    wrong_node_types=wrong_types
+                    wrong_node_types=wrong_types,
+                    node_type_accuracy=node_accuracy,
+                    node_type_details=node_details
                 ))
                 final_success = True
                 break
@@ -212,7 +246,9 @@ class SystematicEvaluator:
                     similarity_to_golden=similarity_to_golden,
                     pattern_complexity=pattern_complexity,
                     missing_operators=missing_ops,
-                    wrong_node_types=wrong_types
+                    wrong_node_types=wrong_types,
+                    node_type_accuracy=node_accuracy,
+                    node_type_details=node_details
                 ))
                 
                 # Add detailed feedback for next attempt
@@ -329,6 +365,67 @@ class SystematicEvaluator:
                     issues.append(f"Pass{i}: {node_type} at statement level (wrap in Assign/Return?)")
         
         return issues
+    
+    def _calculate_node_type_accuracy(self, bug_def: dict, module: str) -> tuple[float, Dict]:
+        """
+        Calculate node type accuracy by comparing generated patterns to expected patterns.
+        Returns: (accuracy_percentage, detailed_results_dict)
+        """
+        if module not in self.expected_patterns:
+            return 0.0, {}
+        
+        expected = self.expected_patterns[module]
+        details = {}
+        correct = 0
+        total = 0
+        
+        for pass_def in bug_def.get('logic', []):
+            if 'pattern' not in pass_def:
+                continue
+            
+            pattern = pass_def['pattern']
+            
+            # Get variable name from pattern
+            var_id = 'unknown'
+            if 'targets' in pattern and pattern['targets']:
+                target = pattern['targets'][0]
+                if isinstance(target, dict):
+                    var_id = target.get('id', 'unknown')
+            
+            # Special case for return statements
+            if pattern.get('node_type') == 'Return':
+                var_id = '__return__'
+            
+            # Get generated pattern details
+            if 'value' in pattern and isinstance(pattern['value'], dict):
+                gen_type = pattern['value'].get('node_type', 'N/A')
+                gen_op = pattern['value'].get('op', None)
+            elif pattern.get('node_type') == 'Return':
+                gen_type = 'Return'
+                gen_op = None
+            else:
+                gen_type = pattern.get('node_type', 'N/A')
+                gen_op = None
+            
+            # Compare with expected
+            if var_id in expected:
+                exp_type, exp_op = expected[var_id]
+                type_match = gen_type == exp_type
+                op_match = exp_op is None or gen_op == exp_op
+                
+                is_correct = type_match and op_match
+                details[var_id] = {
+                    'expected': (exp_type, exp_op),
+                    'generated': (gen_type, gen_op),
+                    'correct': is_correct
+                }
+                
+                if is_correct:
+                    correct += 1
+                total += 1
+        
+        accuracy = (correct / total * 100) if total > 0 else 0.0
+        return accuracy, details
     
     def _measure_attempt_consistency(self, attempts: List[AttemptResult]) -> float:
         """
@@ -575,6 +672,32 @@ class SystematicEvaluator:
         elif avg_similarity > 0.7:
             print(f"  ✅  HIGH SIMILARITY ({avg_similarity:.2f}) - Patterns structurally close to golden")
         
+        # NEW: Node Type Accuracy Statistics
+        print(f"\n📊 AUTOMATED NODE TYPE ACCURACY:")
+        print(f"="*60)
+        
+        # Overall average
+        all_accuracies = [a.node_type_accuracy for r in self.results for a in r.attempts if a.node_type_accuracy > 0]
+        avg_node_accuracy = sum(all_accuracies) / len(all_accuracies) if all_accuracies else 0.0
+        
+        print(f"\nOverall Node Type Accuracy: {avg_node_accuracy:.1f}%")
+        
+        # Per-bug breakdown
+        for bug_result in self.results:
+            print(f"\n{bug_result.module}:")
+            for attempt in bug_result.attempts:
+                if attempt.node_type_accuracy > 0:
+                    status = "✅" if attempt.node_type_accuracy == 100 else "⚠️"
+                    print(f"  Attempt {attempt.attempt_num}: {status} {attempt.node_type_accuracy:.0f}% accurate")
+                    
+                    # Show per-variable details if not 100%
+                    if attempt.node_type_accuracy < 100 and attempt.node_type_details:
+                        for var, details in attempt.node_type_details.items():
+                            if not details['correct']:
+                                exp = details['expected']
+                                gen = details['generated']
+                                print(f"    ❌ {var}: expected {exp[0]}/{exp[1]}, got {gen[0]}/{gen[1]}")
+        
         # NEW: Detailed Pattern Analysis for Manual Review
         print(f"\n📋 DETAILED PATTERN ANALYSIS (For Manual Review):")
         print(f"="*60)
@@ -585,6 +708,7 @@ class SystematicEvaluator:
             for attempt in bug_result.attempts:
                 print(f"\n  Attempt {attempt.attempt_num}: {attempt.failure_mode}")
                 print(f"    Has specific vars: {'✅' if attempt.had_specific_var_names else '❌'}")
+                print(f"    Node type accuracy: {attempt.node_type_accuracy:.0f}%")
                 
                 # Pattern complexity
                 if attempt.pattern_complexity:
