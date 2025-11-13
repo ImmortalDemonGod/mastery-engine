@@ -102,10 +102,10 @@ class HardenRunner:
             
             # Dispatch based on bug type (.json = AST, .patch = legacy)
             if bug_file.suffix == '.json':
-                # --- NEW LOGIC: AST-based bug injection ---
-                from engine.services.ast_service import SoftmaxBugInjector
+                # --- NEW LOGIC: AST-based bug injection (Generic) ---
+                from engine.ast_harden.generic_injector import GenericBugInjector
                 
-                logger.info("Using AST-based bug injection")
+                logger.info("Using AST-based bug injection (generic)")
                 
                 # Load student's OWN code from main workspace
                 student_code_path = Path.cwd() / source_file_path
@@ -116,8 +116,8 @@ class HardenRunner:
                 
                 student_source_code = student_code_path.read_text(encoding='utf-8')
                 
-                # Inject bug using AST transformation
-                injector = SoftmaxBugInjector()
+                # Inject bug using generic AST transformation
+                injector = GenericBugInjector(bug_file)
                 buggy_source_code, success = injector.inject(student_source_code)
                 
                 if not success:

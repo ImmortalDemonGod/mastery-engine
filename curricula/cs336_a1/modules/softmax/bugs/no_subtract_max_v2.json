@@ -12,14 +12,10 @@
       "pattern": {
         "node_type": "Assign",
         "value": {
-          "node_type": "Attribute",
-          "attr": "values",
-          "value": {
-            "node_type": "Call",
-            "func": {
-              "node_type": "Attribute",
-              "attr": "max"
-            }
+          "node_type": "Call",
+          "func": {
+            "node_type": "Attribute",
+            "attr": "max"
           }
         }
       },
@@ -35,7 +31,7 @@
       ],
       "track_as": {
         "max_var_name": "node.targets[0].id",
-        "tensor_var_name": "node.value.value.func.value.id"
+        "tensor_var_name": "node.value.func.value.id"
       }
     },
     {
