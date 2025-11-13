@@ -3,6 +3,7 @@ import math
 import torch
 from torch import Tensor, nn
 from jaxtyping import Float
+from einops import rearrange
 from cs336_basics.utils import softmax as _softmax
 
 
@@ -196,6 +197,8 @@ def multihead_self_attention(
     """
     Optimized batched Multi-Head Self-Attention (no RoPE).
 
+    Uses einops for clear, self-documenting tensor operations (per PDF §3.3).
+
     Args:
         d_model: embedding dimension
         num_heads: number of attention heads (divides d_model)
@@ -211,33 +214,36 @@ def multihead_self_attention(
     orig_leading = in_features.shape[:-2]
     seq_len = in_features.shape[-2]
 
-    x = in_features.reshape(-1, seq_len, d_model)
+    # Flatten leading batch dimensions: (..., s, d) -> (batch, s, d)
+    x = rearrange(in_features, '... s d -> (...) s d')
 
     # Projections for all heads in single matmuls
     q_all = x.matmul(q_proj_weight.t())  # (B, S, d_model)
     k_all = x.matmul(k_proj_weight.t())  # (B, S, d_model)
     v_all = x.matmul(v_proj_weight.t())  # (B, S, d_model)
 
-    # Reshape to heads: (B, H, S, D)
+    # Split into heads and move head dimension before sequence: (B, H, S, D)
     def to_heads(t: Tensor) -> Tensor:
-        # Weights are stacked by heads along the output rows: (H*D, d_model).
-        # After projecting to (B, S, H*D), split into heads then move heads before seq.
-        return t.view(t.shape[0], seq_len, num_heads, head_dim).transpose(1, 2).contiguous()
+        """Split concatenated heads: (b, s, h*d) -> (b, h, s, d)"""
+        return rearrange(t, 'b s (h d) -> b h s d', h=num_heads)
 
     q = to_heads(q_all)
     k = to_heads(k_all)
     v = to_heads(v_all)
 
     # Scaled dot-product attention per head with causal mask
-    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device)).view(1, 1, seq_len, seq_len)
+    # Create lower-triangular causal mask and add broadcast dimensions
+    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device))
+    causal = rearrange(causal, 's1 s2 -> 1 1 s1 s2')  # Add batch and head dims
     context = scaled_dot_product_attention(q, k, v, mask=causal)  # (B, H, S, D)
 
-    # Combine heads: (B, S, H*D=d_model)
-    context = context.transpose(1, 2).contiguous().view(context.shape[0], seq_len, d_model)
+    # Combine heads: (B, H, S, D) -> (B, S, H*D=d_model)
+    context = rearrange(context, 'b h s d -> b s (h d)')
 
     # Output projection
     out = context.matmul(o_proj_weight.t())  # (B, S, d_model)
 
+    # Restore original leading dimensions
     return out.reshape(*orig_leading, seq_len, d_model)
 
 

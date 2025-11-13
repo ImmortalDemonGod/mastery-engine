@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import regex as re
 from typing import Iterable, Optional
 
 
@@ -31,6 +32,11 @@ class Tokenizer:
         # Precompute special-tokens (bytes) and sort by length (greedy, longest-first)
         self._special_tokens_bytes = [s.encode("utf-8") for s in self._special_tokens]
         self._special_tokens_sorted = sorted(self._special_tokens, key=len, reverse=True)
+
+        # GPT-2 regex pattern for pre-tokenization (prevents cross-boundary merges)
+        self._gpt2_pattern = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
 
     # ------------------------- Public API -------------------------
     def encode(self, text: str) -> list[int]:
@@ -93,30 +99,44 @@ class Tokenizer:
 
     # ------------------------ Internal API ------------------------
     def _encode_span(self, text: str) -> list[int]:
-        """Encode a non-special span (no special tokens inside)."""
-        # Start with byte-level tokens as bytes objects
-        b = text.encode("utf-8")
-        tokens: list[bytes] = [bytes([x]) for x in b]
-
-        # Apply merges sequentially
-        for left, right in self._merges:
-            if not tokens or len(tokens) == 1:
-                break
-            tokens = self._apply_merge(tokens, left, right)
-
-        # Map final byte-sequences to ids
+        """Encode a non-special span (no special tokens inside).
+        
+        Uses GPT-2 regex pre-tokenization to split text into pieces,
+        then applies BPE to each piece independently.
+        """
+        if not text:
+            return []
+        
+        # Pre-tokenize using GPT-2 regex
+        pieces = self._gpt2_pattern.findall(text)
+        if not pieces:
+            # Fallback if regex doesn't match (shouldn't happen with GPT-2 pattern)
+            pieces = [text]
+        
         ids: list[int] = []
-        for t in tokens:
-            tid = self._bytes_to_id.get(t)
-            if tid is None:
-                # If a token sequence isn't present (shouldn't happen with correct vocab),
-                # fall back to splitting to bytes to ensure progress.
-                for by in t:
-                    tid_b = self._bytes_to_id.get(bytes([by]))
-                    if tid_b is not None:
-                        ids.append(tid_b)
-            else:
-                ids.append(tid)
+        for piece in pieces:
+            # Start with byte-level tokens for this piece
+            b = piece.encode("utf-8")
+            tokens: list[bytes] = [bytes([x]) for x in b]
+
+            # Apply merges sequentially
+            for left, right in self._merges:
+                if not tokens or len(tokens) == 1:
+                    break
+                tokens = self._apply_merge(tokens, left, right)
+
+            # Map final byte-sequences to ids
+            for t in tokens:
+                tid = self._bytes_to_id.get(t)
+                if tid is None:
+                    # If a token sequence isn't present (shouldn't happen with correct vocab),
+                    # fall back to splitting to bytes to ensure progress.
+                    for by in t:
+                        tid_b = self._bytes_to_id.get(bytes([by]))
+                        if tid_b is not None:
+                            ids.append(tid_b)
+                else:
+                    ids.append(tid)
         return ids
 
     @staticmethod
