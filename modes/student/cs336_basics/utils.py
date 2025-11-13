@@ -11,11 +11,12 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     - Subtract the max along `dim` before exponentiation to avoid overflow.
     - Cast the final probabilities back to the original dtype of the input tensor.
     """
-    float_tensor = in_features.float()
-    peak = float_tensor.max(dim=dim, keepdim=True).values
-    normalized = float_tensor - peak
-    exps = torch.exp(normalized)
-    return (exps / exps.sum(dim=dim, keepdim=True)).to(in_features.dtype)
+    # Final E2E validation with unique variable names
+    tensor_data = in_features.float()
+    maximum = tensor_data.max(dim=dim, keepdim=True).values
+    adjusted = tensor_data - maximum
+    exponentials = torch.exp(adjusted)
+    return (exponentials / exponentials.sum(dim=dim, keepdim=True)).to(in_features.dtype)
 
 
 def cross_entropy(
