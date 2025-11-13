@@ -11,15 +11,13 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     - Subtract the max along `dim` before exponentiation to avoid overflow.
     - Cast the final probabilities back to the original dtype of the input tensor.
     """
-    x = in_features
-    orig_dtype = x.dtype
-    x32 = x.float()
-    max_vals = x32.max(dim=dim, keepdim=True).values
-    shifted = x32 - max_vals
-    exps = torch.exp(shifted)
-    sums = exps.sum(dim=dim, keepdim=True)
-    out = exps / sums
-    return out.to(orig_dtype)
+    # TODO: Implement numerically-stable softmax
+    # 1. Convert to float32: x32 = in_features.float()
+    # 2. Subtract max: shifted = x32 - x32.max(dim=dim, keepdim=True).values
+    # 3. Exponentiate: exps = torch.exp(shifted)
+    # 4. Normalize: out = exps / exps.sum(dim=dim, keepdim=True)
+    # 5. Cast back: return out.to(in_features.dtype)
+    raise NotImplementedError("TODO: Implement softmax with subtract-max trick")
 
 
 def cross_entropy(
@@ -35,16 +33,12 @@ def cross_entropy(
     Returns:
         Scalar tensor: mean cross-entropy over the batch.
     """
-    logits = inputs
-    orig_dtype = logits.dtype
-    x32 = logits.float()
-    t = targets.long()
-    # log-sum-exp for stability
-    lse = torch.logsumexp(x32, dim=-1)
-    # pick the logit for the correct class
-    correct = x32.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)
-    loss = (lse - correct).mean()
-    return loss.to(orig_dtype)
+    # TODO: Implement numerically-stable cross-entropy
+    # 1. Upcast to float32
+    # 2. Use torch.logsumexp for numerical stability
+    # 3. Gather the correct class logits
+    # 4. Compute loss = (logsumexp - correct_logits).mean()
+    raise NotImplementedError("TODO: Implement cross_entropy with log-sum-exp trick")
 
 
 def gradient_clipping(parameters, max_l2_norm: float) -> None:
@@ -58,18 +52,11 @@ def gradient_clipping(parameters, max_l2_norm: float) -> None:
         parameters: Iterable of torch.nn.Parameter (or objects with .grad tensors).
         max_l2_norm: Maximum allowed global L2 norm.
     """
-    # Collect grads that exist
-    grads = [p.grad for p in parameters if getattr(p, "grad", None) is not None]
-    if not grads:
-        return
-    # Compute global L2 norm (same as norm of concatenation)
-    norms = torch.stack([g.detach().norm(2) for g in grads])
-    total_norm = norms.norm(2)
-    # Only scale if norm exceeds the threshold
-    if total_norm > max_l2_norm:
-        clip_coef = max_l2_norm / (total_norm + 1e-6)
-        for g in grads:
-            g.mul_(clip_coef)
+    # TODO: Implement global gradient clipping
+    # 1. Collect all gradients that exist
+    # 2. Compute global L2 norm across all gradients
+    # 3. If total_norm > max_l2_norm, scale all gradients by (max_l2_norm / total_norm)
+    raise NotImplementedError("TODO: Implement gradient_clipping")
 
 
 def get_lr_cosine_schedule(
@@ -89,26 +76,11 @@ def get_lr_cosine_schedule(
       clamped to [0, 1]. The cosine formula is: min + 0.5*(max-min)*(1 + cos(pi * progress)).
     - For it > cosine_cycle_iters, hold at min_learning_rate.
     """
-    # Warmup
-    if it < warmup_iters:
-        if warmup_iters <= 0:
-            return float(max_learning_rate)
-        return float(max_learning_rate * (it / warmup_iters))
-
-    # Cosine decay window
-    if it <= cosine_cycle_iters:
-        # Handle degenerate case where window length is zero
-        denom = max(1, cosine_cycle_iters - warmup_iters)
-        progress = (it - warmup_iters) / denom
-        from math import cos, pi
-
-        return float(
-            min_learning_rate
-            + 0.5 * (max_learning_rate - min_learning_rate) * (1.0 + cos(pi * progress))
-        )
-
-    # After cycle: clamp to min
-    return float(min_learning_rate)
+    # TODO: Implement cosine learning rate schedule with warmup
+    # 1. Linear warmup: if it < warmup_iters, return max_lr * (it / warmup_iters)
+    # 2. Cosine decay: if it <= cosine_cycle_iters, use cosine formula
+    # 3. After cycle: return min_learning_rate
+    raise NotImplementedError("TODO: Implement get_lr_cosine_schedule")
 
 
 def get_batch(dataset, batch_size: int, context_length: int, device: str):
@@ -123,32 +95,23 @@ def get_batch(dataset, batch_size: int, context_length: int, device: str):
 
     Returns: x, y as LongTensors of shape (batch_size, context_length) on `device` where y = x shifted by 1.
     """
-    data = torch.as_tensor(dataset, dtype=torch.long)
-    n = data.shape[0] - context_length
-    if n <= 0:
-        raise ValueError("context_length must be < len(dataset)")
-    starts = torch.randint(low=0, high=n, size=(batch_size,))
-    offsets = torch.arange(context_length).unsqueeze(0)
-    x_idx = starts.unsqueeze(1) + offsets
-    y_idx = x_idx + 1
-    x = data[x_idx]
-    y = data[y_idx]
-    # Move to device (will raise appropriate errors for invalid devices)
-    x = x.to(device)
-    y = y.to(device)
-    return x, y
+    # TODO: Implement data loader for language modeling
+    # 1. Convert dataset to tensor
+    # 2. Sample random start positions
+    # 3. Create x by indexing dataset at positions
+    # 4. Create y by indexing at positions + 1
+    # 5. Move to device
+    raise NotImplementedError("TODO: Implement get_batch")
 
 
 def save_checkpoint(model, optimizer, iteration, out):
     """
     Serialize model/optimizer state dicts and iteration to a path or file-like.
     """
-    payload = {
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "iteration": int(iteration),
-    }
-    torch.save(payload, out)
+    # TODO: Implement checkpoint saving
+    # Create a dict with model_state_dict, optimizer_state_dict, iteration
+    # Use torch.save() to write to 'out'
+    raise NotImplementedError("TODO: Implement save_checkpoint")
 
 
 def load_checkpoint(src, model, optimizer) -> int:
@@ -156,7 +119,8 @@ def load_checkpoint(src, model, optimizer) -> int:
     Load a checkpoint from path or file-like, restore state, and return iteration.
     Always loads onto CPU to avoid device mismatches in tests.
     """
-    checkpoint = torch.load(src, map_location="cpu")
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    return int(checkpoint["iteration"])
+    # TODO: Implement checkpoint loading
+    # Use torch.load() with map_location="cpu"
+    # Load model and optimizer state_dicts
+    # Return iteration
+    raise NotImplementedError("TODO: Implement load_checkpoint")

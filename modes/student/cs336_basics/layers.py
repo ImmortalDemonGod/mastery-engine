@@ -208,43 +208,15 @@ def multihead_self_attention(
     Returns:
         Tensor of shape (..., seq_len, d_model)
     """
-    head_dim = d_model // num_heads
-    assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
-
-    orig_leading = in_features.shape[:-2]
-    seq_len = in_features.shape[-2]
-
-    # Flatten leading batch dimensions: (..., s, d) -> (batch, s, d)
-    x = rearrange(in_features, '... s d -> (...) s d')
-
-    # Projections for all heads in single matmuls
-    q_all = x.matmul(q_proj_weight.t())  # (B, S, d_model)
-    k_all = x.matmul(k_proj_weight.t())  # (B, S, d_model)
-    v_all = x.matmul(v_proj_weight.t())  # (B, S, d_model)
-
-    # Split into heads and move head dimension before sequence: (B, H, S, D)
-    def to_heads(t: Tensor) -> Tensor:
-        """Split concatenated heads: (b, s, h*d) -> (b, h, s, d)"""
-        return rearrange(t, 'b s (h d) -> b h s d', h=num_heads)
-
-    q = to_heads(q_all)
-    k = to_heads(k_all)
-    v = to_heads(v_all)
-
-    # Scaled dot-product attention per head with causal mask
-    # Create lower-triangular causal mask and add broadcast dimensions
-    causal = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=x.device))
-    causal = rearrange(causal, 's1 s2 -> 1 1 s1 s2')  # Add batch and head dims
-    context = scaled_dot_product_attention(q, k, v, mask=causal)  # (B, H, S, D)
-
-    # Combine heads: (B, H, S, D) -> (B, S, H*D=d_model)
-    context = rearrange(context, 'b h s d -> b s (h d)')
-
-    # Output projection
-    out = context.matmul(o_proj_weight.t())  # (B, S, d_model)
-
-    # Restore original leading dimensions
-    return out.reshape(*orig_leading, seq_len, d_model)
+    # TODO: Implement multi-head self-attention
+    # 1. Flatten batch dimensions with einops: rearrange(in_features, '... s d -> (...) s d')
+    # 2. Project Q, K, V for all heads: q_all = x @ q_proj_weight.t()
+    # 3. Split into heads: rearrange(q_all, 'b s (h d) -> b h s d', h=num_heads)
+    # 4. Create causal mask and apply attention
+    # 5. Combine heads: rearrange(context, 'b h s d -> b s (h d)')
+    # 6. Output projection: out = context @ o_proj_weight.t()
+    # 7. Restore original shape
+    raise NotImplementedError("TODO: Implement multihead_self_attention")
 
 
 def transformer_block(
