@@ -11,7 +11,6 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     - Subtract the max along `dim` before exponentiation to avoid overflow.
     - Cast the final probabilities back to the original dtype of the input tensor.
     """
-    # Final E2E test with unique variable names
     float_tensor = in_features.float()
     peak = float_tensor.max(dim=dim, keepdim=True).values
     normalized = float_tensor - peak
