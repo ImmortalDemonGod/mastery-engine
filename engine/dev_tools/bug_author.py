@@ -475,7 +475,7 @@ Before generating JSON, verify:
         import re
         
         try:
-            # Parse patch to get file path and function name
+            # Parse patch to get file path
             patch_content = patch_path.read_text()
             
             # Extract target file from patch header
@@ -486,7 +486,7 @@ Before generating JSON, verify:
             rel_path = match.group(1)
             
             # Try developer mode first, then student mode
-            base_dir = patch_path.parent.parent.parent.parent  # Go up to repo root
+            base_dir = patch_path.parent.parent.parent.parent
             possible_paths = [
                 base_dir / 'modes' / 'developer' / rel_path,
                 base_dir / 'modes' / 'student' / rel_path
@@ -506,7 +506,6 @@ Before generating JSON, verify:
             tree = ast_module.parse(source_code)
             
             # Find the function that contains code similar to our snippet
-            # Look for return statements or assignments that match
             snippet_keywords = set(re.findall(r'\w+', snippet))
             
             for node in ast_module.walk(tree):
@@ -519,7 +518,7 @@ Before generating JSON, verify:
                         overlap = len(snippet_keywords & func_keywords)
                         if overlap >= min(3, len(snippet_keywords)):
                             # Extract just the function body (not def line)
-                            lines = func_source.split('\n')[1:]  # Skip def line
+                            lines = func_source.split('\n')[1:]
                             return '\n'.join(lines)
             
             return snippet
@@ -533,22 +532,23 @@ Before generating JSON, verify:
 ## Bug Description
 {symptom}
 
-## ⚠️ CRITICAL: ANALYZE ONLY THE CODE BELOW (BEFORE/CORRECT CODE)
+## Code Transformation
 
-**YOUR PATTERNS MUST MATCH THIS CODE:**
-
+**BEFORE (Correct):**
 ```python
 {patch_info['before']}
 ```
 
-**☝️ THIS IS THE CODE YOU MUST ANALYZE!**
-**DO NOT look ahead to the AFTER code yet!**
+**AFTER (Buggy):**
+```python
+{patch_info['after']}
+```
 
 ## Your Task
 
-Generate patterns that match the BEFORE code above.
+Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
 
-**Step 1: Analyze ONLY the BEFORE Code Above**
+**Step 1: Analyze the BEFORE Code AST (NOT the AFTER code!)**
 
 ⚠️ CRITICAL: Your patterns must match the BEFORE code's AST structure. The AFTER code is only shown for reference.
 
@@ -572,28 +572,9 @@ denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
 **Critical Requirements:**
 1. ⚠️ INCLUDE SPECIFIC VARIABLE NAMES in patterns (e.g., `"id": "bias_correction1"`) - this is REQUIRED!
 2. ⚠️ USE EXACT NODE TYPES from the BEFORE code - don't guess! Parse it carefully!
-3. ⚠️ MAXIMUM SIMPLICITY: Use minimum fields - do NOT over-specify!
+3. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
 4. Check if same variable appears multiple times - if so, add "op" to disambiguate
 5. Use direct "id" specification (prefer this over context tracking when possible)
-
-**❌ WRONG - Over-Specified Patterns:**
-```json
-{{
-  "node_type": "Call",
-  "func": {{"node_type": "Attribute", "attr": "sqrt"}},
-  "args": [{{"node_type": "Call", "func": {{...}}}}]  ← TOO DEEP!
-}}
-```
-
-**✅ CORRECT - Minimal Patterns:**
-```json
-{{
-  "node_type": "Call",
-  "func": {{"node_type": "Attribute", "attr": "sqrt"}}
-}}
-```
-
-**RULE: Never nest more than 3 levels deep. Don't specify args/keywords for Call unless absolutely necessary for disambiguation.**
 
 **Step 3: Learn from Successful Examples**
 
@@ -648,21 +629,6 @@ Here are PROVEN successful patterns from golden examples. Study their simplicity
 
 **Notice:** All patterns are SIMPLE - they don't over-specify nested structure!
 
----
-
-## AFTER Code (For Reference ONLY - Do NOT analyze this for patterns!)
-
-The transformation produces this buggy code:
-
-```python
-{patch_info['after']}
-```
-
-**⚠️ REMINDER:** Your patterns must match the BEFORE code shown at the top, NOT this AFTER code!
-**Common error:** Seeing `step_size = lr` here and matching Name instead of the BinOp/Div in the BEFORE code.
-
----
-
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
 """
@@ -695,7 +661,7 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 response = self.llm_service.generate_completion(
                     prompt=user_prompt,
                     system=system_prompt,
-                    temperature=0.1,
+                    temperature=0.3,
                     response_format=BugDefSchema
                 )
             except ImportError:
@@ -703,7 +669,7 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 response = self.llm_service.generate_completion(
                     prompt=user_prompt,
                     system=system_prompt,
-                    temperature=0.1
+                    temperature=0.3
                 )
             
             if debug:
@@ -734,7 +700,6 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                     for field in required:
                         has_field = field in bug_def
                         print(f"  {'✅' if has_field else '❌'} {field}: {'present' if has_field else 'MISSING'}")
-                
                 user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Ensure all required fields are present."
                 continue
             
@@ -771,59 +736,7 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
     def _validate_schema(self, bug_def: dict) -> bool:
         """Validate bug definition against schema."""
         required_fields = ["id", "description", "injection_type", "engine_version", "target_function", "logic"]
-        if not all(field in bug_def for field in required_fields):
-            return False
-        
-        # DISABLED: Pattern simplicity validation was too strict, broke working cases
-        # Caused regression: 2/4 → 1/4 overall success
-        # if not self._validate_pattern_simplicity(bug_def):
-        #     return False
-        
-        return True
-    
-    def _validate_pattern_simplicity(self, bug_def: dict) -> bool:
-        """
-        Validate that patterns are appropriately simple.
-        Reject patterns with unnecessary nested structure.
-        """
-        for pass_def in bug_def.get('logic', []):
-            if 'pattern' not in pass_def:
-                continue
-            
-            pattern = pass_def['pattern']
-            
-            # Check depth of nesting
-            def get_depth(obj, current_depth=0):
-                if not isinstance(obj, dict):
-                    return current_depth
-                max_child_depth = current_depth
-                for value in obj.values():
-                    if isinstance(value, dict):
-                        max_child_depth = max(max_child_depth, get_depth(value, current_depth + 1))
-                    elif isinstance(value, list):
-                        for item in value:
-                            if isinstance(item, dict):
-                                max_child_depth = max(max_child_depth, get_depth(item, current_depth + 1))
-                return max_child_depth
-            
-            depth = get_depth(pattern)
-            
-            # Reject if too deep (more than 3 levels of nesting)
-            # Level 0: {"node_type": "Assign"}
-            # Level 1: {"node_type": "Assign", "targets": [{"node_type": "Name"}]}
-            # Level 2: {"node_type": "Assign", "value": {"node_type": "BinOp", "op": "Add"}}
-            # Level 3: {"node_type": "Assign", "targets": [{"node_type": "Name", "id": "x"}], "value": {...}}
-            # Level 4+: TOO COMPLEX
-            if depth > 3:
-                return False
-            
-            # Reject if has unnecessary nested args/keywords in Call patterns
-            if pattern.get('node_type') == 'Call':
-                if 'args' in pattern or 'keywords' in pattern:
-                    # Call with args/keywords is over-specified
-                    return False
-        
-        return True
+        return all(field in bug_def for field in required_fields)
     
     def _test_bug_definition(self, bug_def: dict, correct_code: str, expected_buggy: str) -> bool:
         """Test bug definition by injecting and comparing."""
