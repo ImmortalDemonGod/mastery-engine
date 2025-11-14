@@ -35,28 +35,29 @@ def get_all_modules() -> list[Dict]:
         if not patch_files:
             continue
         
-        # Find JSON file
-        json_files = list(bugs_dir.glob("*.json"))
-        if not json_files:
-            print(f"⚠️  {module_dir.name}: No JSON file found")
-            continue
+        patch_file = patch_files[0]
         
-        json_file = json_files[0]
+        # Determine JSON filename from patch
+        # e.g., missing_scale.patch -> missing_scale.json
+        json_filename = patch_file.stem + ".json"
+        json_file = bugs_dir / json_filename
         
         # Check if has golden pattern
         has_golden = False
-        try:
-            with open(json_file) as f:
-                data = json.load(f)
-                has_golden = "logic" in data and data["logic"]
-        except:
-            pass
+        if json_file.exists():
+            try:
+                with open(json_file) as f:
+                    data = json.load(f)
+                    has_golden = "logic" in data and data["logic"]
+            except:
+                pass
         
         modules.append({
             "name": module_dir.name,
-            "patch": patch_files[0],
+            "patch": patch_file,
             "json": json_file,
-            "has_golden": has_golden
+            "has_golden": has_golden,
+            "json_exists": json_file.exists()
         })
     
     return modules
@@ -84,6 +85,28 @@ def test_golden_pattern(bug_def: dict, correct_code: str, expected_buggy: str) -
     
     except Exception as e:
         return False, f"Error during injection: {e}"
+
+
+def create_stub_json(module_info: Dict) -> None:
+    """Create stub JSON file if it doesn't exist."""
+    if module_info['json_exists']:
+        return
+    
+    # Create minimal stub
+    stub = {
+        "id": f"{module_info['name']}_bug",
+        "description": f"Bug in {module_info['name']}",
+        "injection_type": "generic",
+        "engine_version": "1.0",
+        "target_function": "TODO",
+        "logic": []
+    }
+    
+    module_info['json'].parent.mkdir(parents=True, exist_ok=True)
+    with open(module_info['json'], 'w') as f:
+        json.dump(stub, f, indent=2)
+    
+    print(f"  ✅ Created stub JSON: {module_info['json'].name}")
 
 
 def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional[dict]:
@@ -174,17 +197,37 @@ def main():
     
     # Separate by status
     has_golden = [m for m in modules if m['has_golden']]
+    needs_json = [m for m in modules if not m['json_exists']]
     needs_golden = [m for m in modules if not m['has_golden']]
     
     print(f"\n✅ Already have golden patterns: {len(has_golden)}")
     for m in has_golden:
         print(f"   {m['name']}")
     
+    if needs_json:
+        print(f"\n📝 Need to create JSON files: {len(needs_json)}")
+        for m in needs_json:
+            print(f"   {m['name']}")
+    
     print(f"\n⚠️  Need golden patterns: {len(needs_golden)}")
     for m in needs_golden:
-        print(f"   {m['name']}")
+        status = "(no JSON)" if not m['json_exists'] else "(empty logic)"
+        print(f"   {m['name']} {status}")
     
-    # Initialize bug author with gpt-4o
+    # Step 1: Create stub JSON files where needed
+    if needs_json:
+        print(f"\n{'='*70}")
+        print("STEP 1: Creating stub JSON files")
+        print(f"{'='*70}")
+        for module_info in needs_json:
+            print(f"\n{module_info['name']}:")
+            create_stub_json(module_info)
+        print(f"\n✅ Created {len(needs_json)} stub JSON files")
+    
+    # Step 2: Initialize bug author with gpt-4o
+    print(f"\n{'='*70}")
+    print("STEP 2: Generating golden patterns")
+    print(f"{'='*70}")
     print(f"\n🧠 Initializing with gpt-4o (smarter model)...")
     llm_service = LLMService(model="gpt-4o")
     author = BugAuthor(llm_service=llm_service)
