@@ -709,7 +709,11 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 
                 return False, "\n".join(diagnostic)
             
-            # Normalize whitespace for comparison
+            # Use AST-based functional comparison (ignores comments, whitespace)
+            if self._functionally_equivalent(buggy_code, expected_buggy):
+                return True, "✅ Functionally equivalent!"
+            
+            # Fallback: Try normalized text comparison for better error messages
             buggy_normalized = self._normalize_code(buggy_code)
             expected_normalized = self._normalize_code(expected_buggy)
             
@@ -766,6 +770,29 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 diagnostic.append(traceback.format_exc())
             
             return False, "\n".join(diagnostic)
+    
+    def _functionally_equivalent(self, code1: str, code2: str) -> bool:
+        """
+        Check if two code snippets are functionally equivalent using AST comparison.
+        This ignores comments, whitespace, and formatting differences.
+        """
+        import ast as ast_module
+        import textwrap
+        
+        try:
+            # Parse both codes
+            tree1 = ast_module.parse(textwrap.dedent(code1))
+            tree2 = ast_module.parse(textwrap.dedent(code2))
+            
+            # Compare AST structures using ast.dump
+            # This gives us a canonical string representation of the AST
+            dump1 = ast_module.dump(tree1)
+            dump2 = ast_module.dump(tree2)
+            
+            return dump1 == dump2
+        except:
+            # If either fails to parse, they're not equivalent
+            return False
     
     def _normalize_code(self, code: str) -> str:
         """Normalize code for comparison (remove extra whitespace, etc.)."""
