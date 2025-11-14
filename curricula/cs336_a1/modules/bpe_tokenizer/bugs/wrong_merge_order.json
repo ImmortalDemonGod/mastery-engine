@@ -1,8 +1,22 @@
 {
-  "id": "bpe_tokenizer_bug",
-  "description": "Bug in bpe_tokenizer",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "bpe-tokenizer-wrong-merge-order",
+  "description": "Merges inserted at beginning instead of appended",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "train",
+  "logic": [{
+    "pass": 1,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "Expr",
+      "value": {
+        "node_type": "Call",
+        "func": {"node_type": "Attribute", "attr": "append"}
+      }
+    },
+    "replacement": {
+      "type": "replace_with",
+      "source": "merges.insert(0, (vocab[best_pair[0]], vocab[best_pair[1]]))"
+    }
+  }]
 }

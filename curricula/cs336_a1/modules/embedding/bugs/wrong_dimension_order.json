@@ -1,8 +1,29 @@
 {
-  "id": "embedding_bug",
-  "description": "Bug in embedding",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "embedding-wrong-dimension-order",
+  "description": "Swapped num_embeddings and embedding_dim",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "__init__",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Attribute",
+            "attr": "embedding"
+          }
+        ],
+        "value": {
+          "node_type": "Call"
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "self.embedding = nn.Embedding(num_embeddings=embedding_dim, embedding_dim=num_embeddings)"
+      }
+    }
+  ]
 }

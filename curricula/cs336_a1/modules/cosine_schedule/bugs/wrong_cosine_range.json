@@ -1,8 +1,29 @@
 {
-  "id": "cosine_schedule_bug",
-  "description": "Bug in cosine_schedule",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "cosine-schedule-wrong-range",
+  "description": "Cosine goes negative without proper transformation",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "cosine_learning_rate_schedule",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "cosine_decay"
+          }
+        ],
+        "value": {
+          "node_type": "Call"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "math.cos(math.pi * progress)"
+      }
+    }
+  ]
 }

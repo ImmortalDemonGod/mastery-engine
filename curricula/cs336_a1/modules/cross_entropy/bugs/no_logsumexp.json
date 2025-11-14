@@ -1,8 +1,46 @@
 {
-  "id": "cross_entropy_bug",
-  "description": "Bug in cross_entropy",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "cross-entropy-no-logsumexp",
+  "description": "Using naive softmax instead of logsumexp",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "cross_entropy",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "log_sum_exp"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "log_probs"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Sub"
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "exp_logits = torch.exp(x32)\nsoftmax_probs = exp_logits / exp_logits.sum(dim=-1, keepdim=True)\ntarget_probs = softmax_probs.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)\nlog_probs = torch.log(target_probs + 1e-10)"
+      }
+    }
+  ]
 }

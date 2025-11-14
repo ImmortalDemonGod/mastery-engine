@@ -1,8 +1,29 @@
 {
-  "id": "data_loader_bug",
-  "description": "Bug in data_loader",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "data-loader-wrong-sampling-range",
+  "description": "Wrong high bound in randint causing out-of-bounds",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "get_batch",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "starts"
+          }
+        ],
+        "value": {
+          "node_type": "Call"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "torch.randint(low=0, high=n+1, size=(batch_size,))"
+      }
+    }
+  ]
 }

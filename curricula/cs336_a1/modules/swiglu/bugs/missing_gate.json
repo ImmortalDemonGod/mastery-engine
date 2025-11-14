@@ -1,8 +1,46 @@
 {
-  "id": "swiglu_bug",
-  "description": "Bug in swiglu",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "swiglu-missing-gate",
+  "description": "Missing gate computation in SwiGLU",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "forward",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "gate"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "gated"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Mult"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "value"
+      }
+    }
+  ]
 }

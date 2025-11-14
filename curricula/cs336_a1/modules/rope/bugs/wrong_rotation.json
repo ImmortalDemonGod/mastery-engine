@@ -1,8 +1,30 @@
 {
-  "id": "rope_bug",
-  "description": "Bug in rope",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "rope-wrong-rotation",
+  "description": "Wrong rotation formula (missing negative sign)",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "apply_rotary_position_embeddings",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "x_rotated_even"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Sub"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "x_even * cos_selected + x_odd * sin_selected"
+      }
+    }
+  ]
 }

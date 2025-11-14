@@ -1,8 +1,29 @@
 {
-  "id": "checkpointing_bug",
-  "description": "Bug in checkpointing",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "checkpointing-missing-optimizer-state",
+  "description": "Missing optimizer state from checkpoint",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "save_checkpoint",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "checkpoint"
+          }
+        ],
+        "value": {
+          "node_type": "Dict"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "{'model_state_dict': model.state_dict(), 'iteration': int(iteration)}"
+      }
+    }
+  ]
 }

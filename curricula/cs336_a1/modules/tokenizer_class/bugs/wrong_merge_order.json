@@ -1,8 +1,20 @@
 {
-  "id": "tokenizer_class_bug",
-  "description": "Bug in tokenizer_class",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "tokenizer-class-wrong-merge-order",
+  "description": "Merges applied in reversed order",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "encode",
+  "logic": [{
+    "pass": 1,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "For",
+      "target": {"node_type": "Tuple"},
+      "iter": {"node_type": "Attribute", "attr": "merges"}
+    },
+    "replacement": {
+      "type": "replace_with",
+      "source": "for pair_a, pair_b in reversed(self.merges):\n    tokens = self._apply_merge(tokens, pair_a, pair_b)"
+    }
+  }]
 }
