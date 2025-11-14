@@ -714,6 +714,15 @@ class SystematicEvaluator:
                                     print(f"       Expected: {'function' if has_def_expected else 'snippet'}")
                                     print(f"       Got: {'function' if has_def_got else 'snippet'}")
                                     print(f"       → Comparison invalid (apples vs oranges)")
+                        
+                        # Check for injection success with comparison failure
+                        if 'Injection succeeded but transformation was incorrect' in attempt.feedback_given:
+                            # Check if this is actually a successful transformation
+                            if 'Got:' in attempt.feedback_given and 'def ' in attempt.feedback_given:
+                                print(f"\n    💡 LIKELY SUCCESSFUL TRANSFORMATION:")
+                                print(f"       Pattern matched and code transformed")
+                                print(f"       Failure is in comparison, not transformation")
+                                print(f"       Check if transformation is functionally correct")
                     
                 except Exception as e:
                     print(f"    Error parsing response: {e}")
