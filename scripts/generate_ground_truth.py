@@ -115,39 +115,21 @@ def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional
     print(f"MODULE: {module_info['name']}")
     print(f"{'='*70}")
     
-    # Extract patch info
+    # Generate pattern with LLM (it handles patch extraction + validation internally)
     try:
-        patch_info = author._extract_patch_info(module_info['patch'])
-        print(f"\n✅ Patch extracted successfully")
-        print(f"   Before code: {len(patch_info['before'])} chars")
-        print(f"   After code: {len(patch_info['after'])} chars")
-    except Exception as e:
-        print(f"\n❌ Failed to extract patch: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-    
-    # Show the transformation
-    print(f"\n📝 TRANSFORMATION:")
-    print(f"\nBEFORE:\n{patch_info['before'][:200]}...")
-    print(f"\nAFTER:\n{patch_info['after'][:200]}...")
-    
-    # Generate pattern with LLM
-    print(f"\n🧠 Generating pattern with gpt-4o...")
-    
-    try:
-        bug_def = author._generate_bug_definition_llm(
-            patch_info=patch_info,
+        bug_def, success = author.generate_bug_definition(
             module_name=module_info['name'],
+            patch_path=module_info['patch'],
             symptom=f"Bug in {module_info['name']}",
-            feedback=None
+            max_retries=3,
+            debug=False  # Set to False for cleaner output
         )
         
-        if not bug_def:
-            print(f"❌ LLM failed to generate pattern")
+        if not success or not bug_def:
+            print(f"\n❌ Failed to generate valid pattern")
             return None
         
-        print(f"✅ Pattern generated")
+        print(f"\n✅ Pattern generated and validated!")
         
         # Show pattern summary
         logic = bug_def.get('logic', [])
@@ -160,23 +142,10 @@ def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional
             print(f"       Pattern: {pattern.get('node_type', '?')}")
             print(f"       Replacement: {repl.get('type', '?')}")
         
-        # Test the pattern
-        print(f"\n🧪 Testing pattern with GenericBugInjector...")
-        success, message = test_golden_pattern(
-            bug_def,
-            patch_info['before'],
-            patch_info['after']
-        )
-        
-        if success:
-            print(f"✅ Pattern works correctly!")
-            return bug_def
-        else:
-            print(f"❌ Pattern failed: {message}")
-            return None
+        return bug_def
     
     except Exception as e:
-        print(f"❌ Error generating/testing pattern: {e}")
+        print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
         return None
