@@ -78,6 +78,17 @@ Your implementation will be tested against:
 - Edge cases: single-class, large vocabulary sizes
 - Batch processing correctness
 
+## References
+**Primary Literature:**
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 5.5: Maximum Likelihood Estimation and cross-entropy loss
+  - Log-sum-exp trick for numerical stability (Section 5.5.1)
+
+**Further Reading:**
+- Stanford CS336 Assignment 1 Documentation
+  - Practical implementation guidance for numerically stable cross-entropy
+  - Integration with language modeling objectives
+
 ## Submission
 Once implemented, run:
 ```bash

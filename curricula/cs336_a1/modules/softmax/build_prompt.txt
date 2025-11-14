@@ -65,6 +65,20 @@ Your implementation will be tested against:
 - Large negative shifts: `x - 100`  
 - Mixed magnitudes within same tensor
 
+## References
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Uses softmax as core component of attention mechanism
+  - Softmax(QK^T/√d_k) converts scores to probability distributions
+
+- Bridle, J. S. (1990). "Probabilistic Interpretation of Feedforward Classification Network Outputs, with Relationships to Statistical Pattern Recognition."
+  - Early formalization of softmax for neural networks
+
+**Further Reading:**
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 6.2.2.3: Softmax units for output layers
+
 ## Submission
 Once implemented, run:
 ```bash

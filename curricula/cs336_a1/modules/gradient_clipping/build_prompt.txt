@@ -83,6 +83,19 @@ Your implementation will be tested against:
 - Edge cases: missing gradients, zero gradients
 - Comparison with `torch.nn.utils.clip_grad_norm_`
 
+## References
+**Primary Literature:**
+- Pascanu, R., Mikolov, T., & Bengio, Y. (2013). "On the difficulty of training 
+  Recurrent Neural Networks." In Proceedings of ICML 2013.
+  - Introduced gradient clipping to address exploding gradients in RNNs
+  - Global norm clipping preserves gradient direction
+
+**Further Reading:**
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 10.11.1: Clipping gradients for training stability
+- Stanford CS336 Assignment 1 Documentation
+  - Practical implementation guidance for gradient clipping in Transformers
+
 ## Submission
 Once implemented, run:
 ```bash
