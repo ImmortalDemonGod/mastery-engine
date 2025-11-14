@@ -395,6 +395,23 @@ Sampling Strategy Comparison
 
 Modern systems use: **temperature=0.7 + top_p=0.9** for best results!
 
+References
+──────────
+**Primary Literature:**
+- Holtzman, A., Buys, J., Du, L., Forbes, M., & Choi, Y. (2020). "The Curious Case of 
+  Neural Text Degeneration." In Proceedings of ICLR 2020.
+  - Introduced nucleus sampling (top-p): dynamic truncation based on cumulative probability
+  - Addresses repetition and incoherence problems in language generation
+
+- Fan, A., Lewis, M., & Dauphin, Y. (2018). "Hierarchical Neural Story Generation." 
+  In Proceedings of ACL 2018.
+  - Analysis of sampling strategies and their effect on text quality
+
+**Further Reading:**
+- Stanford CS336 Assignment 1 Documentation
+  - Practical implementation: greedy, temperature, top-k, top-p strategies
+  - Autoregressive generation mechanics
+
 Submission
 ──────────
 Once implemented, run:

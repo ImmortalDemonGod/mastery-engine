@@ -370,6 +370,23 @@ For production, consider:
 - Use fast tokenizers (HuggingFace tokenizers library in Rust)
 - Batch encoding for efficiency
 
+References
+──────────
+**Primary Literature:**
+- Sennrich, R., Haddow, B., & Birch, A. (2016). "Neural Machine Translation of 
+  Rare Words with Subword Units." In Proceedings of ACL 2016.
+  - BPE for open-vocabulary NMT - original tokenization algorithm
+  - Sequential merge application order is critical
+
+- Berglund, M., & van der Merwe, B. (2023). "Formalizing the Semantics of 
+  Byte Pair Encoding."
+  - Formal analysis of BPE merge order and correctness
+  - Mathematical foundations of tokenization algorithms
+
+**Further Reading:**
+- Radford, A., et al. (2019). "Language Models are Unsupervised Multitask Learners." (GPT-2)
+  - Byte-level BPE for universal vocabulary coverage
+
 Submission
 ──────────
 Once implemented, run:

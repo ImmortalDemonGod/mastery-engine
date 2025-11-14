@@ -394,6 +394,20 @@ Why Context Length Matters
 
 Context length is a critical hyperparameter!
 
+References
+──────────
+**Primary Literature:**
+- Kaplan, J., McCandlish, S., Henighan, T., et al. (2020). "Scaling Laws for Neural 
+  Language Models." arXiv:2001.08361.
+  - Context window size affects compute requirements and model capabilities
+  - Systematic study of scaling behaviors including context length
+
+**Further Reading:**
+- Stanford CS336 Assignment 1 Documentation
+  - Random sampling prevents positional overfitting
+  - Input/target shifted by 1 for next-token prediction
+  - Sampling range: [0, N - context_length - 1]
+
 Submission
 ──────────
 Once implemented, run:

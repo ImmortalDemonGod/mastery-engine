@@ -298,6 +298,23 @@ Example (GPT-2 small):
 
 For a 12-layer model, FFN alone is 85M parameters.
 
+References
+──────────
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Linear projections for Q, K, V in attention and position-wise FFN
+  - Foundation of Transformer architecture
+
+- He, K., Zhang, X., Ren, S., & Sun, J. (2015). "Delving Deep into Rectifiers: 
+  Surpassing Human-Level Performance on ImageNet Classification." In Proceedings of ICCV 2015.
+  - Kaiming initialization for layers with ReLU-family activations
+  - Addresses vanishing/exploding gradients in deep networks
+
+**Further Reading:**
+- Shazeer, N. (2020). "GLU Variants Improve Transformer." arXiv:2002.05202.
+  - SwiGLU uses three linear layers (W1, W2, W3) for gating mechanism
+
 Submission
 ──────────
 Once implemented, run:

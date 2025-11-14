@@ -348,6 +348,24 @@ for i, word in enumerate(token_to_word[:100]):  # First 100 tokens
 
 You'll see semantic clusters: animals together, numbers together, etc!
 
+References
+──────────
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Learned embeddings as Transformer input layer
+  - Embedding dimension equals model dimension (d_model)
+
+- Mikolov, T., Chen, K., Corrado, G., & Dean, J. (2013). "Efficient Estimation of 
+  Word Representations in Vector Space." arXiv:1301.3781.
+  - Word2Vec: Foundational work on learning word embeddings
+  - Semantic relationships encoded in vector space
+
+**Further Reading:**
+- Press, O., & Wolf, L. (2017). "Using the Output Embedding to Improve Language Models." 
+  In Proceedings of EACL 2017.
+  - Weight tying between input embeddings and output projection saves parameters
+
 Submission
 ──────────
 Once implemented, run:
