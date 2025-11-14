@@ -1,8 +1,30 @@
 {
-  "id": "transformer_block_bug",
-  "description": "Bug in transformer_block",
-  "injection_type": "generic",
-  "engine_version": "1.0",
-  "target_function": "TODO",
-  "logic": []
+  "id": "transformer-block-missing-residual",
+  "description": "Missing residual connection",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "forward",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "x"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Add"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "attn_out"
+      }
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "id": "linear-missing-transpose",
-  "description": "Missing transpose on weight matrix",
+  "description": "Missing transpose on weight matrix in linear layer",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "forward",
@@ -8,6 +8,7 @@
     {
       "pass": 1,
       "type": "find_and_replace",
+      "description": "Replace in_features.matmul(self.weight.t()) with in_features.matmul(self.weight)",
       "pattern": {
         "node_type": "Assign",
         "targets": [
@@ -25,5 +26,10 @@
         "source": "in_features.matmul(self.weight)"
       }
     }
-  ]
+  ],
+  "metadata": {
+    "created": "2025-11-14",
+    "version": "2.1",
+    "author": "auto_fixed"
+  }
 }

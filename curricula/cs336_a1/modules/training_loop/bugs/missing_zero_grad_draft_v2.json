@@ -1,6 +1,6 @@
 {
   "id": "training-loop-missing-zero-grad",
-  "description": "Missing optimizer.zero_grad()",
+  "description": "Missing optimizer.zero_grad() in training loop",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "train_step",
@@ -8,6 +8,7 @@
     {
       "pass": 1,
       "type": "find_and_replace",
+      "description": "Delete optimizer.zero_grad() call",
       "pattern": {
         "node_type": "Expr",
         "value": {
@@ -22,5 +23,10 @@
         "type": "delete_statement"
       }
     }
-  ]
+  ],
+  "metadata": {
+    "created": "2025-11-14",
+    "version": "2.1",
+    "author": "auto_fixed"
+  }
 }

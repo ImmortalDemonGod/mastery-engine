@@ -1,6 +1,6 @@
 {
-  "id": "linear-missing-transpose",
-  "description": "Missing transpose on weight matrix",
+  "id": "transformer-block-missing-residual",
+  "description": "Missing residual connection in transformer block",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "forward",
@@ -8,22 +8,29 @@
     {
       "pass": 1,
       "type": "find_and_replace",
+      "description": "Replace x = x + attn_out with x = attn_out",
       "pattern": {
         "node_type": "Assign",
         "targets": [
           {
             "node_type": "Name",
-            "id": "y"
+            "id": "x"
           }
         ],
         "value": {
-          "node_type": "Call"
+          "node_type": "BinOp",
+          "op": "Add"
         }
       },
       "replacement": {
         "type": "replace_value_with",
-        "source": "in_features.matmul(self.weight)"
+        "source": "attn_out"
       }
     }
-  ]
+  ],
+  "metadata": {
+    "created": "2025-11-14",
+    "version": "2.1",
+    "author": "auto_fixed"
+  }
 }
