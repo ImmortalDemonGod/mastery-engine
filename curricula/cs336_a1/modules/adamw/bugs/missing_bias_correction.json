@@ -1,0 +1,67 @@
+{
+  "id": "adamw-missing-bias-correction",
+  "description": "AdamW optimizer missing bias correction",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "adamw",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Delete bias_correction1 calculation",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [{"node_type": "Name", "id": "bias_correction1"}],
+        "value": {"node_type": "BinOp", "op": "Sub"}
+      },
+      "replacement": {"type": "delete_statement"}
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "description": "Delete bias_correction2 calculation",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [{"node_type": "Name", "id": "bias_correction2"}],
+        "value": {"node_type": "BinOp", "op": "Sub"}
+      },
+      "replacement": {"type": "delete_statement"}
+    },
+    {
+      "pass": 3,
+      "type": "find_and_replace",
+      "description": "Simplify step_size calculation (remove bias correction)",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [{"node_type": "Name", "id": "step_size"}],
+        "value": {"node_type": "BinOp", "op": "Div"}
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "lr"
+      }
+    },
+    {
+      "pass": 4,
+      "type": "find_and_replace",
+      "description": "Simplify denominator (remove bias correction)",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [{"node_type": "Name", "id": "denom"}],
+        "value": {"node_type": "Call"}
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "exp_avg_sq.sqrt().add_(eps)"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.1",
+    "author": "golden_example",
+    "symptom": "Without bias correction, AdamW updates are biased toward zero (10× too small at step 1), severely slowing initial training",
+    "complexity": "complex",
+    "operations": 4
+  }
+}

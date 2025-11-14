@@ -321,8 +321,18 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                 print(f"      ✅ Matched node at line {line}: {node_type} {var_id}")
             
             replacement = self._create_replacement(node)
-            if replacement is not None:
-                self.replacements_made += 1
+            
+            # Handle both replace (returns node) and delete (returns None)
+            # For delete_statement, replacement is None which signals deletion
+            self.replacements_made += 1
+            
+            if replacement is None:
+                # delete_statement case: return None to remove node
+                if self.debug:
+                    print(f"        ✅ Node will be deleted")
+                return None
+            else:
+                # replace_* case: return new node
                 return replacement
         
         return self.generic_visit(node)
