@@ -332,11 +332,30 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         replacement_def = self.pass_def.get('replacement', {})
         replacement_type = replacement_def.get('type')
         
+        if self.debug:
+            print(f"        Creating replacement: type={replacement_type}")
+        
         if replacement_type == 'replace_value_with':
-            # Replace node's value with value from another part of the node
+            # Replace node's value with value from another part of the node or parse code
             source_path = replacement_def['source']
-            matcher = PatternMatcher({}, self.context)
-            new_value = matcher._evaluate_path(node, source_path)
+            
+            # Check if source is a path (starts with "node.") or Python code
+            if source_path.startswith('node.'):
+                # Path-based replacement
+                matcher = PatternMatcher({}, self.context)
+                new_value = matcher._evaluate_path(node, source_path)
+            else:
+                # Parse Python code as replacement
+                try:
+                    # Parse as expression and extract the AST node
+                    parsed = ast.parse(source_path, mode='eval')
+                    new_value = parsed.body
+                    if self.debug:
+                        print(f"          Parsed code replacement: {source_path[:50]}...")
+                except SyntaxError:
+                    if self.debug:
+                        print(f"          Failed to parse replacement code")
+                    new_value = None
             
             if new_value is not None and hasattr(node, 'value'):
                 # Create a copy of the node with new value
