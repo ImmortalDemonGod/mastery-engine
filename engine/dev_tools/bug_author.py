@@ -596,6 +596,59 @@ denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
 
 **RULE: Never nest more than 3 levels deep. Don't specify args/keywords for Call unless absolutely necessary for disambiguation.**
 
+**Step 3: Learn from Successful Examples**
+
+Here are PROVEN successful patterns from golden examples. Study their simplicity:
+
+**Example 1 - Simple Call removal (rmsnorm):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Call",
+    "func": {{"node_type": "Attribute", "attr": "mean"}}
+  }},
+  "replacement": {{"type": "remove_keyword_arg", "name": "keepdim"}}
+}}
+```
+
+**Example 2 - BinOp replacement (silu):**
+```json
+{{
+  "pattern": {{
+    "node_type": "BinOp",
+    "op": "Mult",
+    "left": {{"node_type": "Name"}},
+    "right": {{"node_type": "Call"}}
+  }},
+  "replacement": {{"type": "replace_with", "path": "node.right"}}
+}}
+```
+
+**Example 3 - Statement deletion (attention):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Assign",
+    "targets": [{{"node_type": "Name", "id": "d_k"}}],
+    "value": {{"node_type": "Subscript"}}
+  }},
+  "replacement": {{"type": "delete_statement"}}
+}}
+```
+
+**Example 4 - Value replacement (adamw):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Assign",
+    "targets": [{{"node_type": "Name", "id": "bias_correction1"}}]
+  }},
+  "replacement": {{"type": "delete_statement"}}
+}}
+```
+
+**Notice:** All patterns are SIMPLE - they don't over-specify nested structure!
+
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
 """
@@ -628,7 +681,7 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 response = self.llm_service.generate_completion(
                     prompt=user_prompt,
                     system=system_prompt,
-                    temperature=0.3,
+                    temperature=0.1,
                     response_format=BugDefSchema
                 )
             except ImportError:
@@ -636,7 +689,7 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                 response = self.llm_service.generate_completion(
                     prompt=user_prompt,
                     system=system_prompt,
-                    temperature=0.3
+                    temperature=0.1
                 )
             
             if debug:
