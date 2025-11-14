@@ -60,14 +60,21 @@ class GenericBugInjector:
             (buggy_code, success) where success indicates if bug was injected
         """
         # Step 1: Parse student's code to ORIGINAL AST (preserve this!)
-        try:
-            original_ast = ast.parse(source_code)
-        except SyntaxError:
-            return source_code, False
+        # Note: Dedent code first if it has leading whitespace
+        import textwrap
+        dedented_code = textwrap.dedent(source_code)
         
-        # Step 2: Check if target function exists
+        try:
+            original_ast = ast.parse(dedented_code)
+        except SyntaxError:
+            return dedented_code, False
+        
+        # Step 2: Check if target function exists (skip for code snippets)
         target_function = self.bug_def.get('target_function')
-        if target_function and not self._has_function(original_ast, target_function):
+        # Note: For code snippets from patches, the function won't exist in AST
+        # Only check if we have actual function definitions in the code
+        has_functions = any(isinstance(node, ast.FunctionDef) for node in ast.walk(original_ast))
+        if target_function and has_functions and not self._has_function(original_ast, target_function):
             return source_code, False
         
         # Step 3: Create canonical AST for pattern matching
