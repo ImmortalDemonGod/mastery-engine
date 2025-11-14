@@ -735,8 +735,9 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
             # Level 0: {"node_type": "Assign"}
             # Level 1: {"node_type": "Assign", "targets": [{"node_type": "Name"}]}
             # Level 2: {"node_type": "Assign", "value": {"node_type": "BinOp", "op": "Add"}}
-            # Level 3+: TOO COMPLEX
-            if depth > 2:
+            # Level 3: {"node_type": "Assign", "targets": [{"node_type": "Name", "id": "x"}], "value": {...}}
+            # Level 4+: TOO COMPLEX
+            if depth > 3:
                 return False
             
             # Reject if has unnecessary nested args/keywords in Call patterns
