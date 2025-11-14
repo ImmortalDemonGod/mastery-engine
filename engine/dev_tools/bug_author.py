@@ -734,18 +734,8 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                     for field in required:
                         has_field = field in bug_def
                         print(f"  {'✅' if has_field else '❌'} {field}: {'present' if has_field else 'MISSING'}")
-                    
-                    # Check if pattern complexity was the issue
-                    if not self._validate_pattern_simplicity(bug_def):
-                        print(f"\n  ⚠️  OVER-SPECIFIED PATTERNS DETECTED!")
-                        print(f"  Your patterns are TOO COMPLEX with unnecessary nesting.")
-                        print(f"  ")
-                        print(f"  ❌ BAD: {{\"node_type\": \"Call\", \"func\": {{...}}, \"args\": [...]")
-                        print(f"  ✅ GOOD: {{\"node_type\": \"Call\"}}")
-                        print(f"  ")
-                        print(f"  Keep patterns MINIMAL - only node_type and essential fields!")
                 
-                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Your patterns are OVER-SPECIFIED with unnecessary nested structure. Keep them SIMPLE - use only node_type and essential disambiguating fields (like 'id' for variable names or 'op' for operators). Do NOT nest func, args, keywords, or other complex structures."
+                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Ensure all required fields are present."
                 continue
             
             if debug:
@@ -784,9 +774,10 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
         if not all(field in bug_def for field in required_fields):
             return False
         
-        # Validate patterns are not over-specified
-        if not self._validate_pattern_simplicity(bug_def):
-            return False
+        # DISABLED: Pattern simplicity validation was too strict, broke working cases
+        # Caused regression: 2/4 → 1/4 overall success
+        # if not self._validate_pattern_simplicity(bug_def):
+        #     return False
         
         return True
     
