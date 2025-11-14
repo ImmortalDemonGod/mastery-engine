@@ -199,6 +199,18 @@ For a 1B parameter model, this saves ~5-10% of total training time when
 considering that normalization is called twice per Transformer block and you 
 have dozens of blocks.
 
+References
+──────────
+**Primary Literature:**
+- Zhang, B., & Sennrich, R. (2019). "Root Mean Square Layer Normalization." 
+  In Proceedings of NeurIPS 2019.
+  - Key insight: Re-centering invariance is dispensable for normalization
+  - RMSNorm achieves comparable performance with ~10-15% speedup
+
+**Further Reading:**
+- Ba, J. L., Kiros, J. R., & Hinton, G. E. (2016). "Layer Normalization." arXiv:1607.06450.
+  - Original LayerNorm paper (mean + variance normalization)
+
 Submission
 ──────────
 Once implemented, run:

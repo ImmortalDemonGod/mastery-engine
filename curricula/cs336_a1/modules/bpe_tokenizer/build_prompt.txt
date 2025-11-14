@@ -315,6 +315,21 @@ Modern LLMs:
 
 Typical range: 30K-100K is standard.
 
+References
+──────────
+**Primary Literature:**
+- Sennrich, R., Haddow, B., & Birch, A. (2016). "Neural Machine Translation of 
+  Rare Words with Subword Units." In Proceedings of ACL 2016.
+  - Original application of BPE to NMT, solving the OOV problem
+
+- Berglund, M., & van der Merwe, B. (2023). "Formalizing the Semantics of 
+  Byte Pair Encoding."
+  - Formal analysis of merge order and algorithm correctness
+
+**Further Reading:**
+- Radford, A., et al. (2019). "Language Models are Unsupervised Multitask Learners." (GPT-2)
+  - Introduced byte-level BPE for universal vocabulary coverage
+
 Submission
 ──────────
 Once implemented, run:

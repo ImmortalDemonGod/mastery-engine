@@ -236,6 +236,23 @@ your silu() function:
 SwiGLU is the feed-forward layer used in modern Transformers (LLaMA, PaLM).
 Getting SiLU right is prerequisite for SwiGLU!
 
+References
+──────────
+**Primary Literature:**
+- Ramachandran, P., Zoph, B., & Le, Q. V. (2017). "Searching for Activation Functions." 
+  arXiv:1710.05941.
+  - Discovered Swish (SiLU) activation: f(x) = x · σ(x) via neural architecture search
+  - Empirically outperforms ReLU on ImageNet and machine translation
+
+- Hendrycks, D., & Gimpel, K. (2016). "Gaussian Error Linear Units (GELUs)." arXiv:1606.08415.
+  - Independently discovered similar smooth activation function
+  - GELU: f(x) = x · Φ(x) where Φ is Gaussian CDF
+
+**Further Reading:**
+- Elfwing, S., Uchibe, E., & Doya, K. (2018). "Sigmoid-Weighted Linear Units for Neural 
+  Network Function Approximation in Reinforcement Learning." Neural Networks.
+  - Analysis of SiLU properties and gradient behavior
+
 Submission
 ──────────
 Once implemented, run:

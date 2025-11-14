@@ -407,6 +407,22 @@ for batch in dataloader:
 
 The optimizer.step() is where your AdamW logic runs!
 
+References
+──────────
+**Primary Literature:**
+- Kingma, D. P., & Ba, J. (2014). "Adam: A Method for Stochastic Optimization." 
+  In Proceedings of ICLR 2015.
+  - Original Adam optimizer combining momentum and adaptive learning rates
+
+- Loshchilov, I., & Hutter, F. (2019). "Decoupled Weight Decay Regularization." 
+  In Proceedings of ICLR 2019.
+  - AdamW fix: Decoupled weight decay for consistent regularization
+  - Key innovation: Apply weight decay after adaptive scaling, not before
+
+**Further Reading:**
+- Brown, T., et al. (2020). "Language Models are Few-Shot Learners." (GPT-3)
+  - Uses AdamW with lr=3e-4, β₂=0.999, weight_decay=0.1 as standard
+
 Submission
 ──────────
 Once implemented, run:

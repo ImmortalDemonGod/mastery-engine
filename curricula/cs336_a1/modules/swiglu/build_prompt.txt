@@ -300,6 +300,23 @@ In a complete Transformer block, SwiGLU replaces the traditional FFN:
 You've now built: RMSNorm ✓, SiLU ✓, and will have SwiGLU ✓
 You're building toward the complete Transformer!
 
+References
+──────────
+**Primary Literature:**
+- Dauphin, Y. N., Fan, A., Auli, M., & Grangier, D. (2017). "Language Modeling with 
+  Gated Convolutional Networks." In Proceedings of ICML 2017.
+  - Introduced Gated Linear Units (GLU): learned gating for neural networks
+  - Foundation for all GLU variants including SwiGLU
+
+- Shazeer, N. (2020). "GLU Variants Improve Transformer." arXiv:2002.05202.
+  - Empirical comparison of all GLU variants (GLU, ReGLU, GEGLU, SwiGLU, etc.)
+  - Found SwiGLU consistently outperforms alternatives
+  - Recommended d_ff = (8/3)d for parameter parity with traditional FFN
+
+**Further Reading:**
+- Touvron, H., et al. (2023). "LLaMA: Open and Efficient Foundation Language Models." arXiv:2302.13971.
+  - Uses SwiGLU as standard FFN in all model sizes (7B-65B)
+
 Submission
 ──────────
 Once implemented, run:

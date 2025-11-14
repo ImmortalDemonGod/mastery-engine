@@ -426,6 +426,24 @@ sometimes techniques like:
 But the basic architecture—the Transformer block you're implementing—
 stays the same!
 
+References
+──────────
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Introduced the Transformer architecture with multi-head attention and residual connections
+  - Original used post-norm (LayerNorm after residual); modern variants use pre-norm
+
+- Xiong, R., Yang, Y., He, D., et al. (2020). "On Layer Normalization in the Transformer Architecture." 
+  In Proceedings of ICML 2020.
+  - Analyzed pre-norm vs post-norm architectures
+  - Showed pre-norm enables deeper networks and more stable training
+
+**Further Reading:**
+- He, K., Zhang, X., Ren, S., & Sun, J. (2016). "Deep Residual Learning for Image Recognition." 
+  In Proceedings of CVPR 2016.
+  - ResNet paper: established residual connections as key to training deep networks
+
 Submission
 ──────────
 Once implemented, run:
