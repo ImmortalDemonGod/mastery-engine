@@ -1,0 +1,52 @@
+{
+  "id": "multihead_attention-missing-transpose",
+  "description": "Removes the transpose operation before reshaping, causing incorrect concatenation of attention heads.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "multihead_attention",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Delete the transpose operation on attn_output before reshaping.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "attn_output"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "transpose"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "delete_statement",
+        "source": null,
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "rope-wrong-rotation-formula",
+  "description": "Introduces a bug in the 2D rotation formula by missing the negative sign, which breaks the rotation matrix.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "apply_2d_rotation",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find the correct rotation formula and replace with the buggy version missing the negative sign.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "x_rotated_even"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Sub",
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": null,
+        "left": {
+          "node_type": "BinOp",
+          "op": "Mult",
+          "attr": null
+        },
+        "right": {
+          "node_type": "BinOp",
+          "op": "Mult",
+          "attr": null
+        },
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "node.value.left.left.id + ' * ' + node.value.left.right.id + ' + ' + node.value.right.left.id + ' * ' + node.value.right.right.id",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": "data_loader-wrong-sampling-range",
+  "description": "Introduces a bug by using an incorrect high value in torch.randint, causing out-of-bounds sampling.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "data_loader",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find torch.randint call with high=n and change to high=n+1",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "starts"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "randint"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": [
+          {
+            "arg": "high",
+            "value": {
+              "node_type": "Name",
+              "op": null,
+              "attr": null
+            }
+          }
+        ]
+      },
+      "conditions": [
+        {
+          "check": "target_is_name",
+          "value": null,
+          "index": 0,
+          "name": null
+        }
+      ],
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.value.keywords[0].value + 1",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "id": "transformer_block-bug",
+  "description": "Bug in transformer_block where x is incorrectly assigned to attn_out instead of x + attn_out.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "transformer_block",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find x = x + attn_out pattern and replace with x = attn_out",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "x"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Add",
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": null,
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "attn_out",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2023-11-24",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

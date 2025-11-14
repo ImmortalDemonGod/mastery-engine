@@ -1,0 +1,63 @@
+{
+  "id": "linear-missing-transpose",
+  "description": "Bug in linear: Missing transpose on weight matrix causing dimension mismatch.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "forward",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find in_features.matmul(self.weight) and replace with in_features.matmul(self.weight.t())",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "y"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "matmul"
+        },
+        "left": null,
+        "right": null,
+        "args": [
+          {
+            "node_type": "Name",
+            "op": null,
+            "attr": null
+          },
+          {
+            "node_type": "Attribute",
+            "op": null,
+            "attr": "weight"
+          }
+        ],
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "y.matmul(self.weight.t())",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

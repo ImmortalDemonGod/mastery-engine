@@ -1,0 +1,126 @@
+{
+  "id": "cross_entropy-naive-softmax",
+  "description": "Replaces logsumexp with naive softmax and log, causing numerical instability.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "cross_entropy",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Replace logsumexp with naive softmax computation and log.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "lse"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": "logsumexp"
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "logsumexp"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "torch.log(torch.exp(x32) / torch.exp(x32).sum(dim=-1, keepdim=True))",
+        "name": null
+      }
+    },
+    {
+      "pass_": 2,
+      "type": "find_and_replace",
+      "description": "Replace correct class logit extraction with probability extraction from softmax.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "correct"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": "gather"
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "gather"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "softmax_probs.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)",
+        "name": null
+      }
+    },
+    {
+      "pass_": 3,
+      "type": "find_and_replace",
+      "description": "Replace loss computation using logsumexp with naive log of probabilities.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "loss"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": "mean"
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "mean"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "-torch.log(target_probs).mean()",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "complex"
+  }
+}

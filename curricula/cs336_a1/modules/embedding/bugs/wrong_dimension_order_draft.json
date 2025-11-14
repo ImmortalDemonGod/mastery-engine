@@ -1,0 +1,145 @@
+{
+  "id": "embedding-dimension-swap",
+  "description": "Swaps the order of num_embeddings and embedding_dim in nn.Embedding, causing incorrect embedding matrix shape.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "__init__",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Swap num_embeddings and embedding_dim arguments in nn.Embedding call",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "self.embedding"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "Embedding"
+        },
+        "left": null,
+        "right": null,
+        "args": [
+          {
+            "node_type": "Name",
+            "op": null,
+            "attr": null
+          },
+          {
+            "node_type": "Name",
+            "op": null,
+            "attr": null
+          }
+        ],
+        "keywords": [
+          {
+            "arg": "num_embeddings",
+            "value": {
+              "node_type": "Name",
+              "op": null,
+              "attr": null
+            }
+          },
+          {
+            "arg": "embedding_dim",
+            "value": {
+              "node_type": "Name",
+              "op": null,
+              "attr": null
+            }
+          }
+        ]
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.value.keywords[1].value",
+        "name": null
+      }
+    },
+    {
+      "pass_": 2,
+      "type": "find_and_replace",
+      "description": "Swap embedding_dim and num_embeddings arguments in nn.Embedding call",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "self.embedding"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "Embedding"
+        },
+        "left": null,
+        "right": null,
+        "args": [
+          {
+            "node_type": "Name",
+            "op": null,
+            "attr": null
+          },
+          {
+            "node_type": "Name",
+            "op": null,
+            "attr": null
+          }
+        ],
+        "keywords": [
+          {
+            "arg": "embedding_dim",
+            "value": {
+              "node_type": "Name",
+              "op": null,
+              "attr": null
+            }
+          },
+          {
+            "arg": "num_embeddings",
+            "value": {
+              "node_type": "Name",
+              "op": null,
+              "attr": null
+            }
+          }
+        ]
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.value.keywords[0].value",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}
