@@ -533,23 +533,22 @@ Before generating JSON, verify:
 ## Bug Description
 {symptom}
 
-## Code Transformation
+## ⚠️ CRITICAL: ANALYZE ONLY THE CODE BELOW (BEFORE/CORRECT CODE)
 
-**BEFORE (Correct):**
+**YOUR PATTERNS MUST MATCH THIS CODE:**
+
 ```python
 {patch_info['before']}
 ```
 
-**AFTER (Buggy):**
-```python
-{patch_info['after']}
-```
+**☝️ THIS IS THE CODE YOU MUST ANALYZE!**
+**DO NOT look ahead to the AFTER code yet!**
 
 ## Your Task
 
-Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
+Generate patterns that match the BEFORE code above.
 
-**Step 1: Analyze the BEFORE Code AST (NOT the AFTER code!)**
+**Step 1: Analyze ONLY the BEFORE Code Above**
 
 ⚠️ CRITICAL: Your patterns must match the BEFORE code's AST structure. The AFTER code is only shown for reference.
 
@@ -648,6 +647,21 @@ Here are PROVEN successful patterns from golden examples. Study their simplicity
 ```
 
 **Notice:** All patterns are SIMPLE - they don't over-specify nested structure!
+
+---
+
+## AFTER Code (For Reference ONLY - Do NOT analyze this for patterns!)
+
+The transformation produces this buggy code:
+
+```python
+{patch_info['after']}
+```
+
+**⚠️ REMINDER:** Your patterns must match the BEFORE code shown at the top, NOT this AFTER code!
+**Common error:** Seeing `step_size = lr` here and matching Name instead of the BinOp/Div in the BEFORE code.
+
+---
 
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
