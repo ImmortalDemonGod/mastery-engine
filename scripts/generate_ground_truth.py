@@ -109,7 +109,7 @@ def create_stub_json(module_info: Dict) -> None:
     print(f"  ✅ Created stub JSON: {module_info['json'].name}")
 
 
-def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional[dict]:
+def generate_golden_for_module(module_info: Dict, author: BugAuthor, save_drafts: bool = True) -> Optional[dict]:
     """Generate golden pattern for a single module."""
     print(f"\n{'='*70}")
     print(f"MODULE: {module_info['name']}")
@@ -117,32 +117,59 @@ def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional
     
     # Generate pattern with LLM (it handles patch extraction + validation internally)
     try:
-        bug_def, success = author.generate_bug_definition(
-            module_name=module_info['name'],
-            patch_path=module_info['patch'],
-            symptom=f"Bug in {module_info['name']}",
-            max_retries=3,
-            debug=False  # Set to False for cleaner output
+        # Access LLM service and patch info to generate raw pattern
+        patch_info = author._extract_patch_info(module_info['patch'])
+        system_prompt = author._build_system_prompt()
+        user_prompt = author._build_user_prompt(module_info['name'], patch_info, f"Bug in {module_info['name']}")
+        
+        # Generate with LLM
+        from engine.schemas import BugDefinition as BugDefSchema
+        response = author.llm_service.generate_completion(
+            prompt=user_prompt,
+            system=system_prompt,
+            temperature=0.3,
+            response_format=BugDefSchema
         )
         
-        if not success or not bug_def:
-            print(f"\n❌ Failed to generate valid pattern")
+        # Parse response
+        bug_def = json.loads(response) if isinstance(response, str) else response
+        
+        if save_drafts:
+            # Save draft even if it fails validation (so we can fix it)
+            draft_file = module_info['json'].parent / f"{module_info['json'].stem}_draft.json"
+            with open(draft_file, 'w') as f:
+                json.dump(bug_def, f, indent=2)
+            print(f"\n💾 Saved draft to: {draft_file.name}")
+        
+        # Test the pattern
+        injector = GenericBugInjector(bug_def)
+        result, success = injector.inject(patch_info['before'])
+        
+        if success:
+            print(f"\n✅ Pattern works! Injection successful")
+            # Show pattern summary
+            logic = bug_def.get('logic', [])
+            print(f"\n📊 PATTERN SUMMARY:")
+            print(f"   Passes: {len(logic)}")
+            for i, pass_def in enumerate(logic, 1):
+                pattern = pass_def.get('pattern', {})
+                repl = pass_def.get('replacement', {})
+                print(f"     Pass {i}: {pass_def.get('type', '?')}")
+                print(f"       Pattern: {pattern.get('node_type', '?')}")
+                print(f"       Replacement: {repl.get('type', '?')}")
+            return bug_def
+        else:
+            print(f"\n⚠️  Pattern generated but injection failed")
+            print(f"    Draft saved for manual fixing")
+            # Show what was generated
+            logic = bug_def.get('logic', [])
+            print(f"\n📊 DRAFT PATTERN:")
+            print(f"   Passes: {len(logic)}")
+            for i, pass_def in enumerate(logic, 1):
+                pattern = pass_def.get('pattern', {})
+                print(f"     Pass {i}: {pass_def.get('type', '?')}")
+                print(f"       Pattern: {pattern.get('node_type', '?')}")
             return None
-        
-        print(f"\n✅ Pattern generated and validated!")
-        
-        # Show pattern summary
-        logic = bug_def.get('logic', [])
-        print(f"\n📊 PATTERN SUMMARY:")
-        print(f"   Passes: {len(logic)}")
-        for i, pass_def in enumerate(logic, 1):
-            pattern = pass_def.get('pattern', {})
-            repl = pass_def.get('replacement', {})
-            print(f"     Pass {i}: {pass_def.get('type', '?')}")
-            print(f"       Pattern: {pattern.get('node_type', '?')}")
-            print(f"       Replacement: {repl.get('type', '?')}")
-        
-        return bug_def
     
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -214,7 +241,7 @@ def main():
         print(f"PROGRESS: {i}/{len(needs_golden)}")
         print(f"{'='*70}")
         
-        golden_pattern = generate_golden_for_module(module_info, author)
+        golden_pattern = generate_golden_for_module(module_info, author, save_drafts=True)
         
         if golden_pattern:
             results['success'].append(module_info['name'])
