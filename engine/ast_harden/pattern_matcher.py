@@ -377,10 +377,27 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
             
             if new_value is not None and hasattr(node, 'value'):
                 # Create a copy of the node with new value
-                new_node = ast.copy_location(
-                    ast.Assign(targets=node.targets, value=new_value),
-                    node
-                )
+                # Handle different node types (Assign vs Return)
+                if isinstance(node, ast.Assign):
+                    new_node = ast.copy_location(
+                        ast.Assign(targets=node.targets, value=new_value),
+                        node
+                    )
+                elif isinstance(node, ast.Return):
+                    new_node = ast.copy_location(
+                        ast.Return(value=new_value),
+                        node
+                    )
+                else:
+                    # Generic fallback: try to copy all attributes
+                    new_node = node.__class__()
+                    for attr in node._fields:
+                        if attr == 'value':
+                            setattr(new_node, attr, new_value)
+                        elif hasattr(node, attr):
+                            setattr(new_node, attr, getattr(node, attr))
+                    new_node = ast.copy_location(new_node, node)
+                
                 return new_node
         
         elif replacement_type == 'replace_with':
