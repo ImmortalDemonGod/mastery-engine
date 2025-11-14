@@ -573,9 +573,28 @@ denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
 **Critical Requirements:**
 1. ⚠️ INCLUDE SPECIFIC VARIABLE NAMES in patterns (e.g., `"id": "bias_correction1"`) - this is REQUIRED!
 2. ⚠️ USE EXACT NODE TYPES from the BEFORE code - don't guess! Parse it carefully!
-3. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
+3. ⚠️ MAXIMUM SIMPLICITY: Use minimum fields - do NOT over-specify!
 4. Check if same variable appears multiple times - if so, add "op" to disambiguate
 5. Use direct "id" specification (prefer this over context tracking when possible)
+
+**❌ WRONG - Over-Specified Patterns:**
+```json
+{
+  "node_type": "Call",
+  "func": {"node_type": "Attribute", "attr": "sqrt"},
+  "args": [{"node_type": "Call", "func": {...}}]  ← TOO DEEP!
+}
+```
+
+**✅ CORRECT - Minimal Patterns:**
+```json
+{
+  "node_type": "Call",
+  "func": {"node_type": "Attribute", "attr": "sqrt"}
+}
+```
+
+**RULE: Never nest more than 3 levels deep. Don't specify args/keywords for Call unless absolutely necessary for disambiguation.**
 
 **Output Format:**
 Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
