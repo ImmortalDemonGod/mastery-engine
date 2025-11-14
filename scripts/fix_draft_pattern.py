@@ -115,8 +115,9 @@ def main():
             if 'replacement' in pass_def:
                 repl = pass_def['replacement']
                 print(f"     Replacement: {repl.get('type', '?')}")
-                if 'source' in repl:
-                    print(f"       Source: {repl.get('source', 'N/A')[:100]}")
+                source = repl.get('source', None)
+                if source:
+                    print(f"       Source: {str(source)[:100]}")
         
         # Test current draft
         success, message = test_pattern(draft_file, before, after)
