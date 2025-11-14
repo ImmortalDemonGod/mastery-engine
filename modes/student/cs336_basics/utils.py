@@ -11,12 +11,12 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     - Subtract the max along `dim` before exponentiation to avoid overflow.
     - Cast the final probabilities back to the original dtype of the input tensor.
     """
-    # Final E2E validation with unique variable names
-    tensor_data = in_features.float()
-    maximum = tensor_data.max(dim=dim, keepdim=True).values
-    adjusted = tensor_data - maximum
-    exponentials = torch.exp(adjusted)
-    return (exponentials / exponentials.sum(dim=dim, keepdim=True)).to(in_features.dtype)
+    # TODO: Implement numerically-stable softmax using the subtract-max trick
+    # 1. Upcast to float32 for stability
+    # 2. Subtract the max along `dim` before exponentiation
+    # 3. Normalize by the sum along `dim`
+    # 4. Cast the result back to the original dtype
+    raise NotImplementedError("TODO: Implement softmax with the subtract-max trick")
 
 
 def cross_entropy(

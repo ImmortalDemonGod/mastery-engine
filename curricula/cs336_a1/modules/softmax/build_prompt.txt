@@ -67,17 +67,30 @@ Your implementation will be tested against:
 
 ## References
 **Primary Literature:**
-- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
-  In Proceedings of NeurIPS 2017.
-  - Uses softmax as core component of attention mechanism
-  - Softmax(QK^T/√d_k) converts scores to probability distributions
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 6.2.2.3: Softmax Units for Multinoulli Output Distributions
+  - Provides formal definition and directly discusses overflow problems
+  - Motivates the need for numerically stable implementation
 
-- Bridle, J. S. (1990). "Probabilistic Interpretation of Feedforward Classification Network Outputs, with Relationships to Statistical Pattern Recognition."
-  - Early formalization of softmax for neural networks
+- Franke, M., & Degen, J. (2022). "The softmax function: Properties, motivation, and interpretation."
+  - In-depth academic treatment of softmax mathematical properties
+  - Derives softmax from first principles (maximum entropy)
+  - Explores parameter interpretation and theoretical foundations
 
 **Further Reading:**
-- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
-  - Chapter 6.2.2.3: Softmax units for output layers
+- Mody, J. (2022). "Numerically Stable Softmax and Cross Entropy."
+  - Step-by-step derivation of the subtract-max trick
+  - Demonstrates overflow instability with practical code examples
+  - Clear implementation guidance for numerical stability
+
+- Vieira, T. (2014). "Exp-normalize trick." Graduate Descent.
+  - Concise explanation of the stability mechanism
+  - Before-and-after code examples demonstrating the fix
+
+- Wikipedia. (2025). "Softmax function."
+  - General reference covering definition and interpretation
+  - Historical context: Boltzmann distribution in statistical mechanics
+  - Applications across machine learning domains
 
 ## Submission
 Once implemented, run:
