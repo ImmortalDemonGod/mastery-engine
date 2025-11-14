@@ -446,18 +446,27 @@ Before generating JSON, verify:
         after_parseable = try_make_parseable(after_code)
         
         # If still unparseable, try to extract full function from source files
-        if before_parseable == before_code:  # No improvement from filtering
+        try:
+            ast_module.parse(textwrap.dedent(before_parseable))
+        except:
+            # Still unparseable - try to find full function
+            full_before = self._extract_full_function_from_patch(patch_path, before_code)
+            # Only use if it's actually parseable
             try:
-                ast_module.parse(textwrap.dedent(before_parseable))
+                ast_module.parse(textwrap.dedent(full_before))
+                before_parseable = full_before
             except:
-                # Still unparseable - try to find full function
-                before_parseable = self._extract_full_function_from_patch(patch_path, before_code)
+                pass  # Keep the filtered version
         
-        if after_parseable == after_code:
+        try:
+            ast_module.parse(textwrap.dedent(after_parseable))
+        except:
+            full_after = self._extract_full_function_from_patch(patch_path, after_code)
             try:
-                ast_module.parse(textwrap.dedent(after_parseable))
+                ast_module.parse(textwrap.dedent(full_after))
+                after_parseable = full_after
             except:
-                after_parseable = self._extract_full_function_from_patch(patch_path, after_code)
+                pass
         
         return {
             "before": before_parseable,
@@ -485,8 +494,11 @@ Before generating JSON, verify:
             
             rel_path = match.group(1)
             
+            # Assume modes/ is at current working directory (repo root)
+            from pathlib import Path
+            base_dir = Path.cwd()
+            
             # Try developer mode first, then student mode
-            base_dir = patch_path.parent.parent.parent.parent
             possible_paths = [
                 base_dir / 'modes' / 'developer' / rel_path,
                 base_dir / 'modes' / 'student' / rel_path
@@ -517,9 +529,8 @@ Before generating JSON, verify:
                         # If significant overlap in keywords, likely the right function
                         overlap = len(snippet_keywords & func_keywords)
                         if overlap >= min(3, len(snippet_keywords)):
-                            # Extract just the function body (not def line)
-                            lines = func_source.split('\n')[1:]
-                            return '\n'.join(lines)
+                            # Return FULL function including def line (parseable)
+                            return func_source
             
             return snippet
         except:
