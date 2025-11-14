@@ -377,22 +377,61 @@ Before generating JSON, verify:
             filtered = []
             skip_docstring = False
             
+            # Docstring-like patterns to skip
+            docstring_patterns = ['returns:', 'args:', 'parameters:', 'yields:', 'raises:', 
+                                 'note:', 'example:', 'attributes:', 'see also:']
+            
             for line in lines:
                 stripped = line.strip()
+                lower = stripped.lower()
+                
                 # Skip empty lines and pure comment lines
                 if not stripped or stripped.startswith('#'):
                     continue
+                    
+                # Skip docstring content patterns
+                if any(lower.startswith(pattern) for pattern in docstring_patterns):
+                    continue
+                    
                 # Detect docstring markers (simple heuristic)
                 if '"""' in stripped or "'''" in stripped:
                     skip_docstring = not skip_docstring
                     continue
                 if skip_docstring:
                     continue
+                    
                 filtered.append(line)
             
             if filtered:
                 filtered_code = '\n'.join(filtered)
                 dedented = textwrap.dedent(filtered_code)
+                try:
+                    ast.parse(dedented)
+                    return dedented
+                except:
+                    pass
+            
+            # Last resort: Try to extract only lines that look like Python statements
+            # This handles cases where patch includes partial function bodies
+            statement_keywords = ['return', 'if', 'for', 'while', 'def', 'class', 'import', 
+                                'from', 'try', 'with', 'assert', 'raise', 'yield', 'pass',
+                                'break', 'continue', 'global', 'nonlocal', 'del']
+            
+            statement_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+                # Check if line looks like a statement (starts with keyword or assignment)
+                if (any(stripped.startswith(kw + ' ') or stripped.startswith(kw + '(') 
+                       for kw in statement_keywords) or
+                    '=' in stripped or  # Assignment
+                    stripped.endswith(':')):  # Block start
+                    statement_lines.append(line)
+            
+            if statement_lines:
+                statement_code = '\n'.join(statement_lines)
+                dedented = textwrap.dedent(statement_code)
                 try:
                     ast.parse(dedented)
                     return dedented
