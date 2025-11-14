@@ -1,0 +1,8 @@
+{
+  "id": "checkpointing_bug",
+  "description": "Bug in checkpointing",
+  "injection_type": "generic",
+  "engine_version": "1.0",
+  "target_function": "TODO",
+  "logic": []
+}

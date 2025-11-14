@@ -1,0 +1,8 @@
+{
+  "id": "cross_entropy_bug",
+  "description": "Bug in cross_entropy",
+  "injection_type": "generic",
+  "engine_version": "1.0",
+  "target_function": "TODO",
+  "logic": []
+}

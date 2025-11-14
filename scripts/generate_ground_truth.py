@@ -121,9 +121,10 @@ def generate_golden_for_module(module_info: Dict, author: BugAuthor) -> Optional
         print(f"\n✅ Patch extracted successfully")
         print(f"   Before code: {len(patch_info['before'])} chars")
         print(f"   After code: {len(patch_info['after'])} chars")
-        print(f"   Source file: {patch_info['source_file']}")
     except Exception as e:
         print(f"\n❌ Failed to extract patch: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     
     # Show the transformation

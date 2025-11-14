@@ -1,0 +1,8 @@
+{
+  "id": "training_loop_bug",
+  "description": "Bug in training_loop",
+  "injection_type": "generic",
+  "engine_version": "1.0",
+  "target_function": "TODO",
+  "logic": []
+}
