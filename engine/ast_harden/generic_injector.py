@@ -88,10 +88,16 @@ class GenericBugInjector:
                 visitor.visit(canonical_ast)
             
             elif pass_type == 'find_and_replace':
-                # Pass 2: Transform original AST
-                transformer = FindAndReplaceTransformer(pass_def, context, original_ast)
-                original_ast = transformer.visit(original_ast)
+                # Pass 2: Match against canonical AST, transform original AST
+                # First, match patterns in canonical AST
+                transformer = FindAndReplaceTransformer(pass_def, context, original_ast, canonical_ast)
+                original_ast = transformer.transform_original()
                 ast.fix_missing_locations(original_ast)
+                
+                # Update canonical AST to match (for multi-pass scenarios)
+                temp_ast = copy.deepcopy(original_ast)
+                canonical_ast = canonicalizer.visit(temp_ast)
+                ast.fix_missing_locations(canonical_ast)
                 
                 if transformer.replacements_made == 0:
                     # Pattern not found

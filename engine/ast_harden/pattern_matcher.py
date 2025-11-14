@@ -228,20 +228,46 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
     """
     Transformer for 'find_and_replace' pass.
     
-    Finds patterns in the original AST and replaces them according to
-    replacement rules.
+    Matches patterns in canonical AST, then finds and transforms
+    corresponding nodes in original AST.
     """
     
-    def __init__(self, pass_def: dict, context: dict[str, Any], original_ast: ast.AST):
+    def __init__(self, pass_def: dict, context: dict[str, Any], original_ast: ast.AST, canonical_ast: ast.AST = None):
         self.pass_def = pass_def
         self.context = context
         self.original_ast = original_ast
+        self.canonical_ast = canonical_ast if canonical_ast is not None else original_ast
         self.pattern_matcher = PatternMatcher(pass_def['pattern'], context)
         self.replacements_made = 0
+        self.matched_locations = []  # Store locations of matched nodes
+    
+    def transform_original(self) -> ast.AST:
+        """
+        Match patterns in canonical AST, then transform original AST.
+        
+        Returns:
+            Transformed original AST
+        """
+        # Step 1: Find all matches in canonical AST
+        self._find_matches_in_canonical()
+        
+        # Step 2: Transform original AST at matched locations
+        transformed = self.visit(self.original_ast)
+        
+        return transformed
+    
+    def _find_matches_in_canonical(self):
+        """Walk canonical AST to find pattern matches and record locations."""
+        for node in ast.walk(self.canonical_ast):
+            if self.pattern_matcher.matches(node):
+                if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
+                    self.matched_locations.append((node.lineno, node.col_offset))
     
     def visit(self, node: ast.AST):
-        """Visit a node and check for pattern match."""
-        if self.pattern_matcher.matches(node):
+        """Visit a node and check if it's at a matched location."""
+        # Check if this node is at a matched location
+        if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
+            (node.lineno, node.col_offset) in self.matched_locations):
             # Found a match! Apply replacement
             replacement = self._create_replacement(node)
             if replacement is not None:
