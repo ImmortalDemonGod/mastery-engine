@@ -574,7 +574,18 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
                     for field in required:
                         has_field = field in bug_def
                         print(f"  {'✅' if has_field else '❌'} {field}: {'present' if has_field else 'MISSING'}")
-                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Ensure all required fields are present."
+                    
+                    # Check if pattern complexity was the issue
+                    if not self._validate_pattern_simplicity(bug_def):
+                        print(f"\n  ⚠️  OVER-SPECIFIED PATTERNS DETECTED!")
+                        print(f"  Your patterns are TOO COMPLEX with unnecessary nesting.")
+                        print(f"  ")
+                        print(f"  ❌ BAD: {{\"node_type\": \"Call\", \"func\": {{...}}, \"args\": [...]")
+                        print(f"  ✅ GOOD: {{\"node_type\": \"Call\"}}")
+                        print(f"  ")
+                        print(f"  Keep patterns MINIMAL - only node_type and essential fields!")
+                
+                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Your patterns are OVER-SPECIFIED with unnecessary nested structure. Keep them SIMPLE - use only node_type and essential disambiguating fields (like 'id' for variable names or 'op' for operators). Do NOT nest func, args, keywords, or other complex structures."
                 continue
             
             if debug:
@@ -610,7 +621,57 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
     def _validate_schema(self, bug_def: dict) -> bool:
         """Validate bug definition against schema."""
         required_fields = ["id", "description", "injection_type", "engine_version", "target_function", "logic"]
-        return all(field in bug_def for field in required_fields)
+        if not all(field in bug_def for field in required_fields):
+            return False
+        
+        # Validate patterns are not over-specified
+        if not self._validate_pattern_simplicity(bug_def):
+            return False
+        
+        return True
+    
+    def _validate_pattern_simplicity(self, bug_def: dict) -> bool:
+        """
+        Validate that patterns are appropriately simple.
+        Reject patterns with unnecessary nested structure.
+        """
+        for pass_def in bug_def.get('logic', []):
+            if 'pattern' not in pass_def:
+                continue
+            
+            pattern = pass_def['pattern']
+            
+            # Check depth of nesting
+            def get_depth(obj, current_depth=0):
+                if not isinstance(obj, dict):
+                    return current_depth
+                max_child_depth = current_depth
+                for value in obj.values():
+                    if isinstance(value, dict):
+                        max_child_depth = max(max_child_depth, get_depth(value, current_depth + 1))
+                    elif isinstance(value, list):
+                        for item in value:
+                            if isinstance(item, dict):
+                                max_child_depth = max(max_child_depth, get_depth(item, current_depth + 1))
+                return max_child_depth
+            
+            depth = get_depth(pattern)
+            
+            # Reject if too deep (more than 3 levels of nesting)
+            # Level 0: {"node_type": "Assign"}
+            # Level 1: {"node_type": "Assign", "targets": [{"node_type": "Name"}]}
+            # Level 2: {"node_type": "Assign", "value": {"node_type": "BinOp", "op": "Add"}}
+            # Level 3+: TOO COMPLEX
+            if depth > 2:
+                return False
+            
+            # Reject if has unnecessary nested args/keywords in Call patterns
+            if pattern.get('node_type') == 'Call':
+                if 'args' in pattern or 'keywords' in pattern:
+                    # Call with args/keywords is over-specified
+                    return False
+        
+        return True
     
     def _test_bug_definition(self, bug_def: dict, correct_code: str, expected_buggy: str) -> bool:
         """Test bug definition by injecting and comparing."""
