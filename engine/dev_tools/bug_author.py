@@ -331,6 +331,9 @@ Before generating JSON, verify:
     
     def _extract_patch_info(self, patch_path: Path) -> dict:
         """Extract before/after code from patch file."""
+        import ast
+        import textwrap
+        
         patch_content = patch_path.read_text()
         
         # Simple patch parser (assumes unified diff format)
@@ -354,9 +357,60 @@ Before generating JSON, verify:
                 before_lines.append(line[1:])
                 after_lines.append(line[1:])
         
+        before_code = '\n'.join(before_lines)
+        after_code = '\n'.join(after_lines)
+        
+        # Try to clean up unparseable code (skip comment-only lines, dedent)
+        # This handles patches that include docstrings or other context
+        def try_make_parseable(code):
+            """Attempt to extract parseable Python code from patch snippet."""
+            # First try as-is with dedent
+            dedented = textwrap.dedent(code)
+            try:
+                ast.parse(dedented)
+                return dedented
+            except:
+                pass
+            
+            # Try filtering out docstring/comment-only context
+            lines = code.split('\n')
+            filtered = []
+            skip_docstring = False
+            
+            for line in lines:
+                stripped = line.strip()
+                # Skip empty lines and pure comment lines
+                if not stripped or stripped.startswith('#'):
+                    continue
+                # Detect docstring markers (simple heuristic)
+                if '"""' in stripped or "'''" in stripped:
+                    skip_docstring = not skip_docstring
+                    continue
+                if skip_docstring:
+                    continue
+                filtered.append(line)
+            
+            if filtered:
+                filtered_code = '\n'.join(filtered)
+                dedented = textwrap.dedent(filtered_code)
+                try:
+                    ast.parse(dedented)
+                    return dedented
+                except:
+                    pass
+            
+            # Return original if nothing works
+            return code
+        
+        # Attempt to make code parseable
+        before_parseable = try_make_parseable(before_code)
+        after_parseable = try_make_parseable(after_code)
+        
         return {
-            "before": '\n'.join(before_lines),
-            "after": '\n'.join(after_lines)
+            "before": before_parseable,
+            "after": after_parseable,
+            "before_raw": before_code,  # Keep original for debugging
+            "after_raw": after_code
         }
     
     def _build_user_prompt(self, module_name: str, patch_info: dict, symptom: str) -> str:
