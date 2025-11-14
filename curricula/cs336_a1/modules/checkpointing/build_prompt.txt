@@ -462,6 +462,20 @@ Why Checkpointing is Non-Negotiable
 - Upload to persistent storage (S3, GCS)
 - Validate checkpoint integrity after saving
 
+References
+──────────
+**Primary Literature:**
+- Stanford CS336 Assignment 1 Documentation
+  - MLOps best practices for training state persistence
+  - Must save: model state, optimizer state (momentum), iteration count
+
+**Further Reading:**
+- Ratner, A., et al. (2017). "Snorkel: Rapid Training Data Creation with Weak Supervision." 
+  VLDB 2017.
+  - Discusses checkpointing strategies for long-running ML workflows
+- PyTorch Documentation: torch.save() and torch.load()
+  - Device-agnostic loading (map_location='cpu')
+
 Submission
 ──────────
 Once implemented, run:

@@ -356,6 +356,23 @@ the schedule right can mean:
 Modern LLMs train for weeks on thousands of GPUs. A good LR schedule saves
 millions of dollars in compute!
 
+References
+──────────
+**Primary Literature:**
+- Loshchilov, I., & Hutter, F. (2017). "SGDR: Stochastic Gradient Descent with 
+  Warm Restarts." In Proceedings of ICLR 2017.
+  - Introduced cosine annealing for learning rate schedules
+  - Warm restart technique for improved convergence
+
+- Goyal, P., Dollár, P., Girshick, R., et al. (2017). "Accurate, Large Minibatch SGD: 
+  Training ImageNet in 1 Hour." arXiv:1706.02677.
+  - Established importance of learning rate warmup for large-batch training
+  - Linear warmup prevents early training instability
+
+**Further Reading:**
+- Brown, T., et al. (2020). "Language Models are Few-Shot Learners." (GPT-3)
+  - Uses cosine decay schedule with warmup as standard for LLM training
+
 Submission
 ──────────
 Once implemented, run:

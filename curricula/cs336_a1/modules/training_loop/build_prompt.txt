@@ -432,6 +432,19 @@ for epoch in range(num_epochs):
 
 This is how GPT-3, LLaMA, and all modern LLMs are trained!
 
+References
+──────────
+**Primary Literature:**
+- Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). "Learning representations 
+  by back-propagating errors." Nature, 323(6088), 533-536.
+  - Established backpropagation as the foundation of neural network training
+  - Forward pass → loss computation → backward pass → parameter update
+
+**Further Reading:**
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 8: Optimization for Training Deep Models
+  - Practical considerations for training loops and debugging
+
 Submission
 ──────────
 Once implemented, run:
