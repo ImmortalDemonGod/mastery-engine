@@ -969,9 +969,10 @@ class SystematicEvaluator:
 def main():
     """Run systematic evaluation"""
     
-    # Use smarter model for testing (gpt-4o instead of gpt-4o-mini)
-    print("🧠 Using model: gpt-4o (smarter model test)")
-    evaluator = SystematicEvaluator(model="gpt-4o")
+    # Default to gpt-4o-mini for cost efficiency
+    # Set model="gpt-4o" for better first-try success (100% improvement)
+    print("🧠 Using model: gpt-4o-mini (default)")
+    evaluator = SystematicEvaluator(model="gpt-4o-mini")
     
     base_path = Path("/Volumes/Totallynotaharddrive/assignment1-basics/curricula/cs336_a1/modules")
     
