@@ -233,6 +233,42 @@ Only include fields that are NECESSARY to uniquely identify the statement:
 3. **remove_keyword_arg**: Remove a keyword argument from Call node
 4. **delete_statement**: Delete the matched statement entirely (use for removing assignments, expressions, etc.)
 
+**⚠️ CRITICAL: When to DELETE vs REPLACE**
+
+Analyze the patch diff carefully:
+
+**Use delete_statement when:**
+- Patch shows line with ONLY '-' (line is REMOVED entirely)
+- Example from patch:
+  ```diff
+  - bias_correction1 = 1 - beta1 ** state['step']  # Line DELETED
+  ```
+- Your JSON:
+  ```json
+  {
+    "replacement": {"type": "delete_statement"}
+  }
+  ```
+
+**Use replace_value_with when:**
+- Patch shows '-' followed by '+' (line is CHANGED)
+- Example from patch:
+  ```diff
+  - step_size = lr / bias_correction1  # Old value
+  + step_size = lr                     # New value
+  ```
+- Your JSON:
+  ```json
+  {
+    "replacement": {
+      "type": "replace_value_with",
+      "source": "lr"  // The NEW value from the '+' line
+    }
+  }
+  ```
+
+**Common mistake:** Using replace_value_with with the OLD value (from '-' line). This keeps the line instead of deleting it!
+
 # Multi-Pass Strategy
 
 **Simple case (prefer this):**
