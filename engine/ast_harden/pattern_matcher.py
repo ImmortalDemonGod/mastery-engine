@@ -349,6 +349,14 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
             # Replace node's value with value from another part of the node or parse code
             source_path = replacement_def['source']
             
+            # Handle case where LLM provides dict instead of string
+            if not isinstance(source_path, str):
+                if self.debug:
+                    print(f"          ERROR: source must be a string (path like 'node.right' or Python code)")
+                    print(f"          Got: {type(source_path).__name__}")
+                raise TypeError(f"Replacement source must be a string, got {type(source_path).__name__}. "
+                               f"Use a path like 'node.right' or Python code string.")
+            
             # Check if source is a path (starts with "node.") or Python code
             if source_path.startswith('node.'):
                 # Path-based replacement
@@ -378,6 +386,15 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         elif replacement_type == 'replace_with':
             # Replace entire node with another part of itself
             source_path = replacement_def['source']
+            
+            # Handle case where LLM provides dict instead of string
+            if not isinstance(source_path, str):
+                if self.debug:
+                    print(f"          ERROR: source must be a string (path like 'node.right' or Python code)")
+                    print(f"          Got: {type(source_path).__name__}")
+                raise TypeError(f"Replacement source must be a string, got {type(source_path).__name__}. "
+                               f"Use a path like 'node.right' or Python code string.")
+            
             matcher = PatternMatcher({}, self.context)
             replacement_node = matcher._evaluate_path(node, source_path)
             
