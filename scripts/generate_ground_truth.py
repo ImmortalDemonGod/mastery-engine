@@ -250,16 +250,10 @@ def main():
         if golden_pattern:
             results['success'].append(module_info['name'])
             
-            # Ask if user wants to save
-            save = input(f"\n💾 Save this golden pattern to {module_info['json'].name}? (y/n): ").strip().lower()
-            
-            if save == 'y':
-                # Save to JSON file
-                with open(module_info['json'], 'w') as f:
-                    json.dump(golden_pattern, f, indent=2)
-                print(f"✅ Saved to {module_info['json']}")
-            else:
-                print(f"⏭️  Skipped saving")
+            # Auto-save draft (systematic approach: generate all, then verify)
+            with open(module_info['json'], 'w') as f:
+                json.dump(golden_pattern, f, indent=2)
+            print(f"✅ Auto-saved draft to {module_info['json']}")
         else:
             results['failed'].append(module_info['name'])
     
