@@ -155,9 +155,21 @@ class SystematicEvaluator:
                 ))
                 continue
             
+            # Strip markdown code fences if present (gpt-4o adds these)
+            response_clean = response.strip()
+            if response_clean.startswith('```'):
+                # Remove opening fence (```json or ```)
+                lines = response_clean.split('\n')
+                if lines[0].startswith('```'):
+                    lines = lines[1:]
+                # Remove closing fence
+                if lines and lines[-1].strip() == '```':
+                    lines = lines[:-1]
+                response_clean = '\n'.join(lines)
+            
             # Parse JSON
             try:
-                bug_def = json.loads(response)
+                bug_def = json.loads(response_clean)
             except json.JSONDecodeError as e:
                 print(f"  ❌ JSON parse error")
                 attempts.append(AttemptResult(
@@ -644,7 +656,17 @@ class SystematicEvaluator:
                 
                 # Parse the response to analyze patterns
                 try:
-                    bug_def = json.loads(attempt.response_text)
+                    # Strip markdown code fences if present
+                    response_clean = attempt.response_text.strip()
+                    if response_clean.startswith('```'):
+                        lines = response_clean.split('\n')
+                        if lines[0].startswith('```'):
+                            lines = lines[1:]
+                        if lines and lines[-1].strip() == '```':
+                            lines = lines[:-1]
+                        response_clean = '\n'.join(lines)
+                    
+                    bug_def = json.loads(response_clean)
                     logic = bug_def.get('logic', [])
                     
                     print(f"    Generated {len(logic)} passes")
