@@ -17,6 +17,7 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from engine.dev_tools.bug_author import BugAuthor
+from engine.services.llm_service import LLMService
 
 
 @dataclass
@@ -68,9 +69,18 @@ class BugEvaluationResult:
 class SystematicEvaluator:
     """Evaluate LLM bug authoring systematically"""
     
-    def __init__(self):
-        self.author = BugAuthor()
+    def __init__(self, model: str = "gpt-4o-mini"):
+        """
+        Initialize evaluator.
+        
+        Args:
+            model: OpenAI model to use (default: gpt-4o-mini)
+                   Options: gpt-4o-mini (fast/cheap), gpt-4o (smart), o1-preview (reasoning)
+        """
+        llm_service = LLMService(model=model)
+        self.author = BugAuthor(llm_service=llm_service)
         self.results: List[BugEvaluationResult] = []
+        self.model = model
         
         # Ground truth: Expected patterns for each bug
         self.expected_patterns = {
@@ -937,7 +947,9 @@ class SystematicEvaluator:
 def main():
     """Run systematic evaluation"""
     
-    evaluator = SystematicEvaluator()
+    # Use smarter model for testing (gpt-4o instead of gpt-4o-mini)
+    print("🧠 Using model: gpt-4o (smarter model test)")
+    evaluator = SystematicEvaluator(model="gpt-4o")
     
     base_path = Path("/Volumes/Totallynotaharddrive/assignment1-basics/curricula/cs336_a1/modules")
     
