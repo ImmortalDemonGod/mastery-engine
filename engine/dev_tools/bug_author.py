@@ -331,7 +331,7 @@ Before generating JSON, verify:
     
     def _extract_patch_info(self, patch_path: Path) -> dict:
         """Extract before/after code from patch file."""
-        import ast
+        import ast as ast_module
         import textwrap
         
         patch_content = patch_path.read_text()
@@ -367,7 +367,7 @@ Before generating JSON, verify:
             # First try as-is with dedent
             dedented = textwrap.dedent(code)
             try:
-                ast.parse(dedented)
+                ast_module.parse(dedented)
                 return dedented
             except:
                 pass
@@ -406,7 +406,7 @@ Before generating JSON, verify:
                 filtered_code = '\n'.join(filtered)
                 dedented = textwrap.dedent(filtered_code)
                 try:
-                    ast.parse(dedented)
+                    ast_module.parse(dedented)
                     return dedented
                 except:
                     pass
@@ -433,7 +433,7 @@ Before generating JSON, verify:
                 statement_code = '\n'.join(statement_lines)
                 dedented = textwrap.dedent(statement_code)
                 try:
-                    ast.parse(dedented)
+                    ast_module.parse(dedented)
                     return dedented
                 except:
                     pass
@@ -449,24 +449,28 @@ Before generating JSON, verify:
         try:
             ast_module.parse(textwrap.dedent(before_parseable))
         except:
-            # Still unparseable - try to find full function
-            full_before = self._extract_full_function_from_patch(patch_path, before_code)
-            # Only use if it's actually parseable
-            try:
-                ast_module.parse(textwrap.dedent(full_before))
-                before_parseable = full_before
-            except:
-                pass  # Keep the filtered version
+            # Still unparseable - try to find full function (use ORIGINAL snippet, not filtered)
+            full_before = self._extract_full_function_from_patch(patch_path, before_code, debug=True)
+            # Only use if it's actually parseable AND different from what we tried
+            if full_before != before_code and full_before != before_parseable:
+                try:
+                    ast_module.parse(textwrap.dedent(full_before))
+                    before_parseable = full_before
+                    print(f"✅ Full function extraction succeeded for BEFORE code!")
+                except Exception as e:
+                    print(f"⚠️ Extracted function still not parseable: {e}")
         
         try:
             ast_module.parse(textwrap.dedent(after_parseable))
         except:
-            full_after = self._extract_full_function_from_patch(patch_path, after_code)
-            try:
-                ast_module.parse(textwrap.dedent(full_after))
-                after_parseable = full_after
-            except:
-                pass
+            full_after = self._extract_full_function_from_patch(patch_path, after_code, debug=True)
+            if full_after != after_code and full_after != after_parseable:
+                try:
+                    ast_module.parse(textwrap.dedent(full_after))
+                    after_parseable = full_after
+                    print(f"✅ Full function extraction succeeded for AFTER code!")
+                except Exception as e:
+                    print(f"⚠️ Extracted function still not parseable: {e}")
         
         return {
             "before": before_parseable,
@@ -475,13 +479,18 @@ Before generating JSON, verify:
             "after_raw": after_code
         }
     
-    def _extract_full_function_from_patch(self, patch_path: Path, snippet: str) -> str:
+    def _extract_full_function_from_patch(self, patch_path: Path, snippet: str, debug: bool = False) -> str:
         """
         Extract full function from source file when patch snippet is unparseable.
         Falls back to snippet if source not found.
         """
         import ast as ast_module
         import re
+        
+        if debug:
+            print(f"\n🔧 _extract_full_function_from_patch:")
+            print(f"   Snippet length: {len(snippet)}")
+            print(f"   First 50 chars: {repr(snippet[:50])}")
         
         try:
             # Parse patch to get file path
@@ -494,9 +503,15 @@ Before generating JSON, verify:
             
             rel_path = match.group(1)
             
+            if debug:
+                print(f"   Relative path from patch: {rel_path}")
+            
             # Assume modes/ is at current working directory (repo root)
             from pathlib import Path
             base_dir = Path.cwd()
+            
+            if debug:
+                print(f"   Base dir (cwd): {base_dir}")
             
             # Try developer mode first, then student mode
             possible_paths = [
@@ -506,12 +521,20 @@ Before generating JSON, verify:
             
             source_file = None
             for path in possible_paths:
+                if debug:
+                    print(f"   Trying: {path}")
+                    print(f"     Exists: {path.exists()}")
                 if path.exists():
                     source_file = path
                     break
             
             if not source_file:
+                if debug:
+                    print(f"   ❌ No source file found, returning snippet")
                 return snippet
+            
+            if debug:
+                print(f"   ✅ Source file found: {source_file}")
             
             # Read source and parse to find functions
             source_code = source_file.read_text()
@@ -519,6 +542,9 @@ Before generating JSON, verify:
             
             # Find the function that contains code similar to our snippet
             snippet_keywords = set(re.findall(r'\w+', snippet))
+            
+            if debug:
+                print(f"   Snippet keywords ({len(snippet_keywords)}): {sorted(list(snippet_keywords))[:10]}...")
             
             for node in ast_module.walk(tree):
                 if isinstance(node, ast_module.FunctionDef):
@@ -528,12 +554,23 @@ Before generating JSON, verify:
                         func_keywords = set(re.findall(r'\w+', func_source))
                         # If significant overlap in keywords, likely the right function
                         overlap = len(snippet_keywords & func_keywords)
+                        if debug and overlap > 0:
+                            print(f"   Function {node.name}: overlap={overlap}, threshold={min(3, len(snippet_keywords))}")
                         if overlap >= min(3, len(snippet_keywords)):
+                            if debug:
+                                print(f"   ✅ MATCH! Returning function {node.name}")
+                                print(f"   Length: {len(func_source)} chars")
                             # Return FULL function including def line (parseable)
                             return func_source
             
+            if debug:
+                print(f"   ❌ No matching function found, returning snippet")
             return snippet
-        except:
+        except Exception as e:
+            if debug:
+                print(f"   ❌ Exception during extraction: {e}")
+                import traceback
+                traceback.print_exc()
             return snippet
     
     def _build_user_prompt(self, module_name: str, patch_info: dict, symptom: str) -> str:
