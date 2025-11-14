@@ -942,49 +942,18 @@ Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, j
             
             return False, "\n".join(diagnostic)
     
-    def _extract_function_body(self, code: str) -> str:
-        """
-        Extract just the function body if code is a full function definition.
-        If it's already a snippet, return as-is.
-        """
-        import ast as ast_module
-        import textwrap
-        
-        try:
-            tree = ast_module.parse(textwrap.dedent(code))
-            
-            # Check if this is a module with a single function definition
-            if (len(tree.body) == 1 and 
-                isinstance(tree.body[0], ast_module.FunctionDef)):
-                # Extract just the function body
-                func_def = tree.body[0]
-                # Recreate a module with just the body statements
-                new_module = ast_module.Module(body=func_def.body, type_ignores=[])
-                return ast_module.unparse(new_module)
-            else:
-                # Already a snippet or multiple statements
-                return code
-        except:
-            # If parsing fails, return as-is
-            return code
-    
     def _functionally_equivalent(self, code1: str, code2: str) -> bool:
         """
         Check if two code snippets are functionally equivalent using AST comparison.
         This ignores comments, whitespace, and formatting differences.
-        Handles scope mismatch: extracts function body if one is full function.
         """
         import ast as ast_module
         import textwrap
         
         try:
-            # Extract function bodies if needed (handles scope mismatch)
-            body1 = self._extract_function_body(code1)
-            body2 = self._extract_function_body(code2)
-            
             # Parse both codes
-            tree1 = ast_module.parse(textwrap.dedent(body1))
-            tree2 = ast_module.parse(textwrap.dedent(body2))
+            tree1 = ast_module.parse(textwrap.dedent(code1))
+            tree2 = ast_module.parse(textwrap.dedent(code2))
             
             # Compare AST structures using ast.dump
             # This gives us a canonical string representation of the AST
