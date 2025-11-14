@@ -573,6 +573,135 @@ class SystematicEvaluator:
         
         return score / total_fields if total_fields > 0 else 0.0
     
+    def manual_llm_output_analysis(self):
+        """
+        MANUAL ANALYSIS: What stats don't show us.
+        Analyze actual LLM-generated text to understand failure modes.
+        """
+        print("\n" + "="*60)
+        print("🔍 MANUAL LLM OUTPUT ANALYSIS")
+        print("="*60)
+        print("(What statistics fail to reveal)")
+        
+        for bug_result in self.results:
+            print(f"\n{'='*60}")
+            print(f"{bug_result.module.upper()}")
+            print(f"{'='*60}")
+            print(f"Overall: {'✅ SUCCESS' if bug_result.final_success else '❌ FAILED'}")
+            
+            for i, attempt in enumerate(bug_result.attempts, 1):
+                print(f"\n  Attempt {i}: {'✅' if attempt.success else '❌'} {attempt.failure_mode}")
+                
+                if not attempt.response_text:
+                    print("    (No response text captured)")
+                    continue
+                
+                # Parse the response to analyze patterns
+                try:
+                    bug_def = json.loads(attempt.response_text)
+                    logic = bug_def.get('logic', [])
+                    
+                    print(f"    Generated {len(logic)} passes")
+                    
+                    for pass_idx, pass_def in enumerate(logic, 1):
+                        if 'pattern' not in pass_def:
+                            continue
+                        
+                        pattern = pass_def['pattern']
+                        replacement = pass_def.get('replacement', {})
+                        
+                        # Human-readable pattern description
+                        desc = self._describe_pattern(pattern)
+                        repl_desc = replacement.get('type', 'unknown')
+                        
+                        print(f"      Pass {pass_idx}: {desc} → {repl_desc}")
+                        
+                        # Check for common issues
+                        issues = []
+                        if self._is_over_specified(pattern):
+                            issues.append("⚠️ OVER-SPECIFIED")
+                        if not self._has_specific_variable(pattern):
+                            issues.append("⚠️ NO SPECIFIC VAR")
+                        if self._wrong_node_type(bug_result.module, pattern, bug_result.expected_patterns):
+                            issues.append("❌ WRONG NODE TYPE")
+                        
+                        if issues:
+                            print(f"        Issues: {', '.join(issues)}")
+                    
+                except Exception as e:
+                    print(f"    Error parsing response: {e}")
+                    # Show first 200 chars of response
+                    preview = attempt.response_text[:200] + "..." if len(attempt.response_text) > 200 else attempt.response_text
+                    print(f"    Response preview: {preview}")
+    
+    def _describe_pattern(self, pattern: dict) -> str:
+        """Convert JSON pattern to human-readable description"""
+        node_type = pattern.get('node_type', 'Unknown')
+        
+        if node_type == 'Assign':
+            targets = pattern.get('targets', [])
+            if targets and isinstance(targets[0], dict):
+                var_name = targets[0].get('id', '?')
+                value = pattern.get('value', {})
+                value_type = value.get('node_type', '?')
+                op = value.get('op', '')
+                if op:
+                    return f"Assign {var_name} = {value_type}({op})"
+                return f"Assign {var_name} = {value_type}"
+        elif node_type == 'Call':
+            func = pattern.get('func', {})
+            attr = func.get('attr', '?')
+            return f"Call .{attr}()"
+        elif node_type == 'BinOp':
+            op = pattern.get('op', '?')
+            return f"BinOp({op})"
+        
+        return node_type
+    
+    def _is_over_specified(self, pattern: dict) -> bool:
+        """Check if pattern is over-specified (too deep nesting)"""
+        def depth(obj, current=0):
+            if not isinstance(obj, dict):
+                return current
+            max_d = current
+            for v in obj.values():
+                if isinstance(v, dict):
+                    max_d = max(max_d, depth(v, current + 1))
+                elif isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, dict):
+                            max_d = max(max_d, depth(item, current + 1))
+            return max_d
+        
+        return depth(pattern) > 3
+    
+    def _has_specific_variable(self, pattern: dict) -> bool:
+        """Check if pattern includes specific variable name (has 'id' field)"""
+        if 'targets' in pattern:
+            targets = pattern['targets']
+            if targets and isinstance(targets[0], dict):
+                return 'id' in targets[0]
+        return False
+    
+    def _wrong_node_type(self, module: str, pattern: dict, expected: dict) -> bool:
+        """Check if pattern uses wrong AST node type"""
+        if module not in expected:
+            return False
+        
+        # Try to match pattern to expected patterns
+        if 'targets' in pattern:
+            targets = pattern.get('targets', [])
+            if targets and isinstance(targets[0], dict):
+                var_name = targets[0].get('id')
+                if var_name in expected:
+                    expected_node, expected_op = expected[var_name]
+                    value = pattern.get('value', {})
+                    actual_node = value.get('node_type')
+                    if actual_node and actual_node != expected_node:
+                        return True
+        
+        return False
+    
     def print_statistics(self):
         """Print comprehensive statistics"""
         if not self.results:
@@ -836,7 +965,10 @@ def main():
         else:
             print(f"\n⚠️  Skipping {bug_info['module']}: patch not found")
     
-    # Print statistics
+    # Manual analysis FIRST (what stats don't show)
+    evaluator.manual_llm_output_analysis()
+    
+    # Then print statistics
     evaluator.print_statistics()
     
     # Save results
@@ -844,5 +976,54 @@ def main():
     evaluator.save_results(output_path)
 
 
+def check_regression(results_path: Path):
+    """
+    Check for performance regression against baseline.
+    Baseline: 3/4 bugs (75%) - attention, rmsnorm, adamw
+    """
+    if not results_path.exists():
+        return
+    
+    with open(results_path, 'r') as f:
+        data = json.load(f)
+    
+    overall_success = sum(1 for bug in data['results'] if any(a['success'] for a in bug['attempts']))
+    
+    BASELINE_SUCCESS = 3
+    BASELINE_BUGS = {"attention", "rmsnorm", "adamw"}
+    
+    current_bugs = {bug['module'] for bug in data['results'] if any(a['success'] for a in bug['attempts'])}
+    
+    print("\n" + "="*60)
+    print("🔒 REGRESSION CHECK")
+    print("="*60)
+    print(f"Baseline: {BASELINE_SUCCESS}/4 bugs - {', '.join(sorted(BASELINE_BUGS))}")
+    print(f"Current:  {overall_success}/4 bugs - {', '.join(sorted(current_bugs))}")
+    
+    if overall_success < BASELINE_SUCCESS:
+        print(f"\n❌ REGRESSION DETECTED!")
+        print(f"   Performance dropped from {BASELINE_SUCCESS}/4 to {overall_success}/4")
+        print(f"   Lost: {BASELINE_BUGS - current_bugs}")
+        print(f"\n   This should not happen! Revert recent changes.")
+        return False
+    elif overall_success == BASELINE_SUCCESS:
+        if current_bugs == BASELINE_BUGS:
+            print(f"\n✅ No regression - same bugs passing")
+        else:
+            print(f"\n⚠️  Same count but different bugs")
+            print(f"   Lost: {BASELINE_BUGS - current_bugs}")
+            print(f"   Gained: {current_bugs - BASELINE_BUGS}")
+        return True
+    else:
+        print(f"\n🎉 IMPROVEMENT!")
+        print(f"   Performance improved from {BASELINE_SUCCESS}/4 to {overall_success}/4")
+        print(f"   Gained: {current_bugs - BASELINE_BUGS}")
+        return True
+
+
 if __name__ == "__main__":
     main()
+    
+    # Check for regression after evaluation
+    results_path = Path("/tmp/llm_evaluation_results.json")
+    check_regression(results_path)
