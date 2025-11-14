@@ -146,7 +146,7 @@ class GenericBugInjector:
                 # Pass 2: Transform original AST
                 # NOTE: Patterns with specific variable names (id fields) must match
                 # against original AST, not canonical (which renames variables to _var0, etc.)
-                transformer = FindAndReplaceTransformer(pass_def, context, original_ast)
+                transformer = FindAndReplaceTransformer(pass_def, context, original_ast, debug=debug)
                 original_ast = transformer.visit(original_ast)
                 ast.fix_missing_locations(original_ast)
                 

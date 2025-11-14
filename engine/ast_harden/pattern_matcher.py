@@ -232,7 +232,7 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
     corresponding nodes in original AST.
     """
     
-    def __init__(self, pass_def: dict, context: dict[str, Any], original_ast: ast.AST, canonical_ast: ast.AST = None):
+    def __init__(self, pass_def: dict, context: dict[str, Any], original_ast: ast.AST, canonical_ast: ast.AST = None, debug: bool = False):
         self.pass_def = pass_def
         self.context = context
         self.original_ast = original_ast
@@ -240,6 +240,7 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         self.pattern_matcher = PatternMatcher(pass_def['pattern'], context)
         self.replacements_made = 0
         self.matched_locations = []  # Store locations of matched nodes
+        self.debug = debug
     
     def transform_original(self) -> ast.AST:
         """
@@ -284,6 +285,11 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
             (node.lineno, node.col_offset) in self.matched_locations):
             # Found a match! Apply replacement
+            if self.debug:
+                node_type = type(node).__name__
+                var_id = node.targets[0].id if isinstance(node, ast.Assign) and hasattr(node.targets[0], 'id') else '?'
+                print(f"      Matched node at line {node.lineno}: {node_type} {var_id}")
+            
             replacement = self._create_replacement(node)
             if replacement is not None:
                 self.replacements_made += 1
