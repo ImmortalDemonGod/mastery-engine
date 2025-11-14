@@ -245,23 +245,38 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         """
         Match patterns in canonical AST, then transform original AST.
         
+        This is a two-phase transformer:
+        1. Visit canonical AST to find pattern matches
+        2. Transform corresponding nodes in original AST
+        
         Returns:
             Transformed original AST
         """
-        # Step 1: Find all matches in canonical AST
-        self._find_matches_in_canonical()
+        # Phase 1: Visit canonical AST as a visitor (no transformation)
+        for node in ast.walk(self.canonical_ast):
+            if self.pattern_matcher.matches(node):
+                # Found match in canonical - find corresponding node in original
+                if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
+                    original_node = self._find_node_at_location(
+                        self.original_ast,
+                        node.lineno,
+                        node.col_offset
+                    )
+                    if original_node:
+                        self.matched_locations.append((node.lineno, node.col_offset))
         
-        # Step 2: Transform original AST at matched locations
+        # Phase 2: Transform original AST at matched locations
         transformed = self.visit(self.original_ast)
         
         return transformed
     
-    def _find_matches_in_canonical(self):
-        """Walk canonical AST to find pattern matches and record locations."""
-        for node in ast.walk(self.canonical_ast):
-            if self.pattern_matcher.matches(node):
-                if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
-                    self.matched_locations.append((node.lineno, node.col_offset))
+    def _find_node_at_location(self, tree: ast.AST, lineno: int, col_offset: int):
+        """Find a node in the tree at the given source location."""
+        for node in ast.walk(tree):
+            if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
+                node.lineno == lineno and node.col_offset == col_offset):
+                return node
+        return None
     
     def visit(self, node: ast.AST):
         """Visit a node and check if it's at a matched location."""
