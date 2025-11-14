@@ -579,19 +579,19 @@ denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
 
 **❌ WRONG - Over-Specified Patterns:**
 ```json
-{
+{{
   "node_type": "Call",
-  "func": {"node_type": "Attribute", "attr": "sqrt"},
-  "args": [{"node_type": "Call", "func": {...}}]  ← TOO DEEP!
-}
+  "func": {{"node_type": "Attribute", "attr": "sqrt"}},
+  "args": [{{"node_type": "Call", "func": {{...}}}}]  ← TOO DEEP!
+}}
 ```
 
 **✅ CORRECT - Minimal Patterns:**
 ```json
-{
+{{
   "node_type": "Call",
-  "func": {"node_type": "Attribute", "attr": "sqrt"}
-}
+  "func": {{"node_type": "Attribute", "attr": "sqrt"}}
+}}
 ```
 
 **RULE: Never nest more than 3 levels deep. Don't specify args/keywords for Call unless absolutely necessary for disambiguation.**
