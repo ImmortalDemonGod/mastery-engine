@@ -682,13 +682,34 @@ class SystematicEvaluator:
         
         print(f"\nOverall Node Type Accuracy: {avg_node_accuracy:.1f}%")
         
+        # CRITICAL: Detect pattern matcher bugs (100% accurate but fails)
+        perfect_but_failing = []
+        for bug_result in self.results:
+            for attempt in bug_result.attempts:
+                if attempt.node_type_accuracy == 100 and not attempt.success:
+                    perfect_but_failing.append({
+                        'bug': bug_result.module,
+                        'attempt': attempt.attempt_num,
+                        'failure_mode': attempt.failure_mode,
+                        'over_specified': attempt.pattern_complexity.get('over_specified', 0) if attempt.pattern_complexity else 0
+                    })
+        
+        if perfect_but_failing:
+            print(f"\n🚨 PATTERN MATCHER BUG DETECTED:")
+            print(f"  {len(perfect_but_failing)} attempts have 100% accurate patterns but FAIL")
+            for item in perfect_but_failing:
+                over_spec_note = f" (over-specified: {item['over_specified']} patterns)" if item['over_specified'] > 0 else ""
+                print(f"    - {item['bug']} attempt {item['attempt']}: {item['failure_mode']}{over_spec_note}")
+            print(f"  → This indicates a bug in the pattern matcher, not LLM generation")
+        
         # Per-bug breakdown
         for bug_result in self.results:
             print(f"\n{bug_result.module}:")
             for attempt in bug_result.attempts:
                 if attempt.node_type_accuracy > 0:
                     status = "✅" if attempt.node_type_accuracy == 100 else "⚠️"
-                    print(f"  Attempt {attempt.attempt_num}: {status} {attempt.node_type_accuracy:.0f}% accurate")
+                    fail_note = " BUT FAILS" if attempt.node_type_accuracy == 100 and not attempt.success else ""
+                    print(f"  Attempt {attempt.attempt_num}: {status} {attempt.node_type_accuracy:.0f}% accurate{fail_note}")
                     
                     # Show per-variable details if not 100%
                     if attempt.node_type_accuracy < 100 and attempt.node_type_details:
