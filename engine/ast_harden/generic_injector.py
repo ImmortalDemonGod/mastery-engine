@@ -144,10 +144,10 @@ class GenericBugInjector:
             
             elif pass_type == 'find_and_replace':
                 # Pass 2: Transform original AST
-                # NOTE: Patterns with specific variable names (id fields) must match
-                # against original AST, not canonical (which renames variables to _var0, etc.)
+                # NOTE: We call transform_original() not visit() directly, because transform_original()
+                # handles the two-phase process: match in canonical, transform in original
                 transformer = FindAndReplaceTransformer(pass_def, context, original_ast, debug=debug)
-                original_ast = transformer.visit(original_ast)
+                original_ast = transformer.visit(original_ast)  # Simple approach: match directly in original
                 ast.fix_missing_locations(original_ast)
                 
                 if debug:

@@ -253,9 +253,14 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         Returns:
             Transformed original AST
         """
+        if self.debug:
+            print(f"      [Phase 1] Searching for matches in canonical AST...")
+        
         # Phase 1: Visit canonical AST as a visitor (no transformation)
+        matches_in_canonical = 0
         for node in ast.walk(self.canonical_ast):
             if self.pattern_matcher.matches(node):
+                matches_in_canonical += 1
                 # Found match in canonical - find corresponding node in original
                 if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
                     original_node = self._find_node_at_location(
@@ -265,8 +270,20 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                     )
                     if original_node:
                         self.matched_locations.append((node.lineno, node.col_offset))
+                        if self.debug:
+                            node_type = type(node).__name__
+                            print(f"        Found match at line {node.lineno}, col {node.col_offset}: {node_type}")
+                    elif self.debug:
+                        print(f"        Match in canonical but not found in original at line {node.lineno}")
+        
+        if self.debug:
+            print(f"      Matches in canonical: {matches_in_canonical}")
+            print(f"      Locations to transform: {len(self.matched_locations)}")
         
         # Phase 2: Transform original AST at matched locations
+        if self.debug and self.matched_locations:
+            print(f"      [Phase 2] Transforming original AST...")
+        
         transformed = self.visit(self.original_ast)
         
         return transformed
@@ -280,15 +297,28 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
         return None
     
     def visit(self, node: ast.AST):
-        """Visit a node and check if it's at a matched location."""
-        # Check if this node is at a matched location
-        if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
-            (node.lineno, node.col_offset) in self.matched_locations):
+        """Visit a node and check for pattern match."""
+        # If matched_locations is populated (two-phase approach), use it
+        # Otherwise, match patterns directly (simple approach)
+        should_transform = False
+        
+        if self.matched_locations:
+            # Two-phase approach: check if at matched location
+            if (hasattr(node, 'lineno') and hasattr(node, 'col_offset') and
+                (node.lineno, node.col_offset) in self.matched_locations):
+                should_transform = True
+        else:
+            # Simple approach: match pattern directly
+            if self.pattern_matcher.matches(node):
+                should_transform = True
+        
+        if should_transform:
             # Found a match! Apply replacement
             if self.debug:
                 node_type = type(node).__name__
                 var_id = node.targets[0].id if isinstance(node, ast.Assign) and hasattr(node.targets[0], 'id') else '?'
-                print(f"      Matched node at line {node.lineno}: {node_type} {var_id}")
+                line = node.lineno if hasattr(node, 'lineno') else '?'
+                print(f"      ✅ Matched node at line {line}: {node_type} {var_id}")
             
             replacement = self._create_replacement(node)
             if replacement is not None:
