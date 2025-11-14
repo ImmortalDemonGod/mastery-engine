@@ -169,7 +169,20 @@ class GenericBugInjector:
             print(f"\n[Step 5] Unparse & Return")
         
         try:
-            buggy_code = ast.unparse(original_ast)
+            # Try ast.unparse (Python 3.9+)
+            if hasattr(ast, 'unparse'):
+                buggy_code = ast.unparse(original_ast)
+            else:
+                # Fallback for Python 3.7/3.8: use astor
+                try:
+                    import astor
+                    buggy_code = astor.to_source(original_ast)
+                except ImportError:
+                    if debug:
+                        print(f"  ❌ ast.unparse not available and astor not installed")
+                        print(f"     Python version likely < 3.9")
+                    return source_code, False
+            
             if debug:
                 print(f"  ✅ Unparse successful")
                 print(f"  Original length: {len(dedented_code)}")
