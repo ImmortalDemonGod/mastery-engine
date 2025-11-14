@@ -342,6 +342,24 @@ Scaled dot-product attention is the core of multi-head attention:
 Each head applies your scaled_dot_product_attention function independently!
 You're building the foundational piece of the Transformer.
 
+References
+──────────
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Introduced scaled dot-product attention: Attention(Q,K,V) = softmax(QK^T/√d_k)V
+  - The 1/√d_k scaling factor prevents vanishing gradients
+
+- Bahdanau, D., Cho, K., & Bengio, Y. (2015). "Neural Machine Translation by Jointly 
+  Learning to Align and Translate." In Proceedings of ICLR 2015.
+  - First attention mechanism for seq2seq models (additive attention)
+  - Established attention as key to handling long sequences
+
+**Further Reading:**
+- Luong, M.-T., Pham, H., & Manning, C. D. (2015). "Effective Approaches to 
+  Attention-based Neural Machine Translation." In Proceedings of EMNLP 2015.
+  - Dot-product attention (precursor to scaled dot-product)
+
 Submission
 ──────────
 Once implemented, run:

@@ -397,6 +397,19 @@ x = x + ffn_out  # Residual connection
 
 You've now implemented most components needed for a full Transformer!
 
+References
+──────────
+**Primary Literature:**
+- Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). "Attention Is All You Need." 
+  In Proceedings of NeurIPS 2017.
+  - Introduced multi-head attention: enables model to attend to different representation subspaces
+  - Projects Q, K, V to num_heads parallel attention operations
+
+**Further Reading:**
+- Shazeer, N., et al. (2018). "Mesh-TensorFlow: Deep Learning for Supercomputers." 
+  In Proceedings of NeurIPS 2018.
+  - Efficient parallelization strategies for multi-head attention across GPUs
+
 Submission
 ──────────
 Once implemented, run:
