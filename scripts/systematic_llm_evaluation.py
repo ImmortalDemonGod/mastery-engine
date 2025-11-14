@@ -231,6 +231,33 @@ class SystematicEvaluator:
                 print(f"  ❌ Failed: {failure_mode}")
                 print(f"     Patterns: {patterns_generated}, Specific vars: {has_specific_vars}")
                 
+                # For pattern_match failures on first attempt, get detailed debug info
+                if failure_mode == "pattern_match" and attempt_num == 1:
+                    print(f"\n  🔍 Collecting detailed pattern matching diagnostics...")
+                    from engine.ast_harden.generic_injector import GenericBugInjector
+                    import io
+                    import sys
+                    
+                    # Capture debug output
+                    old_stdout = sys.stdout
+                    sys.stdout = captured = io.StringIO()
+                    
+                    try:
+                        injector = GenericBugInjector(bug_def)
+                        injector.inject(patch_info['before'], debug=True)
+                    except:
+                        pass
+                    
+                    sys.stdout = old_stdout
+                    debug_output = captured.getvalue()
+                    
+                    if debug_output:
+                        print(f"\n  📋 Pattern Matcher Debug Output:")
+                        # Show just the key parts
+                        for line in debug_output.split('\n'):
+                            if 'Pass' in line or 'Target' in line or 'Replacements' in line or '❌' in line:
+                                print(f"     {line}")
+                
                 # Store the diagnostic as feedback
                 feedback_text = f"**Attempt {attempt_num} failed:**\n{diagnostic}\n"
                 
