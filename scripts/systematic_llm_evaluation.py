@@ -270,16 +270,25 @@ class SystematicEvaluator:
         return result
     
     def _check_for_specific_variable_names(self, bug_def: dict) -> bool:
-        """Check if patterns include specific variable names (e.g., 'id' field in targets)"""
+        """Check if patterns include specific variable names (e.g., 'id' field anywhere in pattern)"""
+        def has_id_field(obj):
+            """Recursively check if any dict in structure has 'id' field"""
+            if isinstance(obj, dict):
+                if 'id' in obj and not isinstance(obj['id'], dict):
+                    return True
+                for value in obj.values():
+                    if has_id_field(value):
+                        return True
+            elif isinstance(obj, list):
+                for item in obj:
+                    if has_id_field(item):
+                        return True
+            return False
+        
         for pass_def in bug_def.get('logic', []):
             if 'pattern' in pass_def:
-                pattern = pass_def['pattern']
-                if 'targets' in pattern and isinstance(pattern['targets'], list):
-                    for target in pattern['targets']:
-                        if isinstance(target, dict) and 'id' in target:
-                            # Has specific variable name
-                            if not isinstance(target['id'], dict):  # Not a context reference
-                                return True
+                if has_id_field(pass_def['pattern']):
+                    return True
         return False
     
     def _analyze_pattern_complexity(self, bug_def: dict) -> Dict[str, int]:
