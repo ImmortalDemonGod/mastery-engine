@@ -696,6 +696,25 @@ class SystematicEvaluator:
                         if issues:
                             print(f"        Issues: {', '.join(issues)}")
                     
+                    # Check for scope mismatch in feedback (permanent diagnostic)
+                    if attempt.feedback_given and not attempt.success:
+                        if 'def ' in attempt.feedback_given and ('Expected:' in attempt.feedback_given or 'Got:' in attempt.feedback_given):
+                            # Check if comparing different scopes
+                            lines = attempt.feedback_given.split('\n')
+                            expected_lines = [l for l in lines if 'Expected:' in l]
+                            got_lines = [l for l in lines if 'Got:' in l]
+                            
+                            # If one has 'def' and other doesn't, it's a scope mismatch
+                            if expected_lines and got_lines:
+                                has_def_expected = any('def ' in l for l in expected_lines)
+                                has_def_got = any('def ' in l for l in got_lines)
+                                
+                                if has_def_expected != has_def_got:
+                                    print(f"\n    🚨 SCOPE MISMATCH DETECTED:")
+                                    print(f"       Expected: {'function' if has_def_expected else 'snippet'}")
+                                    print(f"       Got: {'function' if has_def_got else 'snippet'}")
+                                    print(f"       → Comparison invalid (apples vs oranges)")
+                    
                 except Exception as e:
                     print(f"    Error parsing response: {e}")
                     # Show first 200 chars of response
