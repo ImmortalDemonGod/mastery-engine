@@ -37,6 +37,8 @@ class AttemptResult:
     wrong_node_types: List[str] = None  # Track if wrong AST node type used
     node_type_accuracy: float = 0.0  # Percentage of correct node types vs expected
     node_type_details: Dict[str, Dict] = None  # Per-variable accuracy details
+    injection_succeeded: bool = False  # Did pattern match and transform (even if comparison failed)
+    is_false_negative: bool = False  # Success but marked as failure due to comparison
     
     def __post_init__(self):
         if self.pattern_complexity is None:
@@ -283,6 +285,10 @@ class SystematicEvaluator:
                 # Store the diagnostic as feedback
                 feedback_text = f"**Attempt {attempt_num} failed:**\n{diagnostic}\n"
                 
+                # Detect false negatives: injection succeeded but comparison failed
+                injection_succeeded = 'Injection succeeded but transformation was incorrect' in diagnostic
+                is_false_negative = injection_succeeded and 'def ' in diagnostic
+                
                 attempts.append(AttemptResult(
                     attempt_num=attempt_num,
                     success=False,
@@ -297,7 +303,9 @@ class SystematicEvaluator:
                     missing_operators=missing_ops,
                     wrong_node_types=wrong_types,
                     node_type_accuracy=node_accuracy,
-                    node_type_details=node_details
+                    node_type_details=node_details,
+                    injection_succeeded=injection_succeeded,
+                    is_false_negative=is_false_negative
                 ))
                 
                 # Add detailed feedback for next attempt
@@ -818,6 +826,22 @@ class SystematicEvaluator:
         print(f"  Successful: {successful_bugs}")
         print(f"  Failed: {total_bugs - successful_bugs}")
         print(f"  Success rate: {success_rate:.1f}%")
+        
+        # Check for false negatives (injection succeeded but marked as failure)
+        false_negatives = []
+        for bug_result in self.results:
+            if not bug_result.final_success:
+                for attempt in bug_result.attempts:
+                    if attempt.is_false_negative:
+                        false_negatives.append((bug_result.module, attempt.attempt_num))
+        
+        if false_negatives:
+            print(f"\n⚠️  FALSE NEGATIVES DETECTED:")
+            print(f"  {len(false_negatives)} attempt(s) where injection succeeded but comparison failed")
+            for module, attempt_num in false_negatives:
+                print(f"    - {module} attempt {attempt_num}: Transformation works, comparison issue")
+            print(f"\n  💡 Actual success rate likely higher than reported!")
+            print(f"     If these are true successes: ~{((successful_bugs + len(set(m for m, _ in false_negatives))) / total_bugs * 100):.0f}%")
         
         # Success by complexity
         print(f"\n📊 SUCCESS BY COMPLEXITY:")
