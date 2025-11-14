@@ -450,15 +450,14 @@ Before generating JSON, verify:
             ast_module.parse(textwrap.dedent(before_parseable))
         except:
             # Still unparseable - try to find full function (use ORIGINAL snippet, not filtered)
-            full_before = self._extract_full_function_from_patch(patch_path, before_code, debug=True)
+            full_before = self._extract_full_function_from_patch(patch_path, before_code, debug=False)
             # Only use if it's actually parseable AND different from what we tried
             if full_before != before_code and full_before != before_parseable:
                 try:
                     ast_module.parse(textwrap.dedent(full_before))
                     before_parseable = full_before
-                    print(f"✅ Full function extraction succeeded for BEFORE code!")
                 except Exception as e:
-                    print(f"⚠️ Extracted function still not parseable: {e}")
+                    pass  # Keep filtered version
         
         # DON'T extract full function for AFTER - source file has correct code, not buggy!
         # AFTER must use the buggy code from the patch, not from source
