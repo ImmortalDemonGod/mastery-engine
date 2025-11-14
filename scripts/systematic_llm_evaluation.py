@@ -1022,15 +1022,15 @@ def main():
     """Run systematic evaluation"""
     
     # Default to gpt-4o-mini for cost efficiency
-    # Set model="gpt-4o" for better first-try success (100% improvement)
-    print("🧠 Using model: gpt-4o-mini (default)")
-    evaluator = SystematicEvaluator(model="gpt-4o-mini")
+    # Set model="gpt-4o" for better first-try success (100% improvement vs gpt-4o-mini)
+    print("🧠 Using model: gpt-4o (smarter model)")
+    evaluator = SystematicEvaluator(model="gpt-4o")
     
     base_path = Path("/Volumes/Totallynotaharddrive/assignment1-basics/curricula/cs336_a1/modules")
     
-    # Test suite: bugs of varying complexity
+    # Test suite: ALL 21 bugs from curriculum
     test_bugs = [
-        # Simple (1 operation)
+        # ===== SIMPLE (1-2 operations) =====
         {
             "module": "silu",
             "patch": base_path / "silu/bugs/missing_multiply.patch",
@@ -1038,7 +1038,6 @@ def main():
             "complexity": "simple",
             "operations": 1
         },
-        # Simple (2 deletions, same type)
         {
             "module": "attention",
             "patch": base_path / "attention/bugs/missing_scale.patch",
@@ -1046,21 +1045,142 @@ def main():
             "complexity": "simple",
             "operations": 2
         },
-        # Medium (1 keyword removal)
         {
             "module": "rmsnorm",
             "patch": base_path / "rmsnorm/bugs/missing_keepdim.patch",
             "symptom": "Missing keepdim in RMSNorm",
+            "complexity": "simple",
+            "operations": 1
+        },
+        {
+            "module": "softmax",
+            "patch": base_path / "softmax/bugs/no_subtract_max.patch",
+            "symptom": "Missing max subtraction in softmax",
+            "complexity": "simple",
+            "operations": 1
+        },
+        {
+            "module": "linear",
+            "patch": base_path / "linear/bugs/missing_transpose.patch",
+            "symptom": "Missing transpose in linear layer",
+            "complexity": "simple",
+            "operations": 1
+        },
+        {
+            "module": "embedding",
+            "patch": base_path / "embedding/bugs/wrong_dimension_order.patch",
+            "symptom": "Wrong dimension order in embedding",
+            "complexity": "simple",
+            "operations": 1
+        },
+        {
+            "module": "swiglu",
+            "patch": base_path / "swiglu/bugs/missing_gate.patch",
+            "symptom": "Missing gate in SwiGLU",
+            "complexity": "simple",
+            "operations": 1
+        },
+        
+        # ===== MEDIUM (2-3 operations or keyword args) =====
+        {
+            "module": "cross_entropy",
+            "patch": base_path / "cross_entropy/bugs/no_logsumexp.patch",
+            "symptom": "Not using logsumexp in cross entropy",
+            "complexity": "medium",
+            "operations": 2
+        },
+        {
+            "module": "multihead_attention",
+            "patch": base_path / "multihead_attention/bugs/missing_transpose_back.patch",
+            "symptom": "Missing transpose back in multihead attention",
             "complexity": "medium",
             "operations": 1
         },
-        # Complex (4 operations)
+        {
+            "module": "rope",
+            "patch": base_path / "rope/bugs/wrong_rotation.patch",
+            "symptom": "Wrong rotation in RoPE",
+            "complexity": "medium",
+            "operations": 2
+        },
+        {
+            "module": "cosine_schedule",
+            "patch": base_path / "cosine_schedule/bugs/wrong_cosine_range.patch",
+            "symptom": "Wrong cosine range in scheduler",
+            "complexity": "medium",
+            "operations": 2
+        },
+        {
+            "module": "gradient_clipping",
+            "patch": base_path / "gradient_clipping/bugs/per_parameter_clipping.patch",
+            "symptom": "Per-parameter instead of global clipping",
+            "complexity": "medium",
+            "operations": 2
+        },
+        {
+            "module": "text_generation",
+            "patch": base_path / "text_generation/bugs/temperature_after_softmax.patch",
+            "symptom": "Applying temperature after softmax",
+            "complexity": "medium",
+            "operations": 2
+        },
+        {
+            "module": "transformer_block",
+            "patch": base_path / "transformer_block/bugs/missing_residual.patch",
+            "symptom": "Missing residual connection",
+            "complexity": "medium",
+            "operations": 2
+        },
+        
+        # ===== COMPLEX (3+ operations or multi-statement) =====
         {
             "module": "adamw",
             "patch": base_path / "adamw/bugs/missing_bias_correction.patch",
             "symptom": "Missing bias correction in AdamW",
             "complexity": "complex",
             "operations": 4
+        },
+        {
+            "module": "bpe_tokenizer",
+            "patch": base_path / "bpe_tokenizer/bugs/wrong_merge_order.patch",
+            "symptom": "Wrong merge order in BPE",
+            "complexity": "complex",
+            "operations": 3
+        },
+        {
+            "module": "tokenizer_class",
+            "patch": base_path / "tokenizer_class/bugs/wrong_merge_order.patch",
+            "symptom": "Wrong merge order in tokenizer",
+            "complexity": "complex",
+            "operations": 3
+        },
+        {
+            "module": "data_loader",
+            "patch": base_path / "data_loader/bugs/wrong_sampling_range.patch",
+            "symptom": "Wrong sampling range in data loader",
+            "complexity": "complex",
+            "operations": 2
+        },
+        {
+            "module": "checkpointing",
+            "patch": base_path / "checkpointing/bugs/missing_optimizer_state.patch",
+            "symptom": "Missing optimizer state in checkpoint",
+            "complexity": "complex",
+            "operations": 2
+        },
+        {
+            "module": "training_loop",
+            "patch": base_path / "training_loop/bugs/missing_zero_grad.patch",
+            "symptom": "Missing zero_grad in training loop",
+            "complexity": "complex",
+            "operations": 2
+        },
+        {
+            "module": "transformer_lm",
+            "patch": base_path / "transformer_lm/bugs/missing_final_norm.patch",
+            "symptom": "Missing final normalization",
+            "complexity": "complex",
+            "operations": 2
         },
     ]
     
