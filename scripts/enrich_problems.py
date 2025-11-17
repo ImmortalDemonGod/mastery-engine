@@ -146,32 +146,68 @@ class LeetCodeEnricher:
         return problem
     
     def _extract_examples(self, content: str) -> List[Dict]:
-        """Extract example inputs/outputs from problem description."""
+        """Extract example inputs/outputs from problem description.
+        
+        Handles two formats:
+        1. Design problems: <pre> blocks with Input/Output
+        2. Regular problems: <span> wrapped Input/Output
+        """
         examples = []
         
-        # Simple heuristic: look for "Example 1:", "Example 2:", etc.
-        # This is a basic parser - may need refinement based on actual API response
+        # Pattern 1: Design problems with <pre> blocks
+        # Matches both 'Example:' and 'Example N:' formats
+        pre_blocks = re.findall(
+            r'<strong[^>]*>Example[^<]*:</strong>.*?<pre>(.*?)</pre>',
+            content,
+            re.DOTALL
+        )
         
-        lines = content.split('\n')
-        current_example = None
+        if pre_blocks:
+            for block in pre_blocks:
+                # Extract Input, Output, Explanation from pre block
+                inp = re.search(
+                    r'<strong>Input</strong>\s*(.*?)(?=<strong>Output</strong>)',
+                    block,
+                    re.DOTALL
+                )
+                out = re.search(
+                    r'<strong>Output</strong>\s*(.*?)(?=<strong>Explanation</strong>|$)',
+                    block,
+                    re.DOTALL
+                )
+                exp = re.search(
+                    r'<strong>Explanation</strong>\s*(.*?)$',
+                    block,
+                    re.DOTALL
+                )
+                
+                examples.append({
+                    'input': inp.group(1).strip() if inp else '',
+                    'output': out.group(1).strip() if out else '',
+                    'explanation': exp.group(1).strip() if exp else ''
+                })
         
-        for line in lines:
-            if 'Example' in line and ':' in line:
-                if current_example:
-                    examples.append(current_example)
-                current_example = {"text": line, "input": "", "output": "", "explanation": ""}
-            elif current_example:
-                if 'Input:' in line:
-                    current_example["input"] = line.split('Input:')[-1].strip()
-                elif 'Output:' in line:
-                    current_example["output"] = line.split('Output:')[-1].strip()
-                elif 'Explanation:' in line:
-                    current_example["explanation"] = line.split('Explanation:')[-1].strip()
+        # Pattern 2: Regular problems with span tags  
+        else:
+            ex_matches = re.findall(
+                r'<strong[^>]*>Example \d+:</strong>(.*?)(?=<strong[^>]*>Example \d+:</strong>|<p><strong[^>]*>Constraints:|$)',
+                content,
+                re.DOTALL
+            )
+            
+            for ex in ex_matches:
+                inp = re.search(r'<strong[^>]*>Input:</strong>.*?<span[^>]*>(.*?)</span>', ex)
+                out = re.search(r'<strong[^>]*>Output:</strong>.*?<span[^>]*>(.*?)</span>', ex)
+                exp = re.search(r'<strong[^>]*>Explanation:</strong>\s*</p>\s*<p>(.*?)</p>', ex, re.DOTALL)
+                
+                if inp and out:
+                    examples.append({
+                        'input': inp.group(1).strip(),
+                        'output': out.group(1).strip(),
+                        'explanation': exp.group(1).strip() if exp else ''
+                    })
         
-        if current_example:
-            examples.append(current_example)
-        
-        return examples
+        return examples[:4]  # Max 4 examples
     
     def _extract_constraints(self, content: str) -> List[str]:
         """Extract constraints from problem description."""
