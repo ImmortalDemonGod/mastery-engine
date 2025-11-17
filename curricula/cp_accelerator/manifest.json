@@ -1,8 +1,8 @@
 {
   "curriculum_name": "cp_accelerator",
   "description": "Systematic competitive programming mastery via rating-based progression",
-  "author": "Curated from DSA-Taxonomies + CP Roadmap (v2.0.0)",
-  "version": "2.0.0",
+  "author": "Curated from DSA-Taxonomies + CP Roadmap (v2.1.0)",
+  "version": "2.1.0",
   "metadata": {
     "sources": {
       "roadmap": "https://docs.google.com/document/d/1-7Co93b504uyXyMjjE8bnLJP3d3QXvp_m1UjvbvdR2Y",
