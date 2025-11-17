@@ -1,8 +1,17 @@
 {
   "curriculum_name": "cp_accelerator",
-  "author": "Competitive Programming Experts (Curated via DSA Taxonomy + CP Roadmap)",
+  "description": "Systematic competitive programming mastery via rating-based progression",
+  "author": "Curated from DSA-Taxonomies + CP Roadmap (v1.0.0)",
   "version": "1.0.0",
-  "description": "A systematic, rating-driven curriculum for competitive programming mastery. Synthesizes the DSA Pattern Taxonomy with a proven roadmap to guide learners from newbie (0) to candidate master (1900+) through 19 core algorithmic patterns.",
+  "metadata": {
+    "sources": {
+      "roadmap": "https://docs.google.com/document/d/1-7Co93b504uyXyMjjE8bnLJP3d3QXvp_m1UjvbvdR2Y",
+      "taxonomy": "https://github.com/Yassir-aykhlf/DSA-Taxonomies"
+    },
+    "rating_system": "Codeforces",
+    "target_audience": "0-1899 rating",
+    "last_generated": "2025-11-17"
+  },
   "modules": [
     {
       "id": "sorting",
@@ -12,56 +21,142 @@
       "metadata": {
         "rating_bracket": "0-999",
         "priority": "Vital",
-        "pattern_category": "Foundation",
+        "taxonomy_source": "Taxonomies/5. Sorting.md",
         "estimated_hours": 4
       }
     },
     {
-      "id": "two_pointers",
-      "name": "Two Pointers Pattern",
-      "path": "modules/two_pointers",
-      "dependencies": ["sorting"],
+      "id": "two_pointers_basics",
+      "name": "Two Pointers: Opposite Direction",
+      "path": "modules/two_pointers_basics",
+      "dependencies": [
+        "sorting"
+      ],
       "metadata": {
         "rating_bracket": "0-999",
         "priority": "Helpful",
-        "pattern_category": "Foundation",
+        "taxonomy_source": "Taxonomies/1. Two Pointers.md#opposite-direction",
+        "estimated_hours": 4
+      }
+    },
+    {
+      "id": "two_pointers_sliding_window",
+      "name": "Two Pointers: Sliding Window",
+      "path": "modules/two_pointers_sliding_window",
+      "dependencies": [
+        "two_pointers_basics"
+      ],
+      "metadata": {
+        "rating_bracket": "1000-1199",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/1. Two Pointers.md#sliding-window",
         "estimated_hours": 6
       }
     },
     {
-      "id": "hash_table",
-      "name": "Hash Table Optimization",
-      "path": "modules/hash_table",
+      "id": "hash_table_basics",
+      "name": "Hash Table Fundamentals",
+      "path": "modules/hash_table_basics",
       "dependencies": [],
       "metadata": {
-        "rating_bracket": "0-999",
+        "rating_bracket": "1000-1199",
         "priority": "Vital",
-        "pattern_category": "Foundation",
+        "taxonomy_source": "Taxonomies/2. Hash Table.md#basics",
         "estimated_hours": 5
       }
     },
     {
-      "id": "binary_search",
-      "name": "Binary Search on Index and Answer Space",
-      "path": "modules/binary_search",
-      "dependencies": ["sorting"],
+      "id": "binary_search_on_index",
+      "name": "Binary Search: Search on Index",
+      "path": "modules/binary_search_on_index",
+      "dependencies": [
+        "sorting"
+      ],
       "metadata": {
         "rating_bracket": "1000-1199",
         "priority": "Vital",
-        "pattern_category": "Core Algorithm",
+        "taxonomy_source": "Taxonomies/7. Binary Search.md#index-search",
+        "estimated_hours": 6
+      }
+    },
+    {
+      "id": "recursion_basics",
+      "name": "Recursion Fundamentals",
+      "path": "modules/recursion_basics",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1200-1399",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/6. Traversal Algorithms.md#recursion",
+        "estimated_hours": 5
+      }
+    },
+    {
+      "id": "dp_foundations",
+      "name": "DP: Foundations (Recursion to Memoization)",
+      "path": "modules/dp_foundations",
+      "dependencies": [
+        "recursion_basics"
+      ],
+      "metadata": {
+        "rating_bracket": "1200-1399",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/12. Dynamic Programming.md#foundations",
         "estimated_hours": 8
       }
     },
     {
-      "id": "dynamic_programming",
-      "name": "Dynamic Programming Foundations",
-      "path": "modules/dynamic_programming",
-      "dependencies": ["binary_search"],
+      "id": "prefix_sum",
+      "name": "Prefix Sum & Range Queries",
+      "path": "modules/prefix_sum",
+      "dependencies": [],
       "metadata": {
-        "rating_bracket": "1200-1399",
+        "rating_bracket": "1000-1199",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/9. Prefix Sum.md",
+        "estimated_hours": 4
+      }
+    },
+    {
+      "id": "dp_knapsack",
+      "name": "DP: Knapsack Problems (0/1 and Unbounded)",
+      "path": "modules/dp_knapsack",
+      "dependencies": [
+        "dp_foundations"
+      ],
+      "metadata": {
+        "rating_bracket": "1400-1599",
         "priority": "Vital",
-        "pattern_category": "Specialized",
-        "estimated_hours": 20
+        "taxonomy_source": "Taxonomies/12. Dynamic Programming.md#knapsack",
+        "estimated_hours": 8
+      }
+    },
+    {
+      "id": "binary_search_on_answer",
+      "name": "Binary Search: Search on Answer Space",
+      "path": "modules/binary_search_on_answer",
+      "dependencies": [
+        "binary_search_on_index"
+      ],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/7. Binary Search.md#answer-space",
+        "estimated_hours": 8
+      }
+    },
+    {
+      "id": "graphs_basics",
+      "name": "Graph Fundamentals: Representation & Traversal",
+      "path": "modules/graphs_basics",
+      "dependencies": [
+        "recursion_basics"
+      ],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/6. Traversal Algorithms.md#graphs",
+        "estimated_hours": 10
       }
     }
   ]

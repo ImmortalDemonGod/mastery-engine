@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "last_updated": "2025-11-17",
+  "sources": {
+    "roadmap": "https://docs.google.com/document/d/1-7Co93b504uyXyMjjE8bnLJP3d3QXvp_m1UjvbvdR2Y",
+    "taxonomy": "https://github.com/Yassir-aykhlf/DSA-Taxonomies"
+  },
+  "topics": [
+    {
+      "id": "sorting",
+      "name": "Core Sorting Techniques",
+      "rating_bracket": "0-999",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/5. Sorting.md",
+      "description": "Master fundamental sorting algorithms and their applications. Understand when to use library functions vs. implementing custom sorts.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=kPRA0W1kECg",
+          "title": "Sorting Algorithms Explained"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-912",
+          "title": "Sort an Array",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/sort-an-array/",
+          "difficulty_rating": null,
+          "sub_pattern": "Merge Sort Implementation"
+        }
+      ],
+      "estimated_hours": 4,
+      "notes": "Foundation for many other algorithms. Focus on merge sort for stable O(n log n) sorting."
+    },
+    {
+      "id": "two_pointers_basics",
+      "name": "Two Pointers: Opposite Direction",
+      "rating_bracket": "0-999",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/1. Two Pointers.md#opposite-direction",
+      "description": "Learn to use two pointers starting from opposite ends of an array to solve problems in O(n) time. Essential for target sum problems on sorted arrays.",
+      "dependencies": ["sorting"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=On3Ij3TF1nY",
+          "title": "Two Pointers Technique"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-167",
+          "title": "Two Sum II - Input Array Is Sorted",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/",
+          "difficulty_rating": null,
+          "sub_pattern": "Opposite Direction Pointers"
+        },
+        {
+          "id": "LC-15",
+          "title": "3Sum",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/3sum/",
+          "difficulty_rating": null,
+          "sub_pattern": "Opposite Direction with Deduplication"
+        }
+      ],
+      "estimated_hours": 4,
+      "notes": "Requires sorted array. Fundamental optimization technique."
+    },
+    {
+      "id": "two_pointers_sliding_window",
+      "name": "Two Pointers: Sliding Window",
+      "rating_bracket": "1000-1199",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/1. Two Pointers.md#sliding-window",
+      "description": "Master the sliding window technique for subarray and substring problems. Learn fixed-size and variable-size window patterns.",
+      "dependencies": ["two_pointers_basics"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=MK-NZ4hN7rs",
+          "title": "Sliding Window Technique"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-3",
+          "title": "Longest Substring Without Repeating Characters",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+          "difficulty_rating": null,
+          "sub_pattern": "Variable Size Window"
+        },
+        {
+          "id": "LC-209",
+          "title": "Minimum Size Subarray Sum",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/minimum-size-subarray-sum/",
+          "difficulty_rating": null,
+          "sub_pattern": "Variable Size Window with Target"
+        }
+      ],
+      "estimated_hours": 6,
+      "notes": "One of the highest ROI patterns for interviews and contests."
+    },
+    {
+      "id": "hash_table_basics",
+      "name": "Hash Table Fundamentals",
+      "rating_bracket": "1000-1199",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/2. Hash Table.md#basics",
+      "description": "Master O(1) lookups and frequency counting. Learn when hash tables are the optimal data structure choice.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "documentation",
+          "url": "https://cppreference.com",
+          "title": "STL unordered_map / Python dict documentation"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-1",
+          "title": "Two Sum",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/two-sum/",
+          "difficulty_rating": null,
+          "sub_pattern": "Complement Pattern"
+        },
+        {
+          "id": "LC-49",
+          "title": "Group Anagrams",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/group-anagrams/",
+          "difficulty_rating": null,
+          "sub_pattern": "Frequency Map"
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Foundation for optimization. Learn your language's hash table library thoroughly."
+    },
+    {
+      "id": "binary_search_on_index",
+      "name": "Binary Search: Search on Index",
+      "rating_bracket": "1000-1199",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/7. Binary Search.md#index-search",
+      "description": "Master the classic binary search on sorted arrays. Learn to handle edge cases and avoid off-by-one errors.",
+      "dependencies": ["sorting"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=GU7DpgHINWQ",
+          "title": "Binary Search Tutorial (C++ and Python)"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-704",
+          "title": "Binary Search",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/binary-search/",
+          "difficulty_rating": null,
+          "sub_pattern": "Classic Binary Search"
+        },
+        {
+          "id": "LC-34",
+          "title": "Find First and Last Position of Element in Sorted Array",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array/",
+          "difficulty_rating": null,
+          "sub_pattern": "Lower/Upper Bound"
+        }
+      ],
+      "estimated_hours": 6,
+      "notes": "Essential for O(log n) search. Practice until boundary conditions are intuitive."
+    },
+    {
+      "id": "recursion_basics",
+      "name": "Recursion Fundamentals",
+      "rating_bracket": "1200-1399",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/6. Traversal Algorithms.md#recursion",
+      "description": "Develop recursive thinking. Master base cases, recursive cases, and the call stack.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=IJDJ0kBx2LM",
+          "title": "Recursion for DSA/CP: BEST way to Understand"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-509",
+          "title": "Fibonacci Number",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/fibonacci-number/",
+          "difficulty_rating": null,
+          "sub_pattern": "Classic Recursion"
+        },
+        {
+          "id": "LC-50",
+          "title": "Pow(x, n)",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/powx-n/",
+          "difficulty_rating": null,
+          "sub_pattern": "Divide and Conquer"
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Critical foundation for DP, backtracking, and tree algorithms."
+    },
+    {
+      "id": "dp_foundations",
+      "name": "DP: Foundations (Recursion to Memoization)",
+      "rating_bracket": "1200-1399",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/12. Dynamic Programming.md#foundations",
+      "description": "Learn the DP paradigm: optimal substructure and overlapping subproblems. Master top-down (memoization) and bottom-up (tabulation) approaches.",
+      "dependencies": ["recursion_basics"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=oBt53YbR9Kk",
+          "title": "Dynamic Programming lecture #1 - Fibonacci, iteration vs recursion"
+        },
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=vYquumk4nWw",
+          "title": "Dynamic Programming | Introduction"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-70",
+          "title": "Climbing Stairs",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/climbing-stairs/",
+          "difficulty_rating": null,
+          "sub_pattern": "1D DP"
+        },
+        {
+          "id": "LC-198",
+          "title": "House Robber",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/house-robber/",
+          "difficulty_rating": null,
+          "sub_pattern": "State Machine DP"
+        }
+      ],
+      "estimated_hours": 8,
+      "notes": "Most important algorithmic paradigm. High initial difficulty, highest long-term ROI."
+    },
+    {
+      "id": "prefix_sum",
+      "name": "Prefix Sum & Range Queries",
+      "rating_bracket": "1000-1199",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/9. Prefix Sum.md",
+      "description": "Master prefix sums for O(1) range queries. Learn 1D and 2D prefix sum techniques.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "blog",
+          "url": "https://usaco.guide/silver/prefix-sums",
+          "title": "USACO Guide: Prefix Sums"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-303",
+          "title": "Range Sum Query - Immutable",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/range-sum-query-immutable/",
+          "difficulty_rating": null,
+          "sub_pattern": "1D Prefix Sum"
+        },
+        {
+          "id": "LC-560",
+          "title": "Subarray Sum Equals K",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/subarray-sum-equals-k/",
+          "difficulty_rating": null,
+          "sub_pattern": "Prefix Sum with Hash Map"
+        }
+      ],
+      "estimated_hours": 4,
+      "notes": "Simple but powerful. Often combined with hash tables."
+    },
+    {
+      "id": "dp_knapsack",
+      "name": "DP: Knapsack Problems (0/1 and Unbounded)",
+      "rating_bracket": "1400-1599",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/12. Dynamic Programming.md#knapsack",
+      "description": "Master the knapsack family of problems. Learn 0/1, unbounded, and bounded knapsack patterns.",
+      "dependencies": ["dp_foundations"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=8LusJS5-AGo",
+          "title": "0/1 Knapsack Problem Dynamic Programming"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-416",
+          "title": "Partition Equal Subset Sum",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/partition-equal-subset-sum/",
+          "difficulty_rating": null,
+          "sub_pattern": "0/1 Knapsack (Boolean)"
+        },
+        {
+          "id": "LC-322",
+          "title": "Coin Change",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/coin-change/",
+          "difficulty_rating": null,
+          "sub_pattern": "Unbounded Knapsack"
+        }
+      ],
+      "estimated_hours": 8,
+      "notes": "One of the most common DP patterns. Appears in many disguised forms."
+    },
+    {
+      "id": "binary_search_on_answer",
+      "name": "Binary Search: Search on Answer Space",
+      "rating_bracket": "1400-1599",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/7. Binary Search.md#answer-space",
+      "description": "Advanced binary search: searching on the answer space when you can verify a candidate answer efficiently. Critical for optimization problems.",
+      "dependencies": ["binary_search_on_index"],
+      "resources": [
+        {
+          "type": "blog",
+          "url": "https://usaco.guide/silver/binary-search-ans",
+          "title": "USACO Guide: Binary Search on the Answer"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-875",
+          "title": "Koko Eating Bananas",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/koko-eating-bananas/",
+          "difficulty_rating": null,
+          "sub_pattern": "Minimize Maximum"
+        },
+        {
+          "id": "LC-1011",
+          "title": "Capacity To Ship Packages Within D Days",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/capacity-to-ship-packages-within-d-days/",
+          "difficulty_rating": null,
+          "sub_pattern": "Minimize Maximum with Constraint"
+        }
+      ],
+      "estimated_hours": 8,
+      "notes": "High-value pattern. Transforms many problems from O(n²) to O(n log n)."
+    },
+    {
+      "id": "graphs_basics",
+      "name": "Graph Fundamentals: Representation & Traversal",
+      "rating_bracket": "1400-1599",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/6. Traversal Algorithms.md#graphs",
+      "description": "Learn graph representations (adjacency list/matrix). Master BFS and DFS traversals.",
+      "dependencies": ["recursion_basics"],
+      "resources": [
+        {
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=tWVWeAqZ0WU",
+          "title": "Graph Algorithms for Competitive Programming"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-200",
+          "title": "Number of Islands",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/number-of-islands/",
+          "difficulty_rating": null,
+          "sub_pattern": "DFS on Grid"
+        },
+        {
+          "id": "LC-133",
+          "title": "Clone Graph",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/clone-graph/",
+          "difficulty_rating": null,
+          "sub_pattern": "BFS/DFS on Graph"
+        }
+      ],
+      "estimated_hours": 10,
+      "notes": "Foundation for all advanced graph algorithms. Practice both BFS and DFS."
+    }
+  ]
+}
