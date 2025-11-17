@@ -49,18 +49,58 @@ These curated resources will help you understand the pattern deeply:
 1. https://www.youtube.com/watch?v=kPRA0W1kECg
 2. https://www.geeksforgeeks.org/sorting-algorithms/
 
+## Why This Problem Matters
+
+Sorting is one of the most fundamental operations in computer science:
+- **Foundation for other algorithms**: Binary search, merge operations, scheduling
+- **Interview frequency**: Appears in 20%+ of technical interviews
+- **Real-world applications**: Database query optimization, file systems, data analysis
+- **Complexity baseline**: Understanding O(n log n) vs O(n²) is essential
+
+You'll implement merge sort, a divide-and-conquer algorithm that:
+1. Divides the array into halves recursively
+2. Conquers by sorting each half
+3. Combines by merging two sorted arrays
+
+## Implementation Strategy
+
+**Step 1: Base Case**
+```python
+if len(nums) <= 1:
+    return nums  # Already sorted
+```
+
+**Step 2: Divide**
+```python
+mid = len(nums) // 2
+left = sortArray(nums[:mid])
+right = sortArray(nums[mid:])
+```
+
+**Step 3: Merge**
+```python
+return merge(left, right)
+```
+
+The merge function is the key:
+- Takes two sorted arrays
+- Returns one sorted array
+- Uses two pointers to track progress
+
 ## Common Pitfalls
 
-- Off-by-one errors in pointer movement
-- Not handling edge cases (empty arrays, single elements)
-- Incorrect termination conditions
+1. **Forgetting the base case**: Always handle empty arrays and single elements
+2. **Incomplete merge**: After the main loop, don't forget remaining elements
+3. **Wrong comparison**: Use `<=` not `<` for stable sorting
+4. **Index out of bounds**: Check both `i < len(left)` and `j < len(right)`
 
 ## Hints
 
-If you're stuck, consider:
-1. Drawing the pointer positions on paper for a small example
-2. What invariant should be maintained at each step?
-3. What is the termination condition?
+If you're stuck:
+1. **Draw it out**: Trace merge([1, 3], [2, 4]) on paper
+2. **Start with merge**: Implement the merge function first and test it independently
+3. **Test edge cases**: [], [1], [1, 1], [3, 2, 1]
+4. **Think recursively**: Trust that recursive calls work correctly
 
 ## Submission
 

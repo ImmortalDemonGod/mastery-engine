@@ -5,9 +5,45 @@
   "tests": [
     {
       "id": 1,
-      "input": {},
-      "expected": null,
-      "note": "Example 1 from problem statement - TO BE FILLED"
+      "input": {"nums": [5, 2, 3, 1]},
+      "expected": [1, 2, 3, 5],
+      "note": "Basic case - unsorted array"
+    },
+    {
+      "id": 2,
+      "input": {"nums": [5, 1, 1, 2, 0, 0]},
+      "expected": [0, 0, 1, 1, 2, 5],
+      "note": "Array with duplicates"
+    },
+    {
+      "id": 3,
+      "input": {"nums": [1]},
+      "expected": [1],
+      "note": "Single element"
+    },
+    {
+      "id": 4,
+      "input": {"nums": []},
+      "expected": [],
+      "note": "Empty array edge case"
+    },
+    {
+      "id": 5,
+      "input": {"nums": [3, 2, 1]},
+      "expected": [1, 2, 3],
+      "note": "Reverse sorted"
+    },
+    {
+      "id": 6,
+      "input": {"nums": [1, 2, 3, 4, 5]},
+      "expected": [1, 2, 3, 4, 5],
+      "note": "Already sorted"
+    },
+    {
+      "id": 7,
+      "input": {"nums": [-5, -1, 0, 3, 8]},
+      "expected": [-5, -1, 0, 3, 8],
+      "note": "Negative numbers"
     }
   ]
 }

@@ -1,0 +1,8 @@
+Runtime Error: RecursionError - maximum recursion depth exceeded
+
+Symptom: Your solution crashes on empty arrays with a stack overflow.
+
+The error occurs because when the array is split into [0:0] (empty), 
+the base case doesn't catch it, leading to infinite recursion.
+
+Debug hint: What should sortArray([]) return? Update your base case.

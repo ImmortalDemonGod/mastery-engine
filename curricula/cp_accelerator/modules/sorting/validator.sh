@@ -14,14 +14,13 @@ if [ ! -f "$SCRIPT_DIR/solution.py" ]; then
 fi
 
 # Run tests
+cd "$SCRIPT_DIR"
 python3 << 'EOF'
 import json
 import sys
-from pathlib import Path
 
 # Import user solution
-sys.path.insert(0, str(Path(__file__).parent))
-from solution import solve
+from solution import sortArray
 
 # Load test cases
 with open("test_cases.json") as f:
@@ -32,20 +31,21 @@ failed = 0
 
 for i, test in enumerate(test_cases["tests"], 1):
     try:
-        result = solve(**test["input"])
+        result = sortArray(**test["input"])
         expected = test["expected"]
         
         if result == expected:
-            print(f"✓ Test {i}: PASS")
+            print(f"✓ Test {i}: PASS - {test['note']}")
             passed += 1
         else:
-            print(f"✗ Test {i}: FAIL")
+            print(f"✗ Test {i}: FAIL - {test['note']}")
             print(f"  Input: {test['input']}")
             print(f"  Expected: {expected}")
             print(f"  Got: {result}")
             failed += 1
     except Exception as e:
-        print(f"✗ Test {i}: ERROR - {e}")
+        print(f"✗ Test {i}: ERROR - {test['note']}")
+        print(f"  {type(e).__name__}: {e}")
         failed += 1
 
 print(f"\nResults: {passed}/{passed + failed} passed")
