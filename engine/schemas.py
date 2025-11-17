@@ -22,11 +22,15 @@ class ModuleMetadata(BaseModel):
         name: Human-readable display name (e.g., "RMS Normalization")
         path: Relative path to module directory within curriculum pack
         baseline_perf_seconds: Optional performance baseline from Phase 0 CI for novelty detection
+        dependencies: Optional list of module IDs that must be completed first
+        metadata: Optional dict for curriculum-specific extensions (e.g., rating_bracket, priority)
     """
     id: str
     name: str
     path: str
     baseline_perf_seconds: Optional[float] = None
+    dependencies: list[str] = Field(default_factory=list)
+    metadata: dict = Field(default_factory=dict)
 
 
 class CurriculumManifest(BaseModel):

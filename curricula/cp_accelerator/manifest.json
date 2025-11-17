@@ -1,0 +1,68 @@
+{
+  "curriculum_name": "cp_accelerator",
+  "author": "Competitive Programming Experts (Curated via DSA Taxonomy + CP Roadmap)",
+  "version": "1.0.0",
+  "description": "A systematic, rating-driven curriculum for competitive programming mastery. Synthesizes the DSA Pattern Taxonomy with a proven roadmap to guide learners from newbie (0) to candidate master (1900+) through 19 core algorithmic patterns.",
+  "modules": [
+    {
+      "id": "sorting",
+      "name": "Core Sorting Techniques",
+      "path": "modules/sorting",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "0-999",
+        "priority": "Vital",
+        "pattern_category": "Foundation",
+        "estimated_hours": 4
+      }
+    },
+    {
+      "id": "two_pointers",
+      "name": "Two Pointers Pattern",
+      "path": "modules/two_pointers",
+      "dependencies": ["sorting"],
+      "metadata": {
+        "rating_bracket": "0-999",
+        "priority": "Helpful",
+        "pattern_category": "Foundation",
+        "estimated_hours": 6
+      }
+    },
+    {
+      "id": "hash_table",
+      "name": "Hash Table Optimization",
+      "path": "modules/hash_table",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "0-999",
+        "priority": "Vital",
+        "pattern_category": "Foundation",
+        "estimated_hours": 5
+      }
+    },
+    {
+      "id": "binary_search",
+      "name": "Binary Search on Index and Answer Space",
+      "path": "modules/binary_search",
+      "dependencies": ["sorting"],
+      "metadata": {
+        "rating_bracket": "1000-1199",
+        "priority": "Vital",
+        "pattern_category": "Core Algorithm",
+        "estimated_hours": 8
+      }
+    },
+    {
+      "id": "dynamic_programming",
+      "name": "Dynamic Programming Foundations",
+      "path": "modules/dynamic_programming",
+      "dependencies": ["binary_search"],
+      "metadata": {
+        "rating_bracket": "1200-1399",
+        "priority": "Vital",
+        "pattern_category": "Specialized",
+        "estimated_hours": 20
+      }
+    }
+  ]
+}
