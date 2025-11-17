@@ -61,9 +61,9 @@ class SourceParser:
             
             section = content[section_start:section_end]
             
-            # Extract Vital topics
-            vital_start = section.find("[Vital]")
-            helpful_start = section.find("[Helpful]")
+            # Extract Vital and Helpful topics (handle escaped brackets)
+            vital_start = max(section.find("[Vital]"), section.find("\\[Vital\\]"))
+            helpful_start = max(section.find("[Helpful]"), section.find("\\[Helpful\\]"))
             
             vital_section = section[vital_start:helpful_start] if vital_start != -1 else ""
             helpful_section = section[helpful_start:] if helpful_start != -1 else ""
@@ -78,43 +78,42 @@ class SourceParser:
     def _extract_topics_with_resources(self, section: str) -> List[Dict]:
         """Extract topic names and their resource URLs from a section."""
         topics = []
-        # Match bullet points with optional markdown links
-        # Format: * Topic name - [Resource Title](URL)
-        pattern = r'\* (.+?)(?:\s*-\s*\[(.+?)\]\((.+?)\))?(?:\n|$)'
         
-        for match in re.finditer(pattern, section):
-            topic_text = match.group(1).strip()
-            resource_title = match.group(2)
-            resource_url = match.group(3)
+        # Split by bullet points
+        lines = section.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line.startswith('*'):
+                continue
+            
+            # Remove leading asterisk
+            line = line[1:].strip()
             
             topic = {
-                "name": topic_text,
+                "name": line,
                 "resources": []
             }
             
-            # Extract any inline links in the topic text
-            inline_link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
-            inline_links = re.findall(inline_link_pattern, topic_text)
+            # Extract ALL markdown links from this line
+            # Format: [Title](URL)
+            link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
+            links = re.findall(link_pattern, line)
             
-            for link_title, link_url in inline_links:
+            for link_title, link_url in links:
                 topic["resources"].append({
                     "type": self._classify_resource_type(link_url),
                     "title": link_title,
                     "url": link_url
                 })
             
-            # Add the main resource if present
-            if resource_title and resource_url:
-                topic["resources"].append({
-                    "type": self._classify_resource_type(resource_url),
-                    "title": resource_title,
-                    "url": resource_url
-                })
-            
-            # Clean topic name (remove markdown links)
+            # Clean topic name (remove all markdown links)
             topic["name"] = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', topic["name"])
+            # Clean trailing dash and whitespace
+            topic["name"] = re.sub(r'\s*-\s*$', '', topic["name"]).strip()
             
-            topics.append(topic)
+            if topic["name"]:  # Only add if name is not empty
+                topics.append(topic)
         
         return topics
     
@@ -292,12 +291,12 @@ class SourceParser:
         
         return mapping.get(taxonomy_id)
     
-    def extract_canonical_problems(self, problems: List[Dict], count: int = 3) -> List[Dict]:
+    def extract_canonical_problems(self, problems: List[Dict]) -> List[Dict]:
         """
-        Select the most fundamental problems from the taxonomy.
-        Strategy: Take first N problems (they're usually ordered by fundamentality)
+        Extract ALL problems from the taxonomy (no artificial limit).
+        The taxonomy already curates relevant problems - include them all.
         """
-        return problems[:count] if problems else []
+        return problems
     
     def build_topic(
         self,
@@ -318,10 +317,9 @@ class SourceParser:
             print(f"⚠️  Warning: '{topic_id}' not found in roadmap mapping")
             return None
         
-        # Extract canonical problems
+        # Extract ALL problems from taxonomy (no limit)
         canonical_problems = self.extract_canonical_problems(
-            taxonomy_data["problems"], 
-            count=3
+            taxonomy_data["problems"]
         )
         
         # Extract resources from roadmap
