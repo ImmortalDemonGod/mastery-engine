@@ -16,7 +16,7 @@
   "modules": [
     {
       "id": "sorting",
-      "name": "Core Sorting Techniques",
+      "name": "Sorting Algorithms",
       "path": "modules/sorting",
       "dependencies": [],
       "metadata": {
@@ -28,7 +28,7 @@
     },
     {
       "id": "two_pointers",
-      "name": "Two Pointers Pattern",
+      "name": "Two Pointers",
       "path": "modules/two_pointers",
       "dependencies": [
         "sorting"
@@ -42,7 +42,7 @@
     },
     {
       "id": "hash_table",
-      "name": "Hash Table Techniques",
+      "name": "Hash Table",
       "path": "modules/hash_table",
       "dependencies": [],
       "metadata": {
@@ -53,8 +53,44 @@
       }
     },
     {
+      "id": "stack_queue",
+      "name": "Stack and Queue",
+      "path": "modules/stack_queue",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1000-1199",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/3. Stack and Queue.md",
+        "estimated_hours": 4
+      }
+    },
+    {
+      "id": "linked_list",
+      "name": "Linked List",
+      "path": "modules/linked_list",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "0-999",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/4. Linked List.md",
+        "estimated_hours": 4
+      }
+    },
+    {
+      "id": "traversal",
+      "name": "Traversal Algorithms",
+      "path": "modules/traversal",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1200-1399",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/6. Traversal Algorithms.md",
+        "estimated_hours": 8
+      }
+    },
+    {
       "id": "binary_search",
-      "name": "Binary Search Techniques",
+      "name": "Binary Search",
       "path": "modules/binary_search",
       "dependencies": [
         "sorting"
@@ -63,12 +99,24 @@
         "rating_bracket": "1000-1199",
         "priority": "Helpful",
         "taxonomy_source": "Taxonomies/7. Binary Search.md",
-        "estimated_hours": 8
+        "estimated_hours": 6
+      }
+    },
+    {
+      "id": "heap",
+      "name": "Heap and Priority Queue",
+      "path": "modules/heap",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/8. Heap Priority Queue.md",
+        "estimated_hours": 5
       }
     },
     {
       "id": "prefix_sum",
-      "name": "Prefix Sum & Range Queries",
+      "name": "Prefix Sum",
       "path": "modules/prefix_sum",
       "dependencies": [],
       "metadata": {
@@ -79,10 +127,38 @@
       }
     },
     {
+      "id": "greedy",
+      "name": "Greedy Algorithms",
+      "path": "modules/greedy",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/10. Greedy Algorithms.md",
+        "estimated_hours": 6
+      }
+    },
+    {
+      "id": "backtracking",
+      "name": "Backtracking",
+      "path": "modules/backtracking",
+      "dependencies": [
+        "traversal"
+      ],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/11. Backtracking.md",
+        "estimated_hours": 7
+      }
+    },
+    {
       "id": "dynamic_programming",
       "name": "Dynamic Programming",
       "path": "modules/dynamic_programming",
-      "dependencies": [],
+      "dependencies": [
+        "traversal"
+      ],
       "metadata": {
         "rating_bracket": "1200-1399",
         "priority": "Vital",
@@ -91,15 +167,91 @@
       }
     },
     {
-      "id": "graphs",
-      "name": "Graph Algorithms",
-      "path": "modules/graphs",
+      "id": "divide_conquer",
+      "name": "Divide and Conquer",
+      "path": "modules/divide_conquer",
+      "dependencies": [
+        "traversal"
+      ],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/13. Divide and Conquer.md",
+        "estimated_hours": 6
+      }
+    },
+    {
+      "id": "trie",
+      "name": "Trie",
+      "path": "modules/trie",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1600-1899",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/14. Trie.md",
+        "estimated_hours": 5
+      }
+    },
+    {
+      "id": "union_find",
+      "name": "Union Find (Disjoint Set Union)",
+      "path": "modules/union_find",
       "dependencies": [],
       "metadata": {
         "rating_bracket": "1400-1599",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/15. Union Find.md",
+        "estimated_hours": 5
+      }
+    },
+    {
+      "id": "bit_manipulation",
+      "name": "Bit Manipulation",
+      "path": "modules/bit_manipulation",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1600-1899",
         "priority": "Vital",
-        "taxonomy_source": "Taxonomies/6. Traversal Algorithms.md",
-        "estimated_hours": 10
+        "taxonomy_source": "Taxonomies/16. Bit Manipulation.md",
+        "estimated_hours": 5
+      }
+    },
+    {
+      "id": "segment_tree",
+      "name": "Segment Tree and Fenwick Tree",
+      "path": "modules/segment_tree",
+      "dependencies": [
+        "prefix_sum"
+      ],
+      "metadata": {
+        "rating_bracket": "1600-1899",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/17. Segment Tree and Fenwick Tree.md",
+        "estimated_hours": 8
+      }
+    },
+    {
+      "id": "combinatorics",
+      "name": "Combinatorics and Number Theory",
+      "path": "modules/combinatorics",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1600-1899",
+        "priority": "Vital",
+        "taxonomy_source": "Taxonomies/18. Combinatorics and Number Theory.md",
+        "estimated_hours": 7
+      }
+    },
+    {
+      "id": "design",
+      "name": "Design Patterns",
+      "path": "modules/design",
+      "dependencies": [],
+      "metadata": {
+        "rating_bracket": "1400-1599",
+        "priority": "Helpful",
+        "taxonomy_source": "Taxonomies/19. Design Pattern.md",
+        "estimated_hours": 6
       }
     }
   ]

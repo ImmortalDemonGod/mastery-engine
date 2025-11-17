@@ -10,7 +10,7 @@
   "topics": [
     {
       "id": "sorting",
-      "name": "Core Sorting Techniques",
+      "name": "Sorting Algorithms",
       "rating_bracket": "0-999",
       "priority": "Vital",
       "taxonomy_path": "Taxonomies/5. Sorting.md",
@@ -20,7 +20,7 @@
         {
           "type": "taxonomy",
           "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/5. Sorting.md",
-          "title": "Core Sorting Techniques Taxonomy"
+          "title": "Sorting Algorithms Taxonomy"
         }
       ],
       "problems": [
@@ -50,12 +50,13 @@
       "notes": "Based on roadmap topics: Sorting",
       "metadata": {
         "total_problems_in_taxonomy": 29,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
       "id": "two_pointers",
-      "name": "Two Pointers Pattern",
+      "name": "Two Pointers",
       "rating_bracket": "0-999",
       "priority": "Helpful",
       "taxonomy_path": "Taxonomies/1. Two Pointers.md",
@@ -67,7 +68,7 @@
         {
           "type": "taxonomy",
           "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/1. Two Pointers.md",
-          "title": "Two Pointers Pattern Taxonomy"
+          "title": "Two Pointers Taxonomy"
         }
       ],
       "problems": [
@@ -97,12 +98,13 @@
       "notes": "Based on roadmap topics: Two pointers",
       "metadata": {
         "total_problems_in_taxonomy": 56,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
       "id": "hash_table",
-      "name": "Hash Table Techniques",
+      "name": "Hash Table",
       "rating_bracket": "1000-1199",
       "priority": "Vital",
       "taxonomy_path": "Taxonomies/2. Hash Table.md",
@@ -112,7 +114,7 @@
         {
           "type": "taxonomy",
           "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/2. Hash Table.md",
-          "title": "Hash Table Techniques Taxonomy"
+          "title": "Hash Table Taxonomy"
         }
       ],
       "problems": [
@@ -142,12 +144,151 @@
       "notes": "Based on roadmap topics: STL/library",
       "metadata": {
         "total_problems_in_taxonomy": 49,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "stack_queue",
+      "name": "Stack and Queue",
+      "rating_bracket": "1000-1199",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/3. Stack and Queue.md",
+      "description": "Stacks and queues are fundamental data structures that provide controlled access to elements, enabling elegant solutions to problems involving sequential processing, backtracking, and breadth-first exploration.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/3. Stack and Queue.md",
+          "title": "Stack and Queue Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-20",
+          "title": "Valid Parentheses",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/valid-parentheses/",
+          "verified": false
+        },
+        {
+          "id": "LC-1003",
+          "title": "Check If Word Is Valid After Substitutions",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/check-if-word-is-valid-after-substitutions/",
+          "verified": false
+        },
+        {
+          "id": "LC-591",
+          "title": "Tag Validator",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/tag-validator/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 4,
+      "notes": "Based on roadmap topics: STL/library",
+      "metadata": {
+        "total_problems_in_taxonomy": 57,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "linked_list",
+      "name": "Linked List",
+      "rating_bracket": "0-999",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/4. Linked List.md",
+      "description": "Linked lists are dynamic data structures that excel at insertion and deletion operations, forming the foundation for many advanced data structures and algorithms.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/4. Linked List.md",
+          "title": "Linked List Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-203",
+          "title": "Remove Linked List Elements",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/remove-linked-list-elements/",
+          "verified": false
+        },
+        {
+          "id": "LC-237",
+          "title": "Delete Node in a Linked List",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/delete-node-in-a-linked-list/",
+          "verified": false
+        },
+        {
+          "id": "LC-707",
+          "title": "Design Linked List",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/design-linked-list/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 4,
+      "notes": "Based on roadmap topics: STL/library",
+      "metadata": {
+        "total_problems_in_taxonomy": 37,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "traversal",
+      "name": "Traversal Algorithms",
+      "rating_bracket": "1200-1399",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/6. Traversal Algorithms.md",
+      "description": "Traversal algorithms systematically visit all elements in a data structure, using different strategies based on the structure and problem requirements.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/6. Traversal Algorithms.md",
+          "title": "Traversal Algorithms Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-144",
+          "title": "Binary Tree Preorder Traversal",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/binary-tree-preorder-traversal/",
+          "verified": false
+        },
+        {
+          "id": "LC-589",
+          "title": "N-ary Tree Preorder Traversal",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/n-ary-tree-preorder-traversal/",
+          "verified": false
+        },
+        {
+          "id": "LC-94",
+          "title": "Binary Tree Inorder Traversal",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/binary-tree-inorder-traversal/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 8,
+      "notes": "Based on roadmap topics: Recursion, Graphs/trees",
+      "metadata": {
+        "total_problems_in_taxonomy": 129,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
       "id": "binary_search",
-      "name": "Binary Search Techniques",
+      "name": "Binary Search",
       "rating_bracket": "1000-1199",
       "priority": "Helpful",
       "taxonomy_path": "Taxonomies/7. Binary Search.md",
@@ -159,7 +300,7 @@
         {
           "type": "taxonomy",
           "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/7. Binary Search.md",
-          "title": "Binary Search Techniques Taxonomy"
+          "title": "Binary Search Taxonomy"
         }
       ],
       "problems": [
@@ -185,16 +326,63 @@
           "verified": false
         }
       ],
-      "estimated_hours": 8,
+      "estimated_hours": 6,
       "notes": "Based on roadmap topics: Binary search",
       "metadata": {
         "total_problems_in_taxonomy": 24,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "heap",
+      "name": "Heap and Priority Queue",
+      "rating_bracket": "1400-1599",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/8. Heap Priority Queue.md",
+      "description": "Heaps are specialized tree-based data structures that satisfy the heap property, making them efficient for finding minimum or maximum elements. Priority queues are abstract data types typically implemented with heaps.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/8. Heap Priority Queue.md",
+          "title": "Heap and Priority Queue Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-215",
+          "title": "Kth Largest Element in an Array",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/kth-largest-element-in-an-array/",
+          "verified": false
+        },
+        {
+          "id": "LC-703",
+          "title": "Kth Largest Element in a Stream",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/kth-largest-element-in-a-stream/",
+          "verified": false
+        },
+        {
+          "id": "LC-973",
+          "title": "K Closest Points to Origin",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/k-closest-points-to-origin/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Based on roadmap topics: STL/library",
+      "metadata": {
+        "total_problems_in_taxonomy": 30,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
       "id": "prefix_sum",
-      "name": "Prefix Sum & Range Queries",
+      "name": "Prefix Sum",
       "rating_bracket": "1000-1199",
       "priority": "Helpful",
       "taxonomy_path": "Taxonomies/9. Prefix Sum.md",
@@ -204,7 +392,7 @@
         {
           "type": "taxonomy",
           "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/9. Prefix Sum.md",
-          "title": "Prefix Sum & Range Queries Taxonomy"
+          "title": "Prefix Sum Taxonomy"
         }
       ],
       "problems": [
@@ -231,10 +419,105 @@
         }
       ],
       "estimated_hours": 4,
-      "notes": "Based on roadmap topics: Basic range queries (prefix sums)",
+      "notes": "Based on roadmap topics: Basic range queries",
       "metadata": {
         "total_problems_in_taxonomy": 47,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "greedy",
+      "name": "Greedy Algorithms",
+      "rating_bracket": "1400-1599",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/10. Greedy Algorithms.md",
+      "description": "Greedy algorithms make locally optimal choices at each step with the hope of finding a global optimum, often providing efficient solutions for optimization problems.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/10. Greedy Algorithms.md",
+          "title": "Greedy Algorithms Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-435",
+          "title": "Non-overlapping Intervals",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/non-overlapping-intervals/",
+          "verified": false
+        },
+        {
+          "id": "LC-452",
+          "title": "Minimum Number of Arrows to Burst Balloons",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/minimum-number-of-arrows-to-burst-balloons/",
+          "verified": false
+        },
+        {
+          "id": "LC-1326",
+          "title": "Minimum Number of Taps to Open to Water a Garden",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/minimum-number-of-taps-to-open-to-water-a-garden/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 6,
+      "notes": "Based on roadmap topics: Constructives",
+      "metadata": {
+        "total_problems_in_taxonomy": 55,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "backtracking",
+      "name": "Backtracking",
+      "rating_bracket": "1400-1599",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/11. Backtracking.md",
+      "description": "Backtracking is an algorithmic technique that incrementally builds a solution by trying options, abandoning paths that fail, and returning to try alternatives.",
+      "dependencies": [
+        "traversal"
+      ],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/11. Backtracking.md",
+          "title": "Backtracking Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-78",
+          "title": "Subsets",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/subsets/",
+          "verified": false
+        },
+        {
+          "id": "LC-90",
+          "title": "Subsets II",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/subsets-ii/",
+          "verified": false
+        },
+        {
+          "id": "LC-77",
+          "title": "Combinations",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/combinations/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 7,
+      "notes": "Based on roadmap topics: Recursion",
+      "metadata": {
+        "total_problems_in_taxonomy": 41,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
@@ -244,7 +527,9 @@
       "priority": "Vital",
       "taxonomy_path": "Taxonomies/12. Dynamic Programming.md",
       "description": "Dynamic programming solves complex problems by breaking them into simpler subproblems, storing solutions to avoid redundant calculations.",
-      "dependencies": [],
+      "dependencies": [
+        "traversal"
+      ],
       "resources": [
         {
           "type": "taxonomy",
@@ -279,52 +564,334 @@
       "notes": "Based on roadmap topics: Dynamic programming",
       "metadata": {
         "total_problems_in_taxonomy": 50,
-        "source_verified": true
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     },
     {
-      "id": "graphs",
-      "name": "Graph Algorithms",
+      "id": "divide_conquer",
+      "name": "Divide and Conquer",
       "rating_bracket": "1400-1599",
-      "priority": "Vital",
-      "taxonomy_path": "Taxonomies/6. Traversal Algorithms.md",
-      "description": "Traversal algorithms systematically visit all elements in a data structure, using different strategies based on the structure and problem requirements.",
-      "dependencies": [],
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/13. Divide and Conquer.md",
+      "description": "Divide and conquer is an algorithmic paradigm that breaks a problem into smaller subproblems, solves them independently, and then combines their solutions to solve the original problem, often enabling efficient solutions through recursion.",
+      "dependencies": [
+        "traversal"
+      ],
       "resources": [
         {
           "type": "taxonomy",
-          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/6. Traversal Algorithms.md",
-          "title": "Graph Algorithms Taxonomy"
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/13. Divide and Conquer.md",
+          "title": "Divide and Conquer Taxonomy"
         }
       ],
       "problems": [
         {
-          "id": "LC-144",
-          "title": "Binary Tree Preorder Traversal",
+          "id": "LC-912",
+          "title": "Sort an Array",
           "platform": "LeetCode",
-          "url": "https://leetcode.com/problems/binary-tree-preorder-traversal/",
+          "url": "https://leetcode.com/problems/sort-an-array/",
           "verified": false
         },
         {
-          "id": "LC-589",
-          "title": "N-ary Tree Preorder Traversal",
+          "id": "LC-148",
+          "title": "Sort List",
           "platform": "LeetCode",
-          "url": "https://leetcode.com/problems/n-ary-tree-preorder-traversal/",
+          "url": "https://leetcode.com/problems/sort-list/",
           "verified": false
         },
         {
-          "id": "LC-94",
-          "title": "Binary Tree Inorder Traversal",
+          "id": "LC-315",
+          "title": "Count of Smaller Numbers After Self",
           "platform": "LeetCode",
-          "url": "https://leetcode.com/problems/binary-tree-inorder-traversal/",
+          "url": "https://leetcode.com/problems/count-of-smaller-numbers-after-self/",
           "verified": false
         }
       ],
-      "estimated_hours": 10,
-      "notes": "Based on roadmap topics: Basic graphs/trees",
+      "estimated_hours": 6,
+      "notes": "Based on roadmap topics: Recursion",
       "metadata": {
-        "total_problems_in_taxonomy": 129,
-        "source_verified": true
+        "total_problems_in_taxonomy": 42,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "trie",
+      "name": "Trie",
+      "rating_bracket": "1600-1899",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/14. Trie.md",
+      "description": "Tries (prefix trees) are tree-like data structures used to store associative arrays where keys are usually strings, optimizing search operations for string-related problems.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/14. Trie.md",
+          "title": "Trie Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-208",
+          "title": "Implement Trie (Prefix Tree)",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/implement-trie-prefix-tree/",
+          "verified": false
+        },
+        {
+          "id": "LC-1804",
+          "title": "Implement Trie II (Prefix Tree)",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/implement-trie-ii-prefix-tree/",
+          "verified": false
+        },
+        {
+          "id": "LC-720",
+          "title": "Longest Word in Dictionary",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/longest-word-in-dictionary/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Based on roadmap topics: String algorithms",
+      "metadata": {
+        "total_problems_in_taxonomy": 49,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "union_find",
+      "name": "Union Find (Disjoint Set Union)",
+      "rating_bracket": "1400-1599",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/15. Union Find.md",
+      "description": "Union Find (Disjoint Set Union) efficiently manages dynamic connectivity in a collection of elements, supporting near-constant time union and find operations.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/15. Union Find.md",
+          "title": "Union Find (Disjoint Set Union) Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-547",
+          "title": "Number of Provinces",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/number-of-provinces/",
+          "verified": false
+        },
+        {
+          "id": "LC-684",
+          "title": "Redundant Connection",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/redundant-connection/",
+          "verified": false
+        },
+        {
+          "id": "LC-721",
+          "title": "Accounts Merge",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/accounts-merge/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Based on roadmap topics: DSU",
+      "metadata": {
+        "total_problems_in_taxonomy": 62,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "bit_manipulation",
+      "name": "Bit Manipulation",
+      "rating_bracket": "1600-1899",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/16. Bit Manipulation.md",
+      "description": "Bit manipulation involves directly manipulating the binary representation of numbers using bitwise operations, offering efficient solutions for various computational problems.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/16. Bit Manipulation.md",
+          "title": "Bit Manipulation Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-1486",
+          "title": "XOR Operation in an Array",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/xor-operation-in-an-array/",
+          "verified": false
+        },
+        {
+          "id": "LC-1342",
+          "title": "Number of Steps to Reduce a Number to Zero",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/number-of-steps-to-reduce-a-number-to-zero/",
+          "verified": false
+        },
+        {
+          "id": "LC-1506",
+          "title": "Find Root of N-Ary Tree",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/find-root-of-n-ary-tree/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 5,
+      "notes": "Based on roadmap topics: Bitwise stuff",
+      "metadata": {
+        "total_problems_in_taxonomy": 60,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "segment_tree",
+      "name": "Segment Tree and Fenwick Tree",
+      "rating_bracket": "1600-1899",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/17. Segment Tree and Fenwick Tree.md",
+      "description": "Segment Trees and Fenwick Trees (Binary Indexed Trees) are specialized data structures that efficiently handle range queries and updates on arrays, supporting operations like sum, minimum, maximum, and more in logarithmic time.",
+      "dependencies": [
+        "prefix_sum"
+      ],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/17. Segment Tree and Fenwick Tree.md",
+          "title": "Segment Tree and Fenwick Tree Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-307",
+          "title": "Range Sum Query - Mutable",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/range-sum-query---mutable/",
+          "verified": false
+        },
+        {
+          "id": "LC-307",
+          "title": "Range Sum Query - Mutable",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/range-sum-query---mutable/",
+          "verified": false
+        },
+        {
+          "id": "LC-307",
+          "title": "Range Sum Query - Mutable",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/range-sum-query---mutable/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 8,
+      "notes": "Based on roadmap topics: Segment tree",
+      "metadata": {
+        "total_problems_in_taxonomy": 28,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "combinatorics",
+      "name": "Combinatorics and Number Theory",
+      "rating_bracket": "1600-1899",
+      "priority": "Vital",
+      "taxonomy_path": "Taxonomies/18. Combinatorics and Number Theory.md",
+      "description": "Combinatorics and Number Theory provide mathematical tools for counting, arrangement, and number properties, enabling efficient solutions to problems involving permutations, combinations, prime numbers, and modular arithmetic.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/18. Combinatorics and Number Theory.md",
+          "title": "Combinatorics and Number Theory Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-46",
+          "title": "Permutations",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/permutations/",
+          "verified": false
+        },
+        {
+          "id": "LC-47",
+          "title": "Permutations II",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/permutations-ii/",
+          "verified": false
+        },
+        {
+          "id": "LC-31",
+          "title": "Next Permutation",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/next-permutation/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 7,
+      "notes": "Based on roadmap topics: Basic combinatorics, probability, expected value",
+      "metadata": {
+        "total_problems_in_taxonomy": 63,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
+      }
+    },
+    {
+      "id": "design",
+      "name": "Design Patterns",
+      "rating_bracket": "1400-1599",
+      "priority": "Helpful",
+      "taxonomy_path": "Taxonomies/19. Design Pattern.md",
+      "description": "Design patterns in algorithm problems involve creating efficient data structures and systems with specific behaviors, balancing performance constraints while providing clean interfaces for operations.",
+      "dependencies": [],
+      "resources": [
+        {
+          "type": "taxonomy",
+          "url": "https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/19. Design Pattern.md",
+          "title": "Design Patterns Taxonomy"
+        }
+      ],
+      "problems": [
+        {
+          "id": "LC-146",
+          "title": "LRU Cache",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/lru-cache/",
+          "verified": false
+        },
+        {
+          "id": "LC-460",
+          "title": "LFU Cache",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/lfu-cache/",
+          "verified": false
+        },
+        {
+          "id": "LC-981",
+          "title": "Time Based Key-Value Store",
+          "platform": "LeetCode",
+          "url": "https://leetcode.com/problems/time-based-key-value-store/",
+          "verified": false
+        }
+      ],
+      "estimated_hours": 6,
+      "notes": "Based on roadmap topics: STL/library",
+      "metadata": {
+        "total_problems_in_taxonomy": 51,
+        "source_verified": true,
+        "roadmap_resources_extracted": 0
       }
     }
   ]
