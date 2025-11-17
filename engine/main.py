@@ -2106,8 +2106,10 @@ def create_bug(
         else:
             symptom = f"Bug in {module} module"
         
-        # Initialize bug author
-        author = BugAuthor()
+        # Initialize bug author with gpt-4o for better reasoning
+        from engine.services.llm_service import LLMService
+        llm = LLMService(model="gpt-4o")
+        author = BugAuthor(llm_service=llm)
         
         # Generate bug definition
         bug_def, success = author.generate_bug_definition(
