@@ -1,0 +1,70 @@
+# Build Challenge: Sort an Array
+
+## Pattern Overview
+
+> Sorting algorithms organize data in a specific order, enabling efficient searching, data analysis, and serving as building blocks for more complex algorithms.
+
+## Pattern Taxonomy
+
+```mermaid
+
+```
+
+## Your Task
+
+Implement a solution to the following problem, which is a canonical example of this pattern.
+
+### Problem: 912. Sort an Array
+
+**Problem Link:** https://leetcode.com/problems/sort-an-array
+
+**Problem Statement:**
+[Note: Visit the problem link above for the complete statement, examples, and constraints]
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Will be provided based on the problem
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/sort-an-array
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+1. https://www.youtube.com/watch?v=kPRA0W1kECg
+2. https://www.geeksforgeeks.org/sorting-algorithms/
+
+## Common Pitfalls
+
+- Off-by-one errors in pointer movement
+- Not handling edge cases (empty arrays, single elements)
+- Incorrect termination conditions
+
+## Hints
+
+If you're stuck, consider:
+1. Drawing the pointer positions on paper for a small example
+2. What invariant should be maintained at each step?
+3. What is the termination condition?
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

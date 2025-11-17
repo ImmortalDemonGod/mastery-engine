@@ -43,10 +43,19 @@ class CPContentIngestion:
             Dict containing pattern info: description, mermaid_diagram, problems
         """
         # Try multiple naming conventions
+        pattern_title = pattern_name.replace('_', ' ').title()
         potential_files = [
             self.taxonomy_root / "Taxonomies" / f"{pattern_name}.md",
-            self.taxonomy_root / "Taxonomies" / f"{pattern_name.replace('_', ' ').title()}.md",
+            self.taxonomy_root / "Taxonomies" / f"{pattern_title}.md",
         ]
+        
+        # Also try to find files that end with the pattern name (handles "5. Sorting.md" format)
+        taxonomies_dir = self.taxonomy_root / "Taxonomies"
+        if taxonomies_dir.exists():
+            for f in taxonomies_dir.glob("*.md"):
+                # Check if filename ends with our pattern name (case-insensitive)
+                if f.stem.lower().endswith(pattern_title.lower()):
+                    potential_files.append(f)
         
         taxonomy_file = None
         for f in potential_files:
@@ -69,14 +78,34 @@ class CPContentIngestion:
         mermaid_diagram = mermaid_match.group(1) if mermaid_match else ""
         
         # Extract problem links (looking for LeetCode problem numbers)
-        problem_pattern = r'\[(\d+)\.\s+(.*?)\]\((https://leetcode\.com/problems/[^)]+)\)'
+        # Try format 1: Markdown links [number. title](url)
+        problem_pattern1 = r'\[(\d+)\.\s+(.*?)\]\((https://leetcode\.com/problems/[^)]+)\)'
+        # Try format 2: Plain text "Problem: "number. title""
+        problem_pattern2 = r'Problem:\s*"(\d+)\.\s+([^"]+)"'
+        
         problems = []
-        for match in re.finditer(problem_pattern, content):
+        
+        # Try pattern 1 (full markdown links)
+        for match in re.finditer(problem_pattern1, content):
             problems.append({
                 "number": match.group(1),
                 "title": match.group(2),
                 "url": match.group(3)
             })
+        
+        # Try pattern 2 (plain text, construct URL)
+        if not problems:
+            for match in re.finditer(problem_pattern2, content):
+                title = match.group(2)
+                # Convert title to LeetCode URL slug (lowercase, hyphens)
+                slug = title.lower().replace(' ', '-').replace("'", '')
+                # Remove any trailing punctuation
+                slug = re.sub(r'[^\w\-]+$', '', slug)
+                problems.append({
+                    "number": match.group(1),
+                    "title": title,
+                    "url": f"https://leetcode.com/problems/{slug}"
+                })
             
         return {
             "description": description.strip(),

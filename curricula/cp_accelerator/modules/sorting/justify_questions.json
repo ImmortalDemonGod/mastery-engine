@@ -1,0 +1,24 @@
+[
+  {
+    "id": "sorting_conceptual",
+    "question": "Explain the core invariant that the sorting pattern maintains. Why does this invariant guarantee correctness?",
+    "model_answer": "[To be filled by expert curator]",
+    "failure_modes": [
+      {
+        "category": "Vague Hand-Waving",
+        "keywords": [
+          "moves",
+          "checks",
+          "looks at"
+        ],
+        "feedback": "Instead of describing what the code does, explain *why* the algorithm is correct. What property is preserved at each step?"
+      }
+    ]
+  },
+  {
+    "id": "sorting_complexity",
+    "question": "Analyze the time and space complexity of your solution. How does sorting achieve better complexity than a naive approach?",
+    "model_answer": "[To be filled by expert curator]",
+    "failure_modes": []
+  }
+]
