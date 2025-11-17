@@ -7,6 +7,147 @@
     "taxonomy": "https://github.com/Yassir-aykhlf/DSA-Taxonomies",
     "verification_status": "Parsed from actual sources"
   },
+  "global_resources": {
+    "general": [
+      {
+        "type": "blog",
+        "title": "Self-deception: maybe why you're still grey after practicing every day \\- Codeforces",
+        "url": "https://codeforces.com/blog/entry/98621",
+        "category": "mentality"
+      },
+      {
+        "type": "video",
+        "title": "Candidate Master in 1 Year - This Strategy Works Wonders",
+        "url": "https://www.youtube.com/watch?v=9M5voWYmie4&t=3s",
+        "category": "organization"
+      },
+      {
+        "type": "video",
+        "title": "Competitive Programming: How to Learn from Contests",
+        "url": "https://www.youtube.com/watch?v=E-aylp6MZnM&t=254s",
+        "category": "general"
+      },
+      {
+        "type": "video",
+        "title": "The Dark Side of Competitive Programming",
+        "url": "https://www.youtube.com/watch?v=NfUxtnJ0CaY&t=23s",
+        "category": "dealing_with_failure"
+      },
+      {
+        "type": "video",
+        "title": "Competitive Programming: How to Approach a Problem (as a red coder)",
+        "url": "https://www.youtube.com/watch?v=2TNyrw4hkIY&t=14s",
+        "category": "problem_solving"
+      },
+      {
+        "type": "blog",
+        "title": "How to get started with solving Ad-Hoc tasks on codeforces",
+        "url": "https://codeforces.com/blog/entry/85172",
+        "category": "problem_solving"
+      }
+    ],
+    "practice_sites": [
+      {
+        "type": "practice_site",
+        "title": "Codeforces",
+        "url": "https://codeforces.com/problemset"
+      },
+      {
+        "type": "article",
+        "title": "CodeChef",
+        "url": "https://www.codechef.com/"
+      },
+      {
+        "type": "practice_site",
+        "title": "AtCoder",
+        "url": "https://atcoder.jp/"
+      },
+      {
+        "type": "article",
+        "title": "kenkoooo",
+        "url": "https://kenkoooo.com/atcoder"
+      },
+      {
+        "type": "practice_site",
+        "title": "USACO",
+        "url": "http://usaco.org/"
+      },
+      {
+        "type": "article",
+        "title": "ICPC",
+        "url": "https://icpc.global/worldfinals/problems"
+      },
+      {
+        "type": "article",
+        "title": "CSES",
+        "url": "https://cses.fi/"
+      },
+      {
+        "type": "practice_site",
+        "title": "Codeforces",
+        "url": "https://codeforces.com/edu/courses"
+      },
+      {
+        "type": "blog",
+        "title": "Mostafa sheet",
+        "url": "https://codeforces.com/blog/entry/65133"
+      },
+      {
+        "type": "article",
+        "title": "a2oj",
+        "url": "https://earthshakira.github.io/a2oj-clientside/server/Ladders.html"
+      },
+      {
+        "type": "practice_site",
+        "title": "USACO training",
+        "url": "https://train.usaco.org/"
+      },
+      {
+        "type": "article",
+        "title": "Timus",
+        "url": "https://acm.timus.ru/"
+      }
+    ],
+    "youtube_channels": [
+      {
+        "type": "video",
+        "title": "SecondThread",
+        "url": "https://www.youtube.com/c/SecondThread/videos"
+      },
+      {
+        "type": "video",
+        "title": "Pavel Mavrin",
+        "url": "https://www.youtube.com/c/pavelmavrin/videos"
+      },
+      {
+        "type": "video",
+        "title": "Errichto",
+        "url": "https://www.youtube.com/c/Errichto/videos"
+      },
+      {
+        "type": "video",
+        "title": "Priyansh Agarwal",
+        "url": "https://www.youtube.com/c/PriyanshAgarwal/videos"
+      },
+      {
+        "type": "video",
+        "title": "Utkarsh Gupta",
+        "url": "https://www.youtube.com/channel/UCGS5ZzcSAymQbWZvNoKOFhQ/videos"
+      }
+    ],
+    "meta_guides": [
+      {
+        "type": "blog",
+        "title": "Another roadmap",
+        "url": "https://codeforces.com/blog/entry/66909"
+      },
+      {
+        "type": "tutorial",
+        "title": "USACO Guide",
+        "url": "https://usaco.guide/"
+      }
+    ]
+  },
   "topics": [
     {
       "id": "sorting",
@@ -3493,7 +3634,7 @@
           "title": "Greedy Algorithms Taxonomy"
         },
         {
-          "type": "article",
+          "type": "practice_site",
           "title": "Constructives",
           "url": "https://codeforces.com/problemset?tags=constructive%20algorithms"
         }

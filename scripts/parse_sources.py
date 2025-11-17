@@ -36,17 +36,48 @@ class SourceParser:
     
     def _parse_roadmap(self) -> Dict:
         """
-        Parse RoadmapResources.md to extract rating brackets, topics, and resource URLs.
-        Returns structured data with priorities and links.
+        Parse RoadmapResources.md to extract ALL information:
+        - Rating brackets with topics
+        - General resources (mentality, organization, failure)
+        - Practice sites
+        - YouTube channels and guides
         """
         if not self.roadmap_file.exists():
             print(f"❌ ERROR: Roadmap file not found: {self.roadmap_file}")
             return {}
         
         content = self.roadmap_file.read_text()
-        roadmap = {}
+        roadmap = {
+            "general_resources": [],
+            "practice_sites": [],
+            "youtube_channels": [],
+            "meta_guides": [],
+            "brackets": {}
+        }
         
-        # Extract all rating brackets
+        # Extract general resources (top section)
+        general_start = content.find("**Things directly mentioned in the video:**")
+        topics_start = content.find("**Topics directly mentioned in the video:**")
+        
+        if general_start != -1 and topics_start != -1:
+            general_section = content[general_start:topics_start]
+            roadmap["general_resources"] = self._extract_general_resources(general_section)
+        
+        # Extract practice sites
+        sites_start = content.find("**Sites for practice problems:**")
+        more_start = content.find("**More things**")
+        
+        if sites_start != -1:
+            sites_end = more_start if more_start != -1 else len(content)
+            sites_section = content[sites_start:sites_end]
+            roadmap["practice_sites"] = self._extract_links_from_section(sites_section)
+        
+        # Extract additional resources (YouTube channels, guides)
+        if more_start != -1:
+            more_section = content[more_start:]
+            roadmap["youtube_channels"], roadmap["meta_guides"] = self._extract_additional_resources(more_section)
+        
+        # Extract rating bracket topics
         bracket_pattern = r'\*\*(\d+-\d+)\*\*'
         brackets = re.findall(bracket_pattern, content)
         
@@ -68,7 +99,7 @@ class SourceParser:
             vital_section = section[vital_start:helpful_start] if vital_start != -1 else ""
             helpful_section = section[helpful_start:] if helpful_start != -1 else ""
             
-            roadmap[bracket] = {
+            roadmap["brackets"][bracket] = {
                 "vital": self._extract_topics_with_resources(vital_section),
                 "helpful": self._extract_topics_with_resources(helpful_section)
             }
@@ -127,8 +158,85 @@ class SourceParser:
             return 'tutorial'
         elif 'cppreference.com' in url:
             return 'documentation'
+        elif 'codeforces.com' in url or 'atcoder.jp' in url or 'usaco.org' in url:
+            return 'practice_site'
+        elif 'replit.com' in url:
+            return 'tool'
         else:
             return 'article'
+    
+    def _extract_general_resources(self, section: str) -> List[Dict]:
+        """Extract general resources from top section (mentality, organization, etc)."""
+        resources = []
+        
+        # Extract all markdown links
+        link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
+        links = re.findall(link_pattern, section)
+        
+        for title, url in links:
+            resources.append({
+                "type": self._classify_resource_type(url),
+                "title": title,
+                "url": url,
+                "category": self._categorize_general_resource(title)
+            })
+        
+        return resources
+    
+    def _categorize_general_resource(self, title: str) -> str:
+        """Categorize general resource by title."""
+        title_lower = title.lower()
+        if 'mental' in title_lower or 'grey' in title_lower or 'deception' in title_lower:
+            return 'mentality'
+        elif 'failure' in title_lower or 'dark side' in title_lower:
+            return 'dealing_with_failure'
+        elif 'organization' in title_lower or 'strategy' in title_lower:
+            return 'organization'
+        elif 'approach' in title_lower or 'logic' in title_lower or 'ad-hoc' in title_lower:
+            return 'problem_solving'
+        else:
+            return 'general'
+    
+    def _extract_links_from_section(self, section: str) -> List[Dict]:
+        """Extract all links from a section (for practice sites)."""
+        resources = []
+        
+        # Extract markdown links
+        link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
+        links = re.findall(link_pattern, section)
+        
+        for title, url in links:
+            resources.append({
+                "type": self._classify_resource_type(url),
+                "title": title,
+                "url": url
+            })
+        
+        return resources
+    
+    def _extract_additional_resources(self, section: str) -> tuple:
+        """Extract YouTube channels and meta guides from 'More things' section."""
+        channels = []
+        guides = []
+        
+        # Extract all links
+        link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
+        links = re.findall(link_pattern, section)
+        
+        for title, url in links:
+            resource = {
+                "type": self._classify_resource_type(url),
+                "title": title,
+                "url": url
+            }
+            
+            # Categorize as channel or guide
+            if 'youtube.com/c/' in url or 'youtube.com/channel/' in url or 'videos' in url:
+                channels.append(resource)
+            else:
+                guides.append(resource)
+        
+        return channels, guides
     
     def parse_taxonomy_file(self, taxonomy_file: Path) -> Dict:
         """
@@ -326,10 +434,10 @@ class SourceParser:
         bracket = roadmap_mapping["rating_bracket"]
         roadmap_resources = []
         
-        if bracket in self.roadmap_data:
+        if bracket in self.roadmap_data.get("brackets", {}):
             # Search for matching topics in roadmap
             priority = roadmap_mapping["priority"].lower()
-            roadmap_topics = self.roadmap_data[bracket].get(priority, [])
+            roadmap_topics = self.roadmap_data["brackets"][bracket].get(priority, [])
             
             for roadmap_topic in roadmap_topics:
                 # Check if this roadmap topic matches any of our expected topics
@@ -432,6 +540,12 @@ class SourceParser:
                 "roadmap": "https://docs.google.com/document/d/1-7Co93b504uyXyMjjE8bnLJP3d3QXvp_m1UjvbvdR2Y",
                 "taxonomy": "https://github.com/Yassir-aykhlf/DSA-Taxonomies",
                 "verification_status": "Parsed from actual sources"
+            },
+            "global_resources": {
+                "general": self.roadmap_data.get("general_resources", []),
+                "practice_sites": self.roadmap_data.get("practice_sites", []),
+                "youtube_channels": self.roadmap_data.get("youtube_channels", []),
+                "meta_guides": self.roadmap_data.get("meta_guides", [])
             },
             "topics": topics
         }
