@@ -1492,26 +1492,17 @@ def submit_fix():
             ))
             sys.exit(1)
         
-        # 2. Check for clean working directory
-        result = subprocess.run(
+        # 2. Check for uncommitted changes (for snapshot syncing later)
+        git_status = subprocess.run(
             ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
             check=True
         )
+        has_uncommitted = bool(git_status.stdout.strip())
         
-        if result.stdout.strip():
-            console.print(Panel(
-                "[bold yellow]Uncommitted Changes Detected[/bold yellow]\n\n"
-                "The Mastery Engine requires a clean Git working directory to initialize.\n\n"
-                "Please commit or stash your current changes first:\n"
-                "  [cyan]git add -A && git commit -m 'Pre-mastery checkpoint'[/cyan]\n"
-                "  or\n"
-                "  [cyan]git stash push -m 'Pre-mastery work'[/cyan]",
-                title="INITIALIZATION ERROR",
-                border_style="yellow"
-            ))
-            sys.exit(1)
+        if has_uncommitted:
+            console.print("[yellow]⚠️  Uncommitted changes detected - will sync to validation environment[/yellow]")
         
         # 3. Check if shadow worktree already exists
         if SHADOW_WORKTREE_DIR.exists():
@@ -1558,6 +1549,36 @@ def submit_fix():
             capture_output=True
         )
         logger.info(f"Created shadow worktree at {SHADOW_WORKTREE_DIR}")
+        
+        # 5b. Sync uncommitted changes to shadow worktree (prevents "time travel" bug)
+        if has_uncommitted:
+            console.print("[cyan]Syncing uncommitted changes to validation environment...[/cyan]")
+            
+            # Get list of modified tracked files
+            dirty_files_output = subprocess.run(
+                ["git", "ls-files", "-m"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            dirty_files = [f.strip() for f in dirty_files_output.stdout.splitlines() if f.strip()]
+            
+            # Copy each modified file to shadow worktree
+            import shutil
+            synced_count = 0
+            for file_path in dirty_files:
+                src = Path(file_path)
+                dst = SHADOW_WORKTREE_DIR / file_path
+                
+                if src.exists():
+                    # Ensure parent directory exists
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
+                    synced_count += 1
+            
+            logger.info(f"Synced {synced_count} uncommitted files to shadow worktree")
+            console.print(f"[green]✓ Synced {synced_count} uncommitted file(s)[/green]")
         
         # 6. Create workspace directory in shadow worktree
         workspace_dir = SHADOW_WORKTREE_DIR / "workspace"
