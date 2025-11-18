@@ -39,10 +39,29 @@ class CurriculumManager:
     allowing the engine to work from any subdirectory.
     """
     
-    def __init__(self):
-        """Initialize with project root detection."""
-        self._project_root = find_project_root()
-        self.CURRICULA_DIR = self._project_root / "curricula"
+    # Class-level attribute for test compatibility (can be patched)
+    CURRICULA_DIR = Path("curricula")
+    
+    def __init__(self, curricula_dir: Path = None):
+        """
+        Initialize with project root detection.
+        
+        Args:
+            curricula_dir: Optional override for curricula directory (for testing)
+        """
+        if curricula_dir is not None:
+            # Explicit override (typically from tests)
+            self.CURRICULA_DIR = curricula_dir
+            self._project_root = curricula_dir.parent if curricula_dir.parent != curricula_dir else Path.cwd()
+        else:
+            try:
+                self._project_root = find_project_root()
+                # Only override CURRICULA_DIR if we successfully found project root
+                # This allows tests to patch the class-level attribute
+                self.CURRICULA_DIR = self._project_root / "curricula"
+            except RuntimeError:
+                # Fallback - leave CURRICULA_DIR as class default (tests can patch)
+                self._project_root = Path.cwd()
     
     def load_manifest(self, curriculum_id: str) -> CurriculumManifest:
         """

@@ -41,8 +41,12 @@ class WorkspaceManager:
             workspace_root: Optional custom workspace root. If None, uses default <project_root>/workspace
         """
         if workspace_root is None:
-            project_root = find_project_root()
-            self.workspace_root = project_root / "workspace"
+            try:
+                project_root = find_project_root()
+                self.workspace_root = project_root / "workspace"
+            except RuntimeError:
+                # Fallback for tests or edge cases - use relative path
+                self.workspace_root = Path("workspace")
         else:
             self.workspace_root = workspace_root
     
