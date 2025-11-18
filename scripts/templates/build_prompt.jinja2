@@ -1,0 +1,78 @@
+# Build Challenge: {{ problem.title }}
+
+## Pattern Overview
+
+> {{ topic.description if topic.description else "Learn to solve problems using systematic approaches and algorithmic patterns." }}
+
+## Problem Statement
+
+{{ problem.description_formatted }}
+
+**Difficulty:** {{ problem.difficulty }} | **Acceptance Rate:** {{ problem.acceptance_rate }}  
+**Topics:** {{ problem.topics|join(', ') if problem.topics else 'General' }}
+
+**Problem Link:** {{ problem.url }}
+
+{% if problem.examples %}
+## Examples
+
+{{ problem.examples_formatted }}
+{% endif %}
+
+{% if problem.constraints_formatted %}
+## Constraints
+
+{{ problem.constraints_formatted }}
+{% endif %}
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to {{ problem.url }}
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+{% if problem.hints %}
+## Hints
+
+If you're stuck, consider these hints:
+
+{% for hint in problem.hints %}
+{{ loop.index }}. {{ hint }}
+{% endfor %}
+{% endif %}
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+{% if resources %}
+{% for resource in resources %}
+{{ loop.index }}. {{ resource }}
+{% endfor %}
+{% else %}
+1. Review the problem description carefully
+2. Think about the pattern and approach systematically
+3. Test your solution with the provided examples
+{% endif %}
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

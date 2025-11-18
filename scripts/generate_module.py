@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import sys
 from bs4 import BeautifulSoup
+from jinja2 import Environment, FileSystemLoader
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -120,94 +121,169 @@ class ModuleGenerator:
         
         return result
         
-    def generate_build_prompt(self, pattern_data: Dict, canonical_problem: Dict, 
-                             roadmap_resources: List[str]) -> str:
+    def format_description(self, html_description: str) -> str:
         """
-        Generate build_prompt.txt content.
+        Convert HTML description to clean markdown.
         
         Args:
-            pattern_data: Parsed taxonomy data
-            canonical_problem: Selected problem for implementation
-            roadmap_resources: Links to video/blog tutorials from roadmap
+            html_description: HTML content from LeetCode
+            
+        Returns:
+            Markdown-formatted description
+        """
+        soup = BeautifulSoup(html_description, 'html.parser')
+        
+        # Convert common HTML tags to markdown
+        # <strong> -> **text**
+        for tag in soup.find_all('strong'):
+            tag.replace_with(f"**{tag.get_text()}**")
+        
+        # <code> -> `text`
+        for tag in soup.find_all('code'):
+            tag.replace_with(f"`{tag.get_text()}`")
+        
+        # <pre> -> code block
+        for tag in soup.find_all('pre'):
+            code_text = tag.get_text()
+            tag.replace_with(f"\n```\n{code_text}\n```\n")
+        
+        # <ul> and <li> -> markdown lists
+        for ul in soup.find_all('ul'):
+            items = []
+            for li in ul.find_all('li'):
+                items.append(f"- {li.get_text().strip()}")
+            ul.replace_with('\n' + '\n'.join(items) + '\n')
+        
+        # Get final text
+        text = soup.get_text()
+        
+        # Clean up excessive whitespace
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        text = re.sub(r'  +', ' ', text)
+        
+        return text.strip()
+    
+    def format_examples(self, examples: List[Dict]) -> str:
+        """
+        Format examples for build prompt.
+        
+        Args:
+            examples: List of example dicts with input/output/explanation
+            
+        Returns:
+            Formatted examples string
+        """
+        formatted = []
+        
+        for i, ex in enumerate(examples, 1):
+            formatted.append(f"**Example {i}:**")
+            formatted.append("")
+            
+            # Clean and format input
+            inp_soup = BeautifulSoup(ex.get('input', ''), 'html.parser')
+            input_text = inp_soup.get_text().strip()
+            formatted.append(f"```")
+            formatted.append(f"Input: {input_text}")
+            
+            # Clean and format output
+            out_soup = BeautifulSoup(ex.get('output', ''), 'html.parser')
+            output_text = out_soup.get_text().strip()
+            formatted.append(f"Output: {output_text}")
+            formatted.append(f"```")
+            
+            # Add explanation if present
+            if ex.get('explanation'):
+                exp_soup = BeautifulSoup(ex['explanation'], 'html.parser')
+                explanation_text = exp_soup.get_text().strip()
+                if explanation_text:
+                    formatted.append(f"*Explanation:* {explanation_text}")
+            
+            formatted.append("")
+        
+        return '\n'.join(formatted)
+    
+    def format_constraints(self, constraints: List[str], description_html: str = "") -> str:
+        """
+        Format constraints from either constraints list or extract from HTML.
+        
+        Args:
+            constraints: List of constraint strings
+            description_html: HTML description to extract from if no constraints list
+            
+        Returns:
+            Formatted constraints string
+        """
+        if constraints:
+            return '\n'.join(f"- {c}" for c in constraints)
+        
+        # Try to extract from description HTML
+        soup = BeautifulSoup(description_html, 'html.parser')
+        
+        # Look for "Constraints:" section
+        constraints_text = []
+        found_constraints = False
+        
+        for p in soup.find_all('p'):
+            text = p.get_text().strip()
+            if 'Constraints:' in text or 'constraints:' in text.lower():
+                found_constraints = True
+                continue
+            if found_constraints and text:
+                # Extract constraint lines
+                if text.startswith(('-', '•', '*')):
+                    constraints_text.append(text)
+                elif '<' in text or '≤' in text or '<=' in text:
+                    constraints_text.append(f"- {text}")
+        
+        if constraints_text:
+            return '\n'.join(constraints_text)
+        
+        return ""
+        
+    def generate_build_prompt(self, problem_data: Dict, topic_data: Dict = None,  
+                             resources: List[str] = None) -> str:
+        """
+        Generate build_prompt.txt content using Jinja2 template.
+        
+        Args:
+            problem_data: Extracted problem data from canonical curriculum
+            topic_data: Topic information (description, etc.)
+            resources: Learning resource URLs
             
         Returns:
             Formatted build prompt string
         """
-        prompt = f"""# Build Challenge: {canonical_problem['title']}
-
-## Pattern Overview
-
-{pattern_data['description']}
-
-## Pattern Taxonomy
-
-```mermaid
-{pattern_data['mermaid_diagram']}
-```
-
-## Your Task
-
-Implement a solution to the following problem, which is a canonical example of this pattern.
-
-### Problem: {canonical_problem['number']}. {canonical_problem['title']}
-
-**Problem Link:** {canonical_problem['url']}
-
-**Problem Statement:**
-[Note: Visit the problem link above for the complete statement, examples, and constraints]
-
-## Implementation Requirements
-
-1. **Language:** Python 3 (or your preferred language)
-2. **File:** `solution.py`
-3. **Function Signature:** Will be provided based on the problem
-4. **Constraints:** Must pass all example test cases from the problem statement
-
-## Local Validation
-
-After implementing your solution:
-
-```bash
-engine submit
-```
-
-**Important Note on Validation:**
-- The local validator runs against example test cases extracted from the problem statement
-- Passing local tests is **necessary but not sufficient** for full correctness
-- For complete validation, submit your solution to {canonical_problem['url']}
-- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
-
-## Learning Resources
-
-These curated resources will help you understand the pattern deeply:
-
-"""
+        # Set up Jinja2 environment
+        script_dir = Path(__file__).parent
+        template_dir = script_dir / "templates"
+        env = Environment(loader=FileSystemLoader(str(template_dir)))
+        template = env.get_template('build_prompt.jinja2')
         
-        for idx, resource in enumerate(roadmap_resources, 1):
-            prompt += f"{idx}. {resource}\n"
-            
-        prompt += """
-## Common Pitfalls
-
-- Off-by-one errors in pointer movement
-- Not handling edge cases (empty arrays, single elements)
-- Incorrect termination conditions
-
-## Hints
-
-If you're stuck, consider:
-1. Drawing the pointer positions on paper for a small example
-2. What invariant should be maintained at each step?
-3. What is the termination condition?
-
-## Submission
-
-Once your solution passes local tests:
-```bash
-engine submit
-```
-"""
-        return prompt
+        # Format the data
+        formatted_problem = {
+            'title': problem_data['title'],
+            'url': problem_data['url'],
+            'difficulty': problem_data['difficulty'],
+            'acceptance_rate': problem_data['acceptance_rate'],
+            'topics': problem_data['topics'][:5] if problem_data['topics'] else [],  # Top 5 topics
+            'description_formatted': self.format_description(problem_data['description_html']),
+            'examples_formatted': self.format_examples(problem_data['examples']),
+            'constraints_formatted': self.format_constraints(
+                problem_data['constraints'],
+                problem_data['description_html']
+            ),
+            'hints': problem_data['hints']
+        }
+        
+        # Topic data (if available)
+        topic = topic_data or {'description': 'Learn to solve problems using systematic approaches.'}
+        
+        # Render template
+        return template.render(
+            problem=formatted_problem,
+            topic=topic,
+            resources=resources or []
+        )
         
     def scaffold_justify_questions(self, pattern_name: str) -> List[Dict]:
         """
@@ -504,12 +580,42 @@ def main():
         print(f"   ✅ Generated: {test_cases_path}")
         print(f"   📊 Test count: {len(test_cases['tests'])}")
     
+    # Generate build prompt
+    print(f"\n📝 Generating build_prompt.txt...")
+    
+    # Get topic description from curriculum
+    topic_desc = None
+    for topic in generator.curriculum_data['topics']:
+        for p in topic['problems']:
+            if p['id'] == args.problem_id:
+                topic_desc = {'description': topic.get('description', 'Learn to solve problems systematically.')}
+                break
+    
+    # Get resources (from roadmap or defaults)
+    resources = [
+        "https://www.youtube.com/watch?v=kPRA0W1kECg",
+        "https://www.geeksforgeeks.org/sorting-algorithms/"
+    ]
+    
+    build_prompt = generator.generate_build_prompt(problem_data, topic_desc, resources)
+    build_prompt_path = output_dir / "build_prompt.txt"
+    
+    if build_prompt_path.exists() and not args.force:
+        print(f"   ⚠️  File exists: {build_prompt_path}")
+        print(f"   💡 Use --force to overwrite")
+    else:
+        with open(build_prompt_path, 'w') as f:
+            f.write(build_prompt)
+        print(f"   ✅ Generated: {build_prompt_path}")
+        print(f"   📊 Size: {len(build_prompt)} chars")
+    
     print(f"\n{'='*70}")
-    print(f"✅ PoC Complete!")
+    print(f"✅ Phase 2 Complete!")
     print(f"{'='*70}")
     print(f"\n📁 Output: {output_dir}")
-    print(f"\n🔍 Next: Compare generated file to original:")
+    print(f"\n🔍 Compare generated files to originals:")
     print(f"   git diff {test_cases_path}")
+    print(f"   git diff {build_prompt_path}")
     
     return 0
 
