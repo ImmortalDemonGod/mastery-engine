@@ -64,31 +64,30 @@ All commands verified functional as of Nov 18, 2025.
 
 ---
 
-### Legacy Commands (Still Work)
+### Legacy Commands (Soft-Deprecated, DO NOT USE)
 
-#### 10. `mastery submit-build`
-**Status:** ✅ Working (use `submit` instead)  
-**Usage:** `uv run mastery submit-build`  
-**Description:** Submit Build stage implementation.  
-**Note:** `mastery submit` auto-detects and does this automatically.
+**⚠️ These commands are maintained for backward compatibility only.**  
+**Use the modern equivalents instead.**
 
-#### 11. `mastery submit-justification <answer>`
-**Status:** ✅ Working (use `submit` instead)  
-**Usage:** `uv run mastery submit-justification "Your answer"`  
-**Description:** Submit Justify stage answer.  
-**Note:** `mastery submit` opens editor automatically.
+#### ~~10. `mastery submit-build`~~ → Use `mastery submit`
+**Status:** 🟡 Deprecated (still works, but don't use)  
+**Modern Alternative:** `uv run mastery submit` (auto-detects build stage)  
+**Why deprecated:** Replaced by unified `submit` command
 
-#### 12. `mastery submit-fix`
-**Status:** ✅ Working (use `submit` instead)  
-**Usage:** `uv run mastery submit-fix`  
-**Description:** Submit Harden stage bug fix.  
-**Note:** `mastery submit` auto-detects and does this automatically.
+#### ~~11. `mastery submit-justification`~~ → Use `mastery submit`
+**Status:** 🟡 Deprecated (still works, but don't use)  
+**Modern Alternative:** `uv run mastery submit` (auto-detects justify stage)  
+**Why deprecated:** Replaced by unified `submit` command
 
-#### 13. `mastery next`
-**Status:** ✅ Working (DEPRECATED - use `show` instead)  
-**Usage:** `uv run mastery next`  
-**Description:** Display next challenge.  
-**Note:** Use `mastery show` for read-only display.
+#### ~~12. `mastery submit-fix`~~ → Use `mastery submit`
+**Status:** 🟡 Deprecated (still works, but don't use)  
+**Modern Alternative:** `uv run mastery submit` (auto-detects harden stage)  
+**Why deprecated:** Replaced by unified `submit` command
+
+#### ~~13. `mastery next`~~ → Use `mastery show`
+**Status:** 🟡 Deprecated (still works, but don't use)  
+**Modern Alternative:** `uv run mastery show` (read-only, always safe)  
+**Why deprecated:** Had inconsistent behavior (read vs write)
 
 ---
 
@@ -191,13 +190,34 @@ uv run mastery cleanup
 
 ## Summary
 
-### ✅ All Commands Functional
+### Commands You Should Use (10 Active Commands)
 
-All 14 commands are registered and working:
-- 5 primary commands (submit, init, status, show, cleanup)
-- 4 secondary commands (start-challenge, curriculum-list, progress-reset, reset)
-- 4 legacy commands (submit-build, submit-justification, submit-fix, next)
-- 1 dev tool (create-bug)
+**Primary (5):**
+- `submit` - Auto-detecting submission
+- `init` - Initialize curriculum
+- `status` - Check progress
+- `show` - View challenge content
+- `cleanup` - Remove shadow worktree
+
+**Secondary (4):**
+- `start-challenge` - Initialize harden stage
+- `curriculum-list` - List all modules
+- `progress-reset` - Reset specific module
+- `reset` - Reset curriculum
+
+**Dev Tools (1):**
+- `create-bug` - Generate bug definitions
+
+### Commands You Should NOT Use (4 Deprecated)
+
+**⚠️ Soft-deprecated (kept for backward compatibility):**
+- ~~`submit-build`~~ → Use `submit` instead
+- ~~`submit-justification`~~ → Use `submit` instead
+- ~~`submit-fix`~~ → Use `submit` instead
+- ~~`next`~~ → Use `show` instead
+
+**Why they still exist:** Prevents breaking existing scripts/workflows.  
+**Should you use them:** NO - Use the modern equivalents.
 
 ### 📝 Documentation Discrepancy
 
