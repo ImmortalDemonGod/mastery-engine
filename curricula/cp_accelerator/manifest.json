@@ -43,12 +43,13 @@
     {
       "id": "hash_table",
       "name": "Hash Table",
-      "path": "modules/hash_table",
+      "path": "modules/two_sum",
       "dependencies": [],
       "metadata": {
         "rating_bracket": "1000-1199",
         "priority": "Vital",
         "taxonomy_source": "Taxonomies/2. Hash Table.md",
+        "canonical_problem": "LC-1 (Two Sum)",
         "estimated_hours": 5
       }
     },
