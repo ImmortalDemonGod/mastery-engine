@@ -239,6 +239,47 @@ class ModuleGenerator:
             return '\n'.join(constraints_text)
         
         return ""
+    
+    def extract_examples_from_description(self, description_html: str) -> List[Dict]:
+        """
+        Extract examples from <pre> blocks in description HTML.
+        
+        Fallback method when examples array has incomplete/truncated data.
+        
+        Args:
+            description_html: Full problem description with examples in <pre> tags
+            
+        Returns:
+            List of parsed examples with input/output/explanation
+        """
+        soup = BeautifulSoup(description_html, 'html.parser')
+        examples = []
+        
+        # Find all <pre> blocks (they typically contain examples)
+        pre_blocks = soup.find_all('pre')
+        
+        for pre in pre_blocks:
+            text = pre.get_text()
+            
+            # Skip if this doesn't look like an example
+            if 'Input:' not in text and 'Output:' not in text:
+                continue
+            
+            # Extract input (everything between "Input:" and "Output:")
+            input_match = re.search(r'Input:\s*(.+?)(?=Output:|Explanation:|$)', text, re.DOTALL | re.IGNORECASE)
+            # Extract output (everything between "Output:" and "Explanation:" or end)
+            output_match = re.search(r'Output:\s*(.+?)(?=Explanation:|$)', text, re.DOTALL | re.IGNORECASE)
+            # Extract explanation (optional)
+            explanation_match = re.search(r'Explanation:\s*(.+?)$', text, re.DOTALL | re.IGNORECASE)
+            
+            if input_match and output_match:
+                examples.append({
+                    'input': input_match.group(1).strip(),
+                    'output': output_match.group(1).strip(),
+                    'explanation': explanation_match.group(1).strip() if explanation_match else ''
+                })
+        
+        return examples
         
     def generate_build_prompt(self, problem_data: Dict, topic_data: Dict = None,  
                              resources: List[str] = None) -> str:
@@ -382,7 +423,19 @@ EOF
         """
         tests = []
         
-        for i, example in enumerate(problem_data['examples'], 1):
+        # Get examples (with fallback to description if incomplete)
+        examples = problem_data.get('examples', [])
+        
+        # Check if examples are complete (heuristic: input should be > 20 chars)
+        if not examples or all(len(ex.get('input', '')) < 20 for ex in examples):
+            print(f"   ⚠️  Examples array incomplete, extracting from description HTML...")
+            examples = self.extract_examples_from_description(
+                problem_data.get('description_html', problem_data.get('description', ''))
+            )
+            if examples:
+                print(f"   ✅ Extracted {len(examples)} examples from description")
+        
+        for i, example in enumerate(examples, 1):
             try:
                 # Parse input
                 input_dict = self.parse_example_input(example['input'])
@@ -561,8 +614,12 @@ def main():
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        # Use existing module directory (sorting for LC-912)
-        output_dir = generator.modules_dir / "sorting"
+        # Create module directory based on problem title
+        module_name = problem_data['title'].lower().replace(' ', '_').replace('-', '_')
+        # Remove special characters
+        module_name = re.sub(r'[^a-z0-9_]', '', module_name)
+        output_dir = generator.modules_dir / module_name
+        print(f"   📁 Module directory: {module_name}")
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
