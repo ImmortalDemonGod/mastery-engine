@@ -14,23 +14,25 @@ if [ ! -f "$SCRIPT_DIR/solution.py" ]; then
 fi
 
 # Run tests
-python3 << 'EOF'
+cd "$SCRIPT_DIR"
+python3 << EOF
 import json
 import sys
-from pathlib import Path
+import os
 
-# Import user solution
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+# Add current directory to path
+sys.path.insert(0, os.getcwd())
+
 try:
-    from curricula.cp_accelerator.modules.two_sum.solution import twoSum
-except ImportError:
+    from solution import twoSum
+except ImportError as e:
     print("❌ Could not import twoSum function from solution.py")
+    print(f"   Error: {e}")
     print("   Make sure your solution.py defines: def twoSum(nums, target):")
     sys.exit(1)
 
 # Load test cases
-test_cases_path = Path(__file__).parent / "test_cases.json"
-with open(test_cases_path) as f:
+with open("test_cases.json") as f:
     test_data = json.load(f)
 
 passed = 0
