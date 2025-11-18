@@ -1462,12 +1462,31 @@ def submit_fix():
             f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
             title="ENGINE ERROR",
             border_style="red"
+        ))
+        sys.exit(1)
+
+
+@app.command()
+def init(
+    curriculum_id: str = typer.Argument(..., help="Curriculum ID to initialize (e.g., cp_accelerator)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization (skip already-initialized check)")
+):
+    """
+    Initialize the Mastery Engine with a specific curriculum.
+    
+    This creates a shadow git worktree for isolated validation and sets up
+    the initial learning state. Automatically syncs uncommitted changes to
+    the validation environment.
     
     Options:
-        --force: Allow re-initialization or curriculum switching with uncommitted changes
+        --force: Skip the already-initialized check and re-create the shadow worktree
     
     Args:
-        curriculum_id: ID of the curriculum to start (e.g., 'cs336_a1')
+        curriculum_id: ID of the curriculum to start (e.g., 'cp_accelerator')
+        
+    Examples:
+        mastery init cp_accelerator
+        mastery init cp_accelerator --force  # Re-initialize
     """
     try:
         console.print()
@@ -1504,17 +1523,55 @@ def submit_fix():
         if has_uncommitted:
             console.print("[yellow]⚠️  Uncommitted changes detected - will sync to validation environment[/yellow]")
         
-        # 3. Check if shadow worktree already exists
-        if SHADOW_WORKTREE_DIR.exists():
-            console.print(Panel(
-                "[bold yellow]Already Initialized[/bold yellow]\n\n"
-                f"The shadow worktree already exists at {SHADOW_WORKTREE_DIR}.\n\n"
-                "If you want to re-initialize, first run:\n"
-                "  [cyan]engine cleanup[/cyan]",
-                title="INITIALIZATION ERROR",
-                border_style="yellow"
-            ))
-            sys.exit(1)
+        # 3. Check if shadow worktree already exists - handle idempotently
+        if SHADOW_WORKTREE_DIR.exists() and not force:
+            # Check if switching curricula
+            try:
+                state_mgr = StateManager()
+                current_progress = state_mgr.load()
+                
+                if current_progress.curriculum_id == curriculum_id:
+                    # Same curriculum - just inform user
+                    console.print(Panel(
+                        f"[bold green]Already Initialized[/bold green]\n\n"
+                        f"Already using curriculum: [cyan]{curriculum_id}[/cyan]\n\n"
+                        "No changes needed. You can continue your learning journey.\n\n"
+                        "To re-initialize from scratch, use:\n"
+                        "  [cyan]mastery init {curriculum_id} --force[/cyan]",
+                        title="✓ Already Set Up",
+                        border_style="green"
+                    ))
+                    return
+                else:
+                    # Different curriculum - offer to switch
+                    console.print(Panel(
+                        f"[bold yellow]Curriculum Switch Detected[/bold yellow]\n\n"
+                        f"Current: [cyan]{current_progress.curriculum_id}[/cyan]\n"
+                        f"Requested: [cyan]{curriculum_id}[/cyan]\n\n"
+                        "To switch curricula, first run:\n"
+                        "  [cyan]mastery cleanup[/cyan]\n"
+                        "Then run init again, or use:\n"
+                        "  [cyan]mastery init {curriculum_id} --force[/cyan]",
+                        title="CURRICULUM SWITCH",
+                        border_style="yellow"
+                    ))
+                    sys.exit(1)
+            except:
+                # State file doesn't exist or is corrupt - treat as fresh init
+                pass
+        
+        # 3b. If --force flag is set, clean up existing worktree first
+        if force and SHADOW_WORKTREE_DIR.exists():
+            console.print("[yellow]--force flag set: Removing existing worktree...[/yellow]")
+            try:
+                subprocess.run(
+                    ["git", "worktree", "remove", str(SHADOW_WORKTREE_DIR), "--force"],
+                    check=True,
+                    capture_output=True
+                )
+                logger.info(f"Removed existing worktree at {SHADOW_WORKTREE_DIR}")
+            except subprocess.CalledProcessError as e:
+                console.print(f"[yellow]Warning: Could not remove worktree (continuing anyway): {e}[/yellow]")
         
         # 3b. Prune any stale worktree registrations
         # (in case worktree was deleted manually without git worktree remove)

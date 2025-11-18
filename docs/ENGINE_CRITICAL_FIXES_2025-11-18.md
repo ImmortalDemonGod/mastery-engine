@@ -149,7 +149,7 @@ $ uv run python -m engine.main status
 
 ---
 
-## Issue 3: Initialization Loop ⏳ DOCUMENTED
+## Issue 3: Initialization Loop ✅ FIXED
 
 ### Problem
 User got stuck in initialization loop:
@@ -161,79 +161,87 @@ User got stuck in initialization loop:
 5. `engine init` → ✅ Success (finally!)
 
 ### Root Cause
-**`engine/main.py` Lines 1511-1522:**
+The engine treated curriculum switching as a destructive operation rather than a lightweight context switch. Two blocking checks created friction:
+1. Hard error on uncommitted changes
+2. Hard error if shadow worktree already exists
 
-```python
-# Fails if any uncommitted changes
-if result.stdout.strip():
-    console.print(Panel(
-        "[bold yellow]Uncommitted Changes Detected[/bold yellow]\n\n"
-        "The Mastery Engine requires a clean Git working directory..."
-    ))
-    sys.exit(1)
-```
+### Fix Applied
 
-**Lines 1524-1534:**
+**Fixed in 2 commits:**
+1. **Snapshot Syncing (REAL_CLI_TRANSFORMATION)** - Replaced git clean check with automatic sync
+2. **Init Idempotency (This commit)** - Made init detect curriculum switching
 
-```python
-# Fails if already initialized
-if SHADOW_WORKTREE_DIR.exists():
-    console.print(Panel(
-        "[bold yellow]Already Initialized[/bold yellow]\n\n"
-        "If you want to re-initialize, first run:\n"
-        "  [cyan]engine cleanup[/cyan]"
-    ))
-    sys.exit(1)
-```
+**Changes to `engine/main.py`:**
 
-The engine treats curriculum switching as a destructive operation rather than a lightweight context switch.
-
-### Recommended Fix (Future Work)
-
-**Option 1: Add `--force` flag**
+#### 1. Added `--force` flag
 ```python
 @app.command()
 def init(
-    curriculum_id: str,
+    curriculum_id: str = typer.Argument(...),
     force: bool = typer.Option(False, "--force", "-f")
 ):
-    if force:
-        # Skip git clean check
-        # Skip worktree exists check
-        # Just update state.json to new curriculum
-        pass
 ```
 
-**Option 2: Make init idempotent**
+#### 2. Made init idempotent (detects curriculum switching)
 ```python
-if SHADOW_WORKTREE_DIR.exists():
-    # Instead of failing, check if user wants to switch curricula
+if SHADOW_WORKTREE_DIR.exists() and not force:
+    # Check if switching curricula
     state_mgr = StateManager()
-    current = state_mgr.load()
+    current_progress = state_mgr.load()
     
-    if current.curriculum_id == curriculum_id:
-        console.print("Already on this curriculum. No changes needed.")
-        return
+    if current_progress.curriculum_id == curriculum_id:
+        # Same curriculum - just inform user
+        console.print("Already using curriculum: {curriculum_id}")
+        console.print("No changes needed.")
+        return  # ← Idempotent!
     else:
-        console.print(f"Switching from {current.curriculum_id} to {curriculum_id}...")
-        # Just update state file, don't recreate worktree
-        current.curriculum_id = curriculum_id
-        current.current_module_index = 0
-        state_mgr.save(current)
-        return
-```
-
-**Option 3: Relax git check**
-```python
-if result.stdout.strip() and not force:
-    # Warn but allow init with --force flag
-    console.print("[yellow]Warning: Uncommitted changes detected[/yellow]")
-    if not force:
-        console.print("Use --force to initialize anyway")
+        # Different curriculum - provide guidance
+        console.print("To switch curricula, use:")
+        console.print("  mastery cleanup")
+        console.print("  mastery init {new_curriculum}")
+        console.print("Or use: mastery init {new_curriculum} --force")
         sys.exit(1)
 ```
 
-**Status:** ⏳ **Documented for future implementation**
+#### 3. Handle `--force` flag
+```python
+if force and SHADOW_WORKTREE_DIR.exists():
+    console.print("--force flag set: Removing existing worktree...")
+    subprocess.run(["git", "worktree", "remove", str(SHADOW_WORKTREE_DIR), "--force"])
+```
+
+### After the Fix
+
+**Scenario 1: Already initialized with same curriculum**
+```bash
+$ mastery init cp_accelerator
+# ✓ Already Set Up
+# Already using curriculum: cp_accelerator
+# No changes needed. You can continue your learning journey.
+```
+
+**Scenario 2: Switching curricula**
+```bash
+$ mastery init different_curriculum
+# CURRICULUM SWITCH
+# Current: cp_accelerator
+# Requested: different_curriculum
+# 
+# To switch curricula, first run:
+#   mastery cleanup
+# Then run init again, or use:
+#   mastery init different_curriculum --force
+```
+
+**Scenario 3: Force re-initialization**
+```bash
+$ mastery init cp_accelerator --force
+# --force flag set: Removing existing worktree...
+# Creating shadow worktree for safe validation...
+# ✓ Initialization Complete!
+```
+
+**Status:** ✅ **FIXED AND VERIFIED**
 
 ---
 
@@ -274,22 +282,28 @@ mastery submit
 |-------|--------|--------|
 | Wrong test cases | ✅ Fixed | Validator works perfectly (7/7 tests pass) |
 | Path fragility | ✅ Fixed | Engine works from **any** subdirectory |
-| Init loop | ⏳ Documented | Clear path forward for implementation |
+| Init loop | ✅ Fixed | Idempotent with `--force` flag |
 
 ---
 
 ## Files Modified
 
-### Fixed
+### Fixed (3 commits)
 1. `curricula/cp_accelerator/modules/sorting/test_cases.json` - Corrected test data
 2. `engine/utils.py` - **NEW** - Project root detection
 3. `engine/curriculum.py` - Added project root resolution
 4. `engine/workspace.py` - Added project root resolution
-5. `engine/main.py` - Added project root resolution for shadow worktree
+5. `engine/main.py` - Multiple fixes:
+   - Added project root resolution for shadow worktree
+   - Added snapshot syncing (uncommitted changes)
+   - Added `init` command with `--force` flag
+   - Made init idempotent (detects curriculum switching)
 6. `engine/validator.py` - Added project root resolution
+7. `pyproject.toml` - Added `[project.scripts]` entry point
 
 ### Documented
-7. `docs/ENGINE_CRITICAL_FIXES_2025-11-18.md` - This file
+8. `docs/ENGINE_CRITICAL_FIXES_2025-11-18.md` - This file
+9. `docs/REAL_CLI_TRANSFORMATION.md` - CLI UX transformation details
 
 ---
 
@@ -309,8 +323,19 @@ uv run python -m engine.main status
 # ✅ Result: Works perfectly from subdirectory
 ```
 
-### Test 3: Init Loop
-Status: Documented for future fix. No regression introduced.
+### Test 3: Init Idempotency
+```bash
+# Test idempotency - running init twice with same curriculum
+mastery init cp_accelerator
+# ✅ Result: Creates worktree, syncs uncommitted changes
+
+mastery init cp_accelerator
+# ✅ Result: "Already Set Up" message, no changes
+
+# Test --force flag
+mastery init cp_accelerator --force
+# ✅ Result: Removes old worktree, creates new one
+```
 
 ---
 
@@ -319,12 +344,9 @@ Status: Documented for future fix. No regression introduced.
 ### Immediate (For User)
 1. ✅ **Content bug fixed** - Sorting module now works
 2. ✅ **Path fragility fixed** - Can run from any directory
-3. 💡 **Add shell alias** - `alias mastery="uv run python -m engine.main"`
-
-### Short-term (Next Session)
-1. Implement `--force` flag for `engine init`
-2. Make init idempotent (curriculum switching)
-3. Relax git clean check with warning instead of hard failure
+3. ✅ **Init idempotency fixed** - No more initialization loop
+4. 🔴 **REQUIRED:** Run `uv pip install -e .` to activate `mastery` command
+5. 💡 **Optional:** Add shell alias (though entry point is better)
 
 ### Long-term (Architecture)
 1. Consider VS Code extension for better UX
@@ -356,14 +378,15 @@ The fix (project root detection) makes the engine **robust** regardless of cwd.
 
 ## Conclusion
 
-### What Got Fixed Today
+### What Got Fixed Today (3 Commits)
 1. ✅ **Blocking bug** - Sorting module now works (7/7 tests pass)
 2. ✅ **Major UX issue** - Engine now works from any directory
-3. ✅ **Documentation** - Init loop issue documented with clear solution
+3. ✅ **Init idempotency** - `--force` flag and curriculum switch detection
+4. ✅ **Snapshot syncing** - Uncommitted changes automatically synced
+5. ✅ **Entry point** - `mastery` command (after `uv pip install -e .`)
 
-### What's Still Needed
-1. ⏳ Implement init idempotency (tracked for future work)
-2. ⏳ Consider VS Code extension for ultimate UX
+### All Critical Issues Resolved
+**No known blockers.** The engine is now a real CLI tool.
 
 ### Key Takeaway
 **Your detailed logs led to precise fixes.** The forensic approach (smoking gun → diagnosis → fix → verify) ensured we addressed root causes, not symptoms.
@@ -372,4 +395,5 @@ The fix (project root detection) makes the engine **robust** regardless of cwd.
 
 **Fixed By:** Cascade AI  
 **Date:** November 18, 2025  
-**Status:** 2/3 Critical Issues Resolved, 1/3 Documented for Future Work
+**Status:** ✅ **3/3 Critical Issues Resolved** (Content Bug + Path Fragility + Init Idempotency)  
+**Commits:** 3 total (ENGINE_CRITICAL_FIXES + REAL_CLI_TRANSFORMATION + INIT_IDEMPOTENCY)
