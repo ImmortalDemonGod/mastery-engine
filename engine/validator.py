@@ -88,10 +88,16 @@ class ValidationSubsystem:
             # Execute the validator script with environment variables
             import os
             import sys
+            from engine.utils import find_project_root
             env = os.environ.copy()
             
             # SHADOW_WORKTREE: Path to shadow worktree for isolated validation
-            shadow_worktree = Path('.mastery_engine_worktree')
+            try:
+                project_root = find_project_root()
+                shadow_worktree = project_root / '.mastery_engine_worktree'
+            except RuntimeError:
+                shadow_worktree = Path('.mastery_engine_worktree')
+            
             if shadow_worktree.exists():
                 env['SHADOW_WORKTREE'] = str(shadow_worktree.resolve())
             

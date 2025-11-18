@@ -15,6 +15,8 @@ import logging
 import shutil
 import subprocess
 
+from engine.utils import find_project_root
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +28,23 @@ class WorkspaceManager:
     The workspace is a dedicated directory where users create their code files.
     This manager abstracts the file system paths to decouple the engine
     from specific directory structures.
-    """
     
-    WORKSPACE_DIR = Path("workspace")
+    The workspace directory is resolved relative to the project root,
+    allowing the engine to work from any subdirectory.
+    """
     
     def __init__(self, workspace_root: Path | None = None):
         """
         Initialize workspace manager.
         
         Args:
-            workspace_root: Optional custom workspace root. If None, uses default ./workspace
+            workspace_root: Optional custom workspace root. If None, uses default <project_root>/workspace
         """
-        self.workspace_root = workspace_root if workspace_root else self.WORKSPACE_DIR
+        if workspace_root is None:
+            project_root = find_project_root()
+            self.workspace_root = project_root / "workspace"
+        else:
+            self.workspace_root = workspace_root
     
     def get_workspace_path(self) -> Path:
         """

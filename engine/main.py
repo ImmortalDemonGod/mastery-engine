@@ -47,16 +47,33 @@ from engine.validator import (
 from engine.stages.harden import HardenRunner, HardenChallengeError
 from engine.stages.justify import JustifyRunner, JustifyQuestionsError
 from engine.services.llm_service import LLMService, ConfigurationError, LLMAPIError, LLMResponseError
+from engine.utils import find_project_root
 import subprocess
 
 
 # Initialize Typer app and Rich console
 app = typer.Typer(
     name="engine",
-    help="Mastery Engine - A sophisticated pedagogical framework for deep technical learning",
+    help="Mastery Engine: Build, Justify, Harden learning system",
     add_completion=False,
 )
 console = Console()
+
+# Environment for running validators (e.g. preserve uv run context)
+validator_env = {
+    **subprocess.os.environ,
+    'FORCE_COLOR': '1',
+    'PYTHONUNBUFFERED': '1'
+}
+
+# Shadow worktree configuration
+# Use project root to ensure it works from any subdirectory
+try:
+    _PROJECT_ROOT = find_project_root()
+    SHADOW_WORKTREE_DIR = _PROJECT_ROOT / ".mastery_engine_worktree"
+except RuntimeError:
+    # Fallback for edge cases (e.g., running outside repo)
+    SHADOW_WORKTREE_DIR = Path(".mastery_engine_worktree")
 
 # Configure logging
 logging.basicConfig(
@@ -67,9 +84,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-# Shadow worktree configuration
-SHADOW_WORKTREE_DIR = Path(".mastery_engine_worktree")
 
 logger = logging.getLogger(__name__)
 
@@ -1448,17 +1462,9 @@ def submit_fix():
             f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
             title="ENGINE ERROR",
             border_style="red"
-        ))
-        sys.exit(1)
-
-
-@app.command()
-def init(curriculum_id: str):
-    """
-    Initialize the Mastery Engine for a curriculum.
     
-    Creates a shadow Git worktree for safe, isolated validation.
-    This is the required first step before using the engine.
+    Options:
+        --force: Allow re-initialization or curriculum switching with uncommitted changes
     
     Args:
         curriculum_id: ID of the curriculum to start (e.g., 'cs336_a1')

@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from engine.schemas import CurriculumManifest, ModuleMetadata
+from engine.utils import find_project_root
 
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,15 @@ class CurriculumManager:
                 validator.sh
                 justify_questions.json
                 bugs/...
+    
+    The curriculum directory is resolved relative to the project root,
+    allowing the engine to work from any subdirectory.
     """
     
-    CURRICULA_DIR = Path("curricula")
+    def __init__(self):
+        """Initialize with project root detection."""
+        self._project_root = find_project_root()
+        self.CURRICULA_DIR = self._project_root / "curricula"
     
     def load_manifest(self, curriculum_id: str) -> CurriculumManifest:
         """
