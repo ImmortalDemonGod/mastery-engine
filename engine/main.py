@@ -904,10 +904,10 @@ def next():
 @app.command()
 def submit_build():
     """
-    Submit and validate your Build stage implementation.
+    [DEPRECATED] Submit and validate your Build stage implementation.
     
-    Runs the validator script against your code, shows results,
-    and advances your progress if validation passes.
+    Use 'mastery submit' instead - it auto-detects the build stage.
+    This command is maintained for backward compatibility only.
     """
     try:
         # Ensure shadow worktree exists
@@ -1079,14 +1079,13 @@ def submit_build():
 @app.command()
 def submit_justification(answer: str):
     """
-    Submit your answer to a Justify stage question.
+    [DEPRECATED] Submit your answer to a Justify stage question.
     
-    Implements the Validation Chain:
-    1. Fast keyword filter (catches shallow/vague answers)
-    2. LLM semantic evaluation (if no keyword match)
+    Use 'mastery submit' instead - it auto-detects the justify stage and opens $EDITOR.
+    This command is maintained for backward compatibility only.
     
     Args:
-        answer: Your conceptual explanation
+        answer: Your answer to the conceptual question
     """
     # For testing: allow dependency injection via internal mechanism
     llm_service = None  # Will be initialized when needed
@@ -1275,10 +1274,10 @@ def submit_justification(answer: str):
 @app.command()
 def submit_fix():
     """
-    Submit and validate your Harden stage bug fix.
+    [DEPRECATED] Submit and validate your Harden stage bug fix.
     
-    Runs the validator against your debugged code, shows results,
-    and advances your progress if the fix is correct.
+    Use 'mastery submit' instead - it auto-detects the harden stage.
+    This command is maintained for backward compatibility only.
     """
     try:
         # Ensure shadow worktree exists
