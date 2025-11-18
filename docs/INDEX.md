@@ -48,6 +48,29 @@
 - [`coverage/CURRENT_REPORT.md`](./coverage/CURRENT_REPORT.md) - Detailed analysis
 - [`coverage/html/index.html`](./coverage/html/index.html) - Interactive report
 
+## 🔬 Quality Assurance
+
+**Module testing and validation**:
+
+### Two Sum Module QA
+Complete quality assurance documentation for the Two Sum (LC-1) module:
+- [`two_sum_qa/README.md`](./two_sum_qa/README.md) - QA overview and index
+- [`two_sum_qa/TWO_SUM_COMPLETION_SUMMARY.md`](./two_sum_qa/TWO_SUM_COMPLETION_SUMMARY.md) ⭐ Executive summary
+- [`two_sum_qa/TWO_SUM_FINAL_QUALITY_AUDIT.md`](./two_sum_qa/TWO_SUM_FINAL_QUALITY_AUDIT.md) - Production audit
+- [`two_sum_qa/TWO_SUM_E2E_WORKFLOW_TEST.md`](./two_sum_qa/TWO_SUM_E2E_WORKFLOW_TEST.md) - Test results
+- **Status:** ✅ Production ready (94/100)
+
+## 🤖 Automation
+
+**Module generation and tooling**:
+
+### Module Generation Project
+Documentation for automated module asset generation:
+- [`module_generation/README.md`](./module_generation/README.md) - Project overview and index
+- [`module_generation/MODULE_GENERATION_PROGRESS.md`](./module_generation/MODULE_GENERATION_PROGRESS.md) ⭐ Current status
+- [`module_generation/MODULE_GENERATION_COMPREHENSIVE_SUMMARY.md`](./module_generation/MODULE_GENERATION_COMPREHENSIVE_SUMMARY.md) - Phases 1-2
+- **Status:** Phases 1-3 complete (BUILD stage automation)
+
 ## 📦 Archive
 
 **Historical session reports** (for reference only):
@@ -91,7 +114,7 @@ Organized by date in `archive/sessions/`:
 
 ## 🔄 Maintenance
 
-Last documentation cleanup: 2025-11-17
+Last documentation cleanup: 2025-11-18
 
 To update this index:
 1. Add new documents to appropriate section
