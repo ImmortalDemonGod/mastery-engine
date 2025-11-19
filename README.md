@@ -16,34 +16,38 @@
 Experience the engine immediately without writing code. This demo uses **Developer Mode** (pre-loaded reference implementations) to simulate a user solving the curriculum.
 
 ```bash
-# 1. Install Dependencies
+# 1. Clone and Enter Repository
+git clone https://github.com/ImmortalDemonGod/mastery-engine.git
+cd mastery-engine
+
+# 2. Activate Developer Mode (REQUIRED: Creates cs336_basics symlink)
+./scripts/mode switch developer
+
+# 3. Install Dependencies
 pip install uv
 uv sync
 uv pip install -e .
 
-# 2. Activate Developer Mode (Pre-loads correct code)
-./scripts/mode switch developer
-
-# 3. Initialize a Curriculum
+# 4. Initialize a Curriculum
 uv run mastery init cs336_a1
 
-# 4. View Current Module
+# 5. View Current Module
 uv run mastery show
 # Output: Displays build prompt with problem description
 
-# 5. Run Build Validation (Watch the engine validate the reference implementation)
+# 6. Run Build Validation (Watch the engine validate the reference implementation)
 uv run mastery submit
 # Output: ✅ All tests passed! (25/25 test cases in 0.15s)
 
-# 6. Answer Justify Questions (Auto-passes in mock mode without OpenAI key)
+# 7. Answer Justify Questions (Auto-passes in mock mode without OpenAI key)
 uv run mastery submit
 # Output: 🎭 MOCK MODE: Auto-passing justify stage
 
-# 7. Inject Runtime Bug (Watch the engine mutate the code)
+# 8. Inject Runtime Bug (Watch the engine mutate the code)
 uv run mastery start-challenge
 # Output: 💉 Injecting semantic bug 'off_by_one_loop'...
 
-# 8. See the Bug Fail
+# 9. See the Bug Fail
 uv run mastery submit
 # Output: ❌ Test failed: Expected 8, got 7 (off-by-one error)
 ```
