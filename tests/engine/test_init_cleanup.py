@@ -322,5 +322,5 @@ class TestRequireShadowWorktree:
         assert result.exit_code == 1
         # Normalize output (remove newlines from Rich panels)
         normalized = result.stdout.replace('\n', ' ')
-        assert "INITIALIZATION ERROR" in normalized or "ERROR" in normalized
-        assert "Git command failed" in normalized or "failed" in normalized
+        assert "Not Initialized" in normalized or "INITIALIZATION" in normalized
+        assert "init" in normalized  # Should mention init command
