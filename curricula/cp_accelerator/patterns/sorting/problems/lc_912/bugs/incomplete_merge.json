@@ -1,0 +1,46 @@
+{
+  "id": "sorting-incomplete-merge",
+  "description": "Removes the result.extend(right[j:]) statement that appends remaining right array elements, causing missing elements in sorted output",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "merge",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Delete the result.extend(right[j:]) statement",
+      "pattern": {
+        "node_type": "Expr",
+        "value": {
+          "node_type": "Call",
+          "func": {
+            "node_type": "Attribute",
+            "attr": "extend",
+            "value": {
+              "node_type": "Name",
+              "id": "result"
+            }
+          },
+          "args": [
+            {
+              "node_type": "Subscript",
+              "value": {
+                "node_type": "Name",
+                "id": "right"
+              }
+            }
+          ]
+        }
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-16",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "simple"
+  }
+}

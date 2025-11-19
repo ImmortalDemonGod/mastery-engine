@@ -1,0 +1,22 @@
+Wrong Answer on Test 3
+
+Input: nums = [3, 3], target = 6
+Expected: [0, 1]
+Got: [0, 0]
+
+Symptom: Your solution returns the same index twice instead of two different indices.
+
+This happens when you check if the complement exists in your hash table AFTER 
+inserting the current element. When nums[i] * 2 equals the target, the complement
+equals the current element, and you incorrectly find it at the same index.
+
+Example walkthrough for the bug:
+- i = 0, nums[0] = 3, target = 6
+- Insert: seen[3] = 0
+- Compute complement: 6 - 3 = 3
+- Check: 3 in seen? YES, at index 0
+- Return [0, 0]  ← WRONG! This uses the same element twice
+
+Debug hint: Should you check for the complement BEFORE or AFTER inserting the 
+current element into the hash table? Think about what happens when the complement
+equals the current number.

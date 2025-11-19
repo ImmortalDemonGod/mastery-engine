@@ -1,0 +1,57 @@
+{
+  "id": "two-sum-insert-before-check",
+  "description": "Inserts the current element into the hash table BEFORE checking for the complement, allowing the same element to be used twice (returning [i, i] when nums[i] * 2 == target)",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "twoSum",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Swap the order of hash table insertion and complement check, causing same-index bug",
+      "pattern": {
+        "node_type": "If",
+        "test": {
+          "node_type": "Compare",
+          "left": {
+            "node_type": "Name",
+            "id": "complement"
+          },
+          "ops": [
+            {
+              "node_type": "In"
+            }
+          ],
+          "comparators": [
+            {
+              "node_type": "Name",
+              "id": "seen"
+            }
+          ]
+        }
+      },
+      "replacement": {
+        "type": "move_after",
+        "target_node": {
+          "node_type": "Assign",
+          "targets": [
+            {
+              "node_type": "Subscript",
+              "value": {
+                "node_type": "Name",
+                "id": "seen"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-18",
+    "version": "2.1",
+    "author": "Generated (CP Accelerator)",
+    "tier": "subtle",
+    "note": "This is a classic off-by-one style bug where order of operations matters. The correct approach is to check for the complement BEFORE inserting the current element."
+  }
+}

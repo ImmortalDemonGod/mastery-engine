@@ -1,0 +1,96 @@
+# Build Challenge: Number of Islands
+
+## Pattern Overview
+
+> Union Find (Disjoint Set Union) efficiently manages dynamic connectivity in a collection of elements, supporting near-constant time union and find operations.
+
+## Problem Statement
+
+Given an `m x n` 2D binary grid `grid` which represents a map of `'1'`s (land) and `'0'`s (water), return the number of islands.
+An **island** is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. You may assume all four edges of the grid are all surrounded by water.
+ 
+**Example 1:**
+
+```
+
+**Input:** grid = [
+ ["1","1","1","1","0"],
+ ["1","1","0","1","0"],
+ ["1","1","0","0","0"],
+ ["0","0","0","0","0"]
+]
+**Output:** 1
+
+```
+
+**Example 2:**
+
+```
+
+**Input:** grid = [
+ ["1","1","0","0","0"],
+ ["1","1","0","0","0"],
+ ["0","0","1","0","0"],
+ ["0","0","0","1","1"]
+]
+**Output:** 3
+
+```
+
+**Constraints:**
+
+- `m == grid.length`
+- `n == grid[i].length`
+- `1 <= m, n <= 300`
+- `grid[i][j]` is `'0'` or `'1'`.
+
+**Difficulty:** Medium | **Acceptance Rate:** 63.3%  
+**Topics:** Array, Depth-First Search, Breadth-First Search, Union Find, Matrix
+
+**Problem Link:** https://leetcode.com/problems/number-of-islands/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/number-of-islands/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. https://www.youtube.com/watch?v=kPRA0W1kECg
+
+2. https://www.geeksforgeeks.org/sorting-algorithms/
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```
