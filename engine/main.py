@@ -37,7 +37,7 @@ load_dotenv(override=True)
 from engine.state import StateManager, StateFileCorruptedError
 from engine.curriculum import CurriculumManager, CurriculumNotFoundError, CurriculumInvalidError
 from engine.workspace import WorkspaceManager, PatchApplicationError
-from engine.schemas import UserProgress
+from engine.schemas import UserProgress, CurriculumType
 from engine.validator import (
     ValidationSubsystem,
     ValidatorNotFoundError,
@@ -1652,13 +1652,23 @@ def init(
         
         # Success!
         console.print()
+        
+        # Build context-aware success message
+        if manifest.type == CurriculumType.LIBRARY:
+            content_summary = f"Patterns: {len(manifest.patterns)}"
+            next_step = "Run [bold cyan]mastery status[/bold cyan] to see available patterns, then [bold cyan]mastery select <pattern> <problem>[/bold cyan]"
+        else:
+            content_summary = f"Modules: {len(manifest.modules)}"
+            next_step = "Run [bold cyan]mastery show[/bold cyan] to see your first challenge"
+        
         console.print(Panel(
             f"[bold green]✓ Initialization Complete![/bold green]\n\n"
             f"Curriculum: [bold]{manifest.curriculum_name}[/bold]\n"
-            f"Modules: {len(manifest.modules)}\n\n"
+            f"Type: {manifest.type.value.upper()}\n"
+            f"{content_summary}\n\n"
             f"Shadow worktree created at: [cyan]{SHADOW_WORKTREE_DIR}[/cyan]\n\n"
             f"You are now ready to begin learning!\n\n"
-            f"Next step: Run [bold cyan]engine next[/bold cyan] to see your first challenge.",
+            f"Next step: {next_step}",
             title="🎓 Mastery Engine Ready",
             border_style="green"
         ))
@@ -2066,6 +2076,257 @@ def cleanup():
         sys.exit(1)
 
 
+def _show_linear_status(progress: UserProgress, manifest) -> None:
+    """Display status for LINEAR curriculum (legacy modules mode)."""
+    # Determine current module
+    if progress.current_module_index < len(manifest.modules):
+        current_module = manifest.modules[progress.current_module_index]
+        module_display = f"{current_module.name} ({progress.current_module_index + 1}/{len(manifest.modules)})"
+    else:
+        module_display = "All modules completed! 🎉"
+    
+    # Create status table
+    table = Table(title="🎓 Mastery Engine Progress", show_header=False, title_style="bold cyan")
+    table.add_column("Field", style="bold")
+    table.add_column("Value")
+    
+    table.add_row("Curriculum", manifest.curriculum_name)
+    table.add_row("Type", "Linear")
+    table.add_row("Author", manifest.author)
+    table.add_row("Version", manifest.version)
+    table.add_row("Current Module", module_display)
+    table.add_row("Current Stage", progress.current_stage.upper())
+    table.add_row("Completed Modules", str(len(progress.completed_modules)))
+    
+    console.print()
+    console.print(table)
+    console.print()
+    
+    # Show next action hint
+    if progress.current_module_index < len(manifest.modules):
+        if progress.current_stage == "build":
+            hint = "Run [bold cyan]mastery show[/bold cyan] to see the build prompt"
+        elif progress.current_stage == "justify":
+            hint = "Run [bold cyan]mastery submit[/bold cyan] to answer the justify questions"
+        elif progress.current_stage == "harden":
+            hint = "Run [bold cyan]mastery start-challenge[/bold cyan] to begin the harden challenge"
+        else:
+            hint = "Unknown stage"
+        
+        console.print(Panel(hint, title="Next Action", border_style="green"))
+
+
+def _show_library_status(progress: UserProgress, manifest, curr_mgr: CurriculumManager) -> None:
+    """Display status for LIBRARY curriculum (patterns/problems mode)."""
+    # Check if user has selected a problem
+    if progress.active_problem_id is None:
+        # Show pattern overview
+        console.print()
+        console.print(f"[bold cyan]📚 {manifest.curriculum_name}[/bold cyan] - Library Mode")
+        console.print(f"[dim]{manifest.description if hasattr(manifest, 'description') else 'Pattern-based problem library'}[/dim]")
+        console.print()
+        
+        # Create patterns summary table
+        table = Table(title="Available Patterns", show_header=True, title_style="bold green")
+        table.add_column("Pattern", style="bold")
+        table.add_column("Progress", justify="right")
+        table.add_column("Status", justify="center")
+        
+        for pattern in manifest.patterns:
+            total = len(pattern.problems)
+            completed = sum(1 for p in pattern.problems if f"{pattern.id}/{p.id}" in progress.completed_problems)
+            
+            if pattern.id in progress.completed_patterns:
+                theory_status = "✓"
+            else:
+                theory_status = "○"
+            
+            progress_str = f"{completed}/{total}"
+            status = "✅" if completed == total else "🔵" if completed > 0 else "⚪"
+            
+            table.add_row(
+                f"{pattern.title} ({pattern.id})",
+                f"{progress_str} {theory_status}",
+                status
+            )
+        
+        console.print(table)
+        console.print()
+        console.print(Panel(
+            "[bold]Next Steps:[/bold]\n\n"
+            "1. Select a problem: [cyan]mastery select <pattern> <problem>[/cyan]\n"
+            "   Example: [cyan]mastery select sorting lc_912[/cyan]\n\n"
+            "Legend: ✓=Theory Complete  ○=Theory Pending  ✅=All Done  🔵=In Progress  ⚪=Not Started",
+            title="Getting Started",
+            border_style="green"
+        ))
+        console.print()
+    
+    else:
+        # Show active problem context
+        problem_lookup = curr_mgr.get_problem_metadata(progress.active_problem_id)
+        if problem_lookup is None:
+            console.print(Panel(
+                f"[bold yellow]Warning[/bold yellow]\n\n"
+                f"Active problem '{progress.active_problem_id}' not found in manifest.\n"
+                f"Use [cyan]mastery select[/cyan] to choose a different problem.",
+                title="INVALID STATE",
+                border_style="yellow"
+            ))
+            return
+        
+        pattern_id, problem_meta = problem_lookup
+        pattern_meta = curr_mgr.get_pattern_metadata(pattern_id)
+        
+        # Create context table
+        table = Table(title="🎯 Active Problem", show_header=False, title_style="bold cyan")
+        table.add_column("Field", style="bold")
+        table.add_column("Value")
+        
+        table.add_row("Curriculum", manifest.curriculum_name)
+        table.add_row("Type", "Library")
+        table.add_row("Pattern", f"{pattern_meta.title} ({pattern_id})")
+        table.add_row("Problem", f"{problem_meta.title} ({progress.active_problem_id})")
+        table.add_row("Difficulty", problem_meta.difficulty)
+        table.add_row("Current Stage", progress.current_stage.upper())
+        
+        # Theory status
+        theory_status = "✓ Complete" if pattern_id in progress.completed_patterns else "○ Pending"
+        table.add_row("Pattern Theory", theory_status)
+        
+        # Problem status
+        problem_key = f"{pattern_id}/{progress.active_problem_id}"
+        problem_status = "✅ Complete" if problem_key in progress.completed_problems else "🔵 In Progress"
+        table.add_row("Problem Status", problem_status)
+        
+        console.print()
+        console.print(table)
+        console.print()
+        
+        # Show next action hint
+        if progress.current_stage == "build":
+            hint = "Run [bold cyan]mastery show[/bold cyan] to see the build prompt"
+        elif progress.current_stage == "justify":
+            if pattern_id not in progress.completed_patterns:
+                hint = "Run [bold cyan]mastery show[/bold cyan] to see pattern theory questions"
+            else:
+                hint = "Pattern theory complete. Advancing to Harden stage..."
+        elif progress.current_stage == "harden":
+            hint = "Run [bold cyan]mastery start-challenge[/bold cyan] to begin the harden challenge"
+        else:
+            hint = f"Run [bold cyan]mastery submit[/bold cyan] to proceed"
+        
+        console.print(Panel(hint, title="Next Action", border_style="green"))
+
+
+@app.command()
+def select(
+    pattern: str = typer.Argument(..., help="Pattern ID (e.g., 'sorting', 'hash_table')"),
+    problem: str = typer.Argument(..., help="Problem ID (e.g., 'lc_912', 'lc_1')")
+):
+    """
+    Select a problem to work on (LIBRARY mode only).
+    
+    This command sets the active pattern and problem, resetting you to the Build stage.
+    Use this to start a new problem or switch between problems.
+    
+    Example:
+        mastery select sorting lc_912
+    """
+    try:
+        # Ensure shadow worktree exists
+        require_shadow_worktree()
+        
+        # Load state and curriculum
+        state_mgr = StateManager()
+        curr_mgr = CurriculumManager()
+        
+        progress = state_mgr.load()
+        manifest = curr_mgr.load_manifest(progress.curriculum_id)
+        
+        # Verify this is a LIBRARY curriculum
+        if manifest.type != CurriculumType.LIBRARY:
+            console.print(Panel(
+                f"[bold yellow]Not Applicable[/bold yellow]\n\n"
+                f"The 'select' command is only available for LIBRARY curricula.\n"
+                f"Current curriculum '{manifest.curriculum_name}' is type: {manifest.type}\n\n"
+                f"For LINEAR curricula, use [cyan]mastery next[/cyan] to progress through modules.",
+                title="LIBRARY MODE ONLY",
+                border_style="yellow"
+            ))
+            sys.exit(1)
+        
+        # Validate pattern exists
+        pattern_meta = curr_mgr.get_pattern_metadata(pattern)
+        if pattern_meta is None:
+            console.print(Panel(
+                f"[bold red]Pattern Not Found[/bold red]\n\n"
+                f"Pattern '{pattern}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                f"Use [cyan]mastery list[/cyan] to see available patterns.",
+                title="INVALID PATTERN",
+                border_style="red"
+            ))
+            sys.exit(1)
+        
+        # Validate problem exists
+        problem_lookup = curr_mgr.get_problem_metadata(problem)
+        if problem_lookup is None:
+            console.print(Panel(
+                f"[bold red]Problem Not Found[/bold red]\n\n"
+                f"Problem '{problem}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                f"Use [cyan]mastery list {pattern}[/cyan] to see available problems in this pattern.",
+                title="INVALID PROBLEM",
+                border_style="red"
+            ))
+            sys.exit(1)
+        
+        resolved_pattern, problem_meta = problem_lookup
+        
+        # Update progress state
+        progress.active_pattern_id = pattern
+        progress.active_problem_id = problem
+        progress.current_stage = "build"
+        state_mgr.save(progress)
+        
+        # Display confirmation
+        console.print()
+        console.print(Panel(
+            f"[bold green]Problem Selected[/bold green]\n\n"
+            f"[bold]Pattern:[/bold] {pattern_meta.title}\n"
+            f"[bold]Problem:[/bold] {problem_meta.title} ({problem_meta.difficulty})\n"
+            f"[bold]Stage:[/bold] Build\n\n"
+            f"Run [cyan]mastery show[/cyan] to see the build prompt.",
+            title="✓ SELECTION CONFIRMED",
+            border_style="green"
+        ))
+        console.print()
+        
+    except StateFileCorruptedError as e:
+        console.print(Panel(
+            f"[bold red]State File Corrupted[/bold red]\n\n{str(e)}\n\n"
+            f"You may need to delete {StateManager.STATE_FILE} and start over.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except CurriculumNotFoundError as e:
+        console.print(Panel(
+            f"[bold red]Curriculum Not Found[/bold red]\n\n{str(e)}",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Unexpected error in select command")
+        console.print(Panel(
+            f"[bold red]Unexpected Error[/bold red]\n\n{str(e)}\n\n"
+            f"Check the log file at {Path.home() / '.mastery_engine.log'} for details.",
+            title="ENGINE ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
 @app.command()
 def status():
     """
@@ -2085,41 +2346,11 @@ def status():
         progress = state_mgr.load()
         manifest = curr_mgr.load_manifest(progress.curriculum_id)
         
-        # Determine current module
-        if progress.current_module_index < len(manifest.modules):
-            current_module = manifest.modules[progress.current_module_index]
-            module_display = f"{current_module.name} ({progress.current_module_index + 1}/{len(manifest.modules)})"
+        # Route based on curriculum type
+        if manifest.type == CurriculumType.LIBRARY:
+            _show_library_status(progress, manifest, curr_mgr)
         else:
-            module_display = "All modules completed! 🎉"
-        
-        # Create status table
-        table = Table(title="🎓 Mastery Engine Progress", show_header=False, title_style="bold cyan")
-        table.add_column("Field", style="bold")
-        table.add_column("Value")
-        
-        table.add_row("Curriculum", manifest.curriculum_name)
-        table.add_row("Author", manifest.author)
-        table.add_row("Version", manifest.version)
-        table.add_row("Current Module", module_display)
-        table.add_row("Current Stage", progress.current_stage.upper())
-        table.add_row("Completed Modules", str(len(progress.completed_modules)))
-        
-        console.print()
-        console.print(table)
-        console.print()
-        
-        # Show next action hint
-        if progress.current_module_index < len(manifest.modules):
-            if progress.current_stage == "build":
-                hint = "Run [bold cyan]engine next[/bold cyan] to see the build prompt"
-            elif progress.current_stage == "justify":
-                hint = "Run [bold cyan]engine submit-justify[/bold cyan] to answer the justify questions"
-            elif progress.current_stage == "harden":
-                hint = "Run [bold cyan]engine submit-harden[/bold cyan] to fix the injected bug"
-            else:
-                hint = "Unknown stage"
-            
-            console.print(Panel(hint, title="Next Action", border_style="green"))
+            _show_linear_status(progress, manifest)
         
     except StateFileCorruptedError as e:
         console.print(Panel(
