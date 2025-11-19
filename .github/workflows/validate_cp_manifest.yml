@@ -28,6 +28,14 @@ jobs:
       - name: Install uv
         run: pip install uv
       
+      - name: Create cs336_basics symlink (required for package install)
+        run: |
+          echo "Creating cs336_basics symlink for CI..."
+          ln -s modes/student/cs336_basics cs336_basics
+      
+      - name: Install dependencies
+        run: uv sync
+      
       - name: Validate canonical curriculum
         run: |
           echo "🔍 Validating canonical_curriculum.json..."
@@ -65,7 +73,7 @@ jobs:
           MODULE_ERRORS=0
           
           # Read module IDs from manifest
-          MODULE_IDS=$(uv run python -c "
+          MODULE_IDS=$(python -c "
           import json
           with open('curricula/cp_accelerator/manifest.json') as f:
               manifest = json.load(f)
@@ -101,10 +109,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
       - name: Validate canonical_curriculum.json structure
         run: |
           echo "🔍 Validating canonical_curriculum.json structure..."
-          uv run python -c "
+          python -c "
           import json
           import sys
           
@@ -141,7 +154,7 @@ jobs:
       - name: Validate manifest.json against engine schema
         run: |
           echo "🔍 Validating manifest.json against Mastery Engine schema..."
-          uv run python -c "
+          python -c "
           import json
           import sys
           
@@ -176,10 +189,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
       - name: Generate dependency graph report
         run: |
           echo "📊 Generating dependency graph analysis..."
-          uv run python -c "
+          python -c "
           import json
           from collections import defaultdict, deque
           
