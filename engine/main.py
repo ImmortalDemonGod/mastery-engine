@@ -19,6 +19,7 @@ for backward compatibility.
 """
 
 import sys
+import os
 import json
 import logging
 from pathlib import Path
@@ -2014,6 +2015,19 @@ def init(
             capture_output=True
         )
         logger.info(f"Created shadow worktree at {SHADOW_WORKTREE_DIR}")
+        
+        # 5a. Recreate cs336_basics symlink in shadow worktree (if it exists in main repo)
+        # Git worktrees don't automatically copy symlinks, so we must recreate them
+        cs336_symlink = Path("cs336_basics")
+        if cs336_symlink.is_symlink():
+            # Read the symlink target from main repo
+            symlink_target = os.readlink(cs336_symlink)
+            
+            # Create the same symlink in shadow worktree
+            shadow_symlink = SHADOW_WORKTREE_DIR / "cs336_basics"
+            if not shadow_symlink.exists():
+                os.symlink(symlink_target, shadow_symlink)
+                logger.info(f"Recreated cs336_basics symlink in shadow worktree → {symlink_target}")
         
         # 5b. Sync uncommitted changes to shadow worktree (prevents "time travel" bug)
         if has_uncommitted:
