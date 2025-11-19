@@ -10,8 +10,8 @@
 
 ✅ **PASSED** - All Quick Start instructions now work correctly from scratch.
 
-**Issues Found:** 2 critical bugs  
-**Issues Fixed:** 2 critical bugs  
+**Issues Found:** 3 critical bugs  
+**Issues Fixed:** 3 critical bugs  
 **Final Status:** Production ready
 
 ---
@@ -124,6 +124,70 @@ lrwxr-xr-x  1 user  wheel  28 Nov 19 14:59 cs336_basics -> modes/developer/cs336
 
 ---
 
+### ❌ Issue #3: Justify Stage Froze Instead of Auto-Passing (CRITICAL)
+
+**Symptom:**
+```bash
+$ uv run mastery submit
+# After build stage passes, justify stage should auto-pass
+# README claims: "Auto-passes in mock mode without OpenAI key"
+# ACTUAL: Opens $EDITOR (vim/nano) and FREEZES waiting for user input
+```
+
+**Root Cause:**  
+The `_submit_justify_stage()` handler checked mock mode AFTER opening the editor, not before.
+
+**Flow (Broken):**
+1. Line 286: Opens `$EDITOR` ← **Blocks here!**
+2. Waits for user to type answer
+3. Line 344: Creates `LLMService()` 
+4. Line 349: Calls `evaluate_justification()` which HAS mock logic
+5. **Never reached** - user stuck in editor
+
+**The Problem:**
+- `LLMService.evaluate_justification()` HAD mock mode auto-pass logic
+- But `_submit_justify_stage()` opened editor BEFORE calling it
+- README promised "auto-pass" but users got frozen in editor
+
+**Fix Applied:**  
+✅ Commit `bea63b5` - Check mock mode BEFORE opening editor
+
+**Implementation:**
+```python
+# Line 270 in _submit_justify_stage()
+llm_service = LLMService()  # Check mode first
+if llm_service.use_mock:
+    # Auto-pass immediately WITHOUT opening editor
+    console.print(Panel("🎭 MOCK MODE: Auto-passing..."))
+    progress.mark_stage_complete("justify")
+    return True
+
+# Line 305: Only reached if NOT in mock mode
+editor = os.getenv('EDITOR', 'nano')  # Production path
+# ... open editor and evaluate with LLM
+```
+
+**Why This Works:**
+- Mock mode check happens FIRST
+- Editor only opens in production mode (with API key)
+- README promise now matches actual behavior
+- Strangers testing repo won't freeze
+
+**Verification:**
+```bash
+$ uv run mastery submit
+╭────────────────── ✓ Justify Stage (Mock Mode) ──────────────────╮
+│ 🎭 MOCK MODE: No OpenAI API key detected                        │
+│ Justify stage auto-passing for demonstration purposes.          │
+│ ...                                                              │
+╰──────────────────────────────────────────────────────────────────╯
+
+Next step: Debug a buggy implementation.
+✅ Immediate completion - NO editor freeze
+```
+
+---
+
 ## Test Results - Step by Step
 
 ### ✅ Step 1: Clone Repository
@@ -206,20 +270,32 @@ Performance: 6.493 seconds
 ✅ SUCCESS - Validator found cs336_basics in shadow worktree
 ```
 
-### ⚠️ Step 7: Justify Stage (Interactive - Not Tested)
+### ✅ Step 7: Justify Stage (Auto-Pass in Mock Mode)
 
-**Status:** Blocked on user input (expected behavior)
+**Status:** ✅ SUCCESS - Auto-passes without editor in mock mode
 
-The justify stage opens `$EDITOR` for interactive question answering. This is correct behavior but blocks automated testing.
-
-**What happens:**
 ```bash
 $ uv run mastery submit
-# Opens editor (vim/nano/etc) waiting for user to answer questions
-# Terminal blocks until editor closes
+╭──────────────────────── ✓ Justify Stage (Mock Mode) ─────────────────────╮
+│ 🎭 MOCK MODE: No OpenAI API key detected                                 │
+│                                                                           │
+│ Justify stage auto-passing for demonstration purposes.                   │
+│                                                                           │
+│ In production mode (with OPENAI_API_KEY set):                            │
+│ • You would answer conceptual questions in your $EDITOR                  │
+│ • GPT-4o would evaluate your understanding                               │
+│ • Socratic feedback would guide your learning                            │
+│                                                                           │
+│ Question: Justify the subtract-max trick in your softmax...              │
+│                                                                           │
+│ To enable real LLM evaluation, set OPENAI_API_KEY environment variable.  │
+╰───────────────────────────────────────────────────────────────────────────╯
+
+Next step: Debug a buggy implementation.
+✅ SUCCESS - No editor freeze, immediate completion
 ```
 
-This is **intentional** - the justify stage requires human input. Cannot be tested non-interactively without mocking.
+**Fixed in commit `bea63b5`** - Previously froze waiting for editor input
 
 ---
 
@@ -229,6 +305,7 @@ This is **intentional** - the justify stage requires human input. Cannot be test
 |--------|-------------|--------|
 | `4922ed3` | Fix README instruction order | README now works from scratch |
 | `1558497` | Recreate symlink in shadow worktree | Validators can now run |
+| `bea63b5` | Auto-pass justify stage in mock mode | No editor freeze, true auto-pass |
 
 ---
 
@@ -244,10 +321,10 @@ This is **intentional** - the justify stage requires human input. Cannot be test
 | Symlink in worktree | ✅ PASS | Automatically recreated |
 | View module | ✅ PASS | Build prompt displays |
 | Build validation | ✅ PASS | Tests run successfully |
-| Justify stage | ⚠️ INTERACTIVE | Requires editor input (expected) |
+| Justify stage | ✅ PASS | Auto-passes in mock mode (was broken) |
 
-**Pass Rate:** 8/8 automated steps (100%)  
-**Critical Bugs Fixed:** 2/2  
+**Pass Rate:** 9/9 automated steps (100%)  
+**Critical Bugs Fixed:** 3/3  
 **Status:** ✅ PRODUCTION READY
 
 ---
