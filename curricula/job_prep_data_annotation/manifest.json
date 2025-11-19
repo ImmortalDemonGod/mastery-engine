@@ -1,0 +1,41 @@
+{
+  "curriculum_name": "job_prep_data_annotation",
+  "author": "Mastery Engine Curriculum Team",
+  "version": "1.0.0",
+  "description": "Surgical Python training for DataAnnotation coding assessments: HTTP requests, HTML parsing, and 2D grid manipulation",
+  "modules": [
+    {
+      "id": "http_transport",
+      "name": "HTTP Requests & Error Handling",
+      "path": "modules/http_transport",
+      "baseline_perf_seconds": 0.10,
+      "dependencies": [],
+      "metadata": {
+        "source": "30_days_28_API + 30_days_22_Web_scraping",
+        "failure_mode": "Confusing file I/O with network I/O (open() vs requests.get())"
+      }
+    },
+    {
+      "id": "data_parsing_extraction",
+      "name": "Robust HTML Parsing with BeautifulSoup & Regex",
+      "path": "modules/data_parsing_extraction",
+      "baseline_perf_seconds": 0.15,
+      "dependencies": ["http_transport"],
+      "metadata": {
+        "source": "30_days_22_Web_scraping + 30_days_18_Regex",
+        "failure_mode": "Brittle string.split() parsers that break on whitespace variations"
+      }
+    },
+    {
+      "id": "grid_visualization",
+      "name": "2D Grid Initialization & Coordinate Mapping",
+      "path": "modules/grid_visualization",
+      "baseline_perf_seconds": 0.12,
+      "dependencies": ["data_parsing_extraction"],
+      "metadata": {
+        "source": "30_days_13_List_comprehension",
+        "failure_mode": "Reference copying bug: [[' '] * w] * h creates aliased rows"
+      }
+    }
+  ]
+}

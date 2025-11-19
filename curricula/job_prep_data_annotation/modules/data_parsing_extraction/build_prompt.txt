@@ -1,0 +1,126 @@
+# Build Challenge: Data Parsing & Extraction
+
+## Learning Objective
+Master robust extraction of structured data from unstructured HTML using **BeautifulSoup** and **regular expressions**. Understand why naive string manipulation (`split()`) is fragile and how to build parsers that handle real-world data variations.
+
+## Problem Statement
+You are building a coordinate extractor for a web scraping pipeline. Given raw HTML containing coordinate data in `<span>` tags, you must extract the x, y coordinates and character values.
+
+### Example Input HTML
+```html
+<div>
+  <span>x=10, y=5, char=A</span>
+  <span>x = 20, y= 10, char = B</span>
+  <span>x=30,y=15,char=C</span>
+</div>
+```
+
+Note the **inconsistent formatting**: Sometimes there are spaces around `=`, sometimes not. This is real-world data.
+
+## Specification
+
+Implement the following function in `cs336_basics/utils.py`:
+
+```python
+def extract_coordinates(html: str) -> list[tuple[int, int, str]]:
+    """
+    Extract coordinate data from HTML spans using BeautifulSoup and regex.
+    
+    Args:
+        html: Raw HTML string containing <span> tags with coordinate data
+    
+    Returns:
+        List of tuples: [(x, y, char), ...] where x and y are integers
+        Example: [(10, 5, 'A'), (20, 10, 'B')]
+    
+    Raises:
+        ValueError: If HTML is empty or malformed
+    """
+```
+
+### Requirements
+1. **Parse HTML**: Use `BeautifulSoup(html, 'html.parser')` to parse the HTML
+2. **Find All Spans**: Use `soup.find_all('span')` to locate all coordinate spans
+3. **Regex Extraction**: For each span's text, use `re.search()` or `re.findall()` to extract:
+   - `x=(\d+)` - Captures the x coordinate
+   - `y=(\d+)` - Captures the y coordinate  
+   - `char=([A-Za-z])` - Captures the character
+4. **Return**: List of tuples `[(x, y, char), ...]` sorted by x coordinate
+
+### Critical BeautifulSoup Syntax
+```python
+from bs4 import BeautifulSoup
+import re
+
+# 1. Parse HTML
+soup = BeautifulSoup(html, 'html.parser')
+
+# 2. Find all elements with specific tag
+spans = soup.find_all('span')  # Returns list of Tag objects
+
+# 3. Extract text from each tag
+for span in spans:
+    text = span.get_text()  # Or span.text
+    # text is now a string like "x=10, y=5, char=A"
+    
+    # 4. Use regex to extract structured data
+    x_match = re.search(r'x\s*=\s*(\d+)', text)
+    x = int(x_match.group(1))  # group(1) is the captured number
+```
+
+### Example Usage
+```python
+html = """
+<div>
+  <span>x=10, y=5, char=A</span>
+  <span>x = 20, y= 10, char = B</span>
+</div>
+"""
+
+coords = extract_coordinates(html)
+assert coords == [(10, 5, 'A'), (20, 10, 'B')]
+```
+
+## Why Not Just Use `split()`?
+
+Consider this **brittle** approach:
+```python
+text = "x=10, y=5, char=A"
+parts = text.split(',')  # ['x=10', ' y=5', ' char=A']
+x = int(parts[0].split('=')[1])  # Works
+```
+
+**Problem**: This breaks when the data has variations:
+- `"x = 10, y = 5"` (spaces around `=`)
+- `"x=10,y=5"` (no spaces after commas)
+- `"x= 10"` (space after `=`)
+
+### Regex Solution
+```python
+import re
+match = re.search(r'x\s*=\s*(\d+)', text)
+x = int(match.group(1))  # Handles all spacing variations
+```
+
+The `\s*` pattern matches zero or more whitespace characters, making the parser **robust**.
+
+## Testing Your Implementation
+```bash
+mastery submit
+```
+
+The validator tests:
+- Consistent formatting (no spaces)
+- Inconsistent formatting (varied spacing)
+- Multiple coordinates (10+ spans)
+- Edge cases (single coordinate, empty HTML)
+
+## Resources
+- [BeautifulSoup Documentation](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+- [Python Regex Tutorial](https://docs.python.org/3/howto/regex.html)
+- [Regex Tester Tool](https://regex101.com/)
+- Source: 30 Days of Python - Day 18 (Regex), Day 22 (Web Scraping)
+
+---
+
+**Success Criterion**: Your parser must handle all formatting variations without breaking.

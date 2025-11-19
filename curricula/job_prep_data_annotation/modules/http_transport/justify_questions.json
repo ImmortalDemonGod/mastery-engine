@@ -1,0 +1,56 @@
+{
+  "questions": [
+    {
+      "id": "q1_io_boundary",
+      "question": "Why does `open('http://example.com')` raise a `FileNotFoundError` in Python? Explain the fundamental difference between file I/O and network I/O.",
+      "model_answer": "The `open()` function is designed for file system operations and expects a file path on the local disk. When you pass a URL like 'http://example.com', Python treats it as a literal file path and tries to find a file with that name on your filesystem, which doesn't exist. Network I/O requires establishing a TCP socket connection, sending HTTP requests, and parsing responses - completely different protocols than file system operations. The `requests` library abstracts these network operations, while `open()` only handles file descriptors.",
+      "failure_modes": [
+        "URLs are just strings",
+        "open() can read anything",
+        "it's the same as reading a file",
+        "just need to add http://"
+      ],
+      "required_concepts": [
+        "file descriptor",
+        "socket",
+        "TCP",
+        "HTTP protocol",
+        "network layer"
+      ]
+    },
+    {
+      "id": "q2_requests_vs_urllib",
+      "question": "Why is the `requests` library preferred over `urllib` for HTTP operations in production code? Provide at least two technical reasons.",
+      "model_answer": "`requests` is preferred because: (1) It provides automatic status code validation via `raise_for_status()`, whereas `urllib` requires manual checking of `getcode()`. (2) It handles connection pooling and session management automatically, improving performance for multiple requests. (3) The API is more Pythonic - `requests.get(url)` vs `urllib.request.urlopen(url).read().decode()`. (4) Better error handling with specific exception types instead of generic URLErrors.",
+      "failure_modes": [
+        "they're the same thing",
+        "urllib is newer",
+        "requests is just a wrapper",
+        "no real difference"
+      ],
+      "required_concepts": [
+        "status code validation",
+        "connection pooling",
+        "API design",
+        "exception hierarchy"
+      ]
+    },
+    {
+      "id": "q3_raise_for_status",
+      "question": "What does `response.raise_for_status()` do, and why is it critical for robust error handling? What would happen if you omitted it?",
+      "model_answer": "`raise_for_status()` checks the HTTP status code and raises an `HTTPError` exception if the status indicates a client error (4xx) or server error (5xx). Without it, a 404 or 500 response would appear 'successful' because the network request itself succeeded - you'd get a response object with empty or error HTML content. This is critical because HTTP requests can technically 'succeed' (no network errors) while logically 'failing' (the resource doesn't exist or the server crashed). Omitting this check leads to silent failures where your program processes error pages as if they were valid data.",
+      "failure_modes": [
+        "status codes don't matter",
+        "200 is the only code",
+        "exceptions are bad practice",
+        "just check if response exists"
+      ],
+      "required_concepts": [
+        "HTTP status code semantics",
+        "4xx vs 5xx errors",
+        "exception-based error handling",
+        "fail-fast principle"
+      ]
+    }
+  ]
+}

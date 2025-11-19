@@ -1,0 +1,55 @@
+{
+  "questions": [
+    {
+      "id": "q1_split_brittleness",
+      "question": "Why is using `text.split(',')` followed by `split('=')` considered brittle for parsing coordinate data? What specific real-world variations would break this approach?",
+      "model_answer": "The split() approach is brittle because it assumes exact formatting: specifically, that delimiters (commas and equals signs) have no surrounding whitespace. Real-world data has variations like 'x = 10' (space before/after =), 'x=10,y=5' (no space after comma), or 'x= 10' (space only after =). Each variation changes the split() results: 'x = 10'.split('=') gives ['x ', ' 10'] with spaces that must be stripped, but if you forget to strip, int() fails. Regex patterns like r'x\\s*=\\s*(\\d+)' handle all these cases uniformly by matching optional whitespace (\\s*).",
+      "failure_modes": [
+        "split always works",
+        "data is always formatted the same",
+        "just add strip()",
+        "whitespace doesn't matter"
+      ],
+      "required_concepts": [
+        "whitespace handling",
+        "regex flexibility",
+        "production data quality",
+        "defensive programming"
+      ]
+    },
+    {
+      "id": "q2_regex_robustness",
+      "question": "Explain how the regex pattern `r'x\\s*=\\s*(\\d+)'` provides robustness. What does each component (\\s*, \\d+, capturing group) accomplish?",
+      "model_answer": "The pattern breaks down as: (1) `x` - literal match for the character 'x', (2) `\\s*` - matches zero or more whitespace characters (spaces, tabs) before the equals sign, (3) `=` - literal equals sign, (4) `\\s*` - matches zero or more whitespace after the equals, (5) `(\\d+)` - capturing group that matches one or more digits. The \\s* components are critical: they make the pattern work regardless of spacing. Without them, 'x = 10' would fail to match 'x=\\d+'. The capturing group (parentheses) extracts just the number, so match.group(1) returns '10' as a string ready for int() conversion.",
+      "failure_modes": [
+        "regex is overkill",
+        "spaces don't need special handling",
+        "just match the number",
+        "\\d+ is enough"
+      ],
+      "required_concepts": [
+        "regex metacharacters",
+        "capturing groups",
+        "quantifiers (* and +)",
+        "pattern matching vs string comparison"
+      ]
+    },
+    {
+      "id": "q3_beautifulsoup_dom",
+      "question": "Why must you use BeautifulSoup instead of searching for `<span>` substrings directly with `text.find('<span>')`? What problem does BeautifulSoup solve?",
+      "model_answer": "BeautifulSoup parses HTML into a Document Object Model (DOM) tree structure, which understands the hierarchical relationship between tags. Direct string searching with find() treats HTML as plain text, which fails on: (1) Nested tags - '<span><b>x=10</b></span>' would match incorrectly, (2) Attributes - '<span class=\"coord\">x=10</span>' changes the position, (3) Self-closing tags - '<span />' vs '<span></span>', (4) Malformed HTML - unclosed tags or extra spaces. BeautifulSoup normalizes all these variations and provides .find_all('span') which returns actual tag objects with .text to extract content, regardless of attributes or nesting.",
+      "failure_modes": [
+        "HTML is just text",
+        "find() is simpler",
+        "tags are always consistent",
+        "no need for parsing"
+      ],
+      "required_concepts": [
+        "DOM tree structure",
+        "HTML parsing vs string search",
+        "tag attributes",
+        "malformed HTML handling"
+      ]
+    }
+  ]
+}

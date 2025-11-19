@@ -1,0 +1,55 @@
+{
+  "questions": [
+    {
+      "id": "q1_reference_copying",
+      "question": "Explain why `grid = [[' '] * width] * height` creates a bug where modifying one cell affects entire columns. What is the difference between shallow and deep copying in this context?",
+      "model_answer": "When you use `[[' '] * width] * height`, Python creates ONE list `[' '] * width` and then creates `height` references to that SAME list object. This is shallow copying - you're copying references, not the actual lists. So grid[0], grid[1], grid[2] all point to the same list in memory. When you write `grid[0][0] = 'A'`, you're modifying the list that all rows reference, so the change appears in all rows. The correct approach `[[' '] * width for _ in range(height)]` creates a NEW list object for each row via the comprehension, ensuring each row is independent. This is deep copying - each row is a separate object in memory.",
+      "failure_modes": [
+        "they're the same thing",
+        "just a performance difference",
+        "* is always safe",
+        "lists don't share memory"
+      ],
+      "required_concepts": [
+        "shallow vs deep copy",
+        "object identity",
+        "reference semantics",
+        "list comprehension"
+      ]
+    },
+    {
+      "id": "q2_dimension_calculation",
+      "question": "Why must you add 1 when calculating grid dimensions (e.g., `width = max_x + 1`)? What would happen if you used `width = max_x` instead?",
+      "model_answer": "Coordinates are 0-indexed, meaning the first position is 0, not 1. If max_x is 5, that means coordinates range from 0 to 5, which is 6 distinct positions. Using `width = max_x` (5) would create a grid with indices 0-4, and trying to access grid[y][5] would raise an IndexError because index 5 doesn't exist. The +1 accounts for the 0th position: positions 0, 1, 2, 3, 4, 5 require 6 slots. This is the classic off-by-one error in computer science: length = max_index + 1 for 0-indexed arrays.",
+      "failure_modes": [
+        "coordinates start at 1",
+        "max value is the length",
+        "doesn't matter",
+        "just use max value"
+      ],
+      "required_concepts": [
+        "0-indexed arrays",
+        "off-by-one errors",
+        "inclusive vs exclusive bounds",
+        "array length calculation"
+      ]
+    },
+    {
+      "id": "q3_row_col_indexing",
+      "question": "In a 2D grid, why do we access elements as `grid[y][x]` instead of `grid[x][y]`? Explain the convention and what happens if you swap them.",
+      "model_answer": "In 2D arrays, the first index selects the row, the second selects the column. Since y-coordinates represent vertical position (rows) and x-coordinates represent horizontal position (columns), the correct indexing is grid[y][x] or equivalently grid[row][col]. This follows the mathematical matrix convention: M[i][j] where i is the row and j is the column. If you use grid[x][y], coordinates would be transposed: a point at (3, 1) would be placed at (1, 3), flipping the grid diagonally. The visual grid would be rotated 90 degrees and reflected compared to the intended layout.",
+      "failure_modes": [
+        "x always comes first",
+        "the order doesn't matter",
+        "it's interchangeable",
+        "depends on preference"
+      ],
+      "required_concepts": [
+        "row-major order",
+        "matrix indexing convention",
+        "coordinate system mapping",
+        "array memory layout"
+      ]
+    }
+  ]
+}
