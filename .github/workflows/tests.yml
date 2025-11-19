@@ -34,18 +34,16 @@ jobs:
         
       - name: Run unit tests
         run: |
+          # Only run engine tests (not cs336_basics assignment tests)
           # Exclude integration tests that require OpenAI API keys
-          uv run pytest tests/ -v \
-            --ignore=tests/integration/ \
-            --ignore=tests/e2e/ \
+          uv run pytest tests/engine/ -v \
             -m "not integration" \
             --tb=short
         
       - name: Generate coverage report
         run: |
-          uv run pytest tests/ \
-            --ignore=tests/integration/ \
-            --ignore=tests/e2e/ \
+          # Only run engine tests for coverage
+          uv run pytest tests/engine/ \
             -m "not integration" \
             --cov=engine \
             --cov-report=term-missing \
