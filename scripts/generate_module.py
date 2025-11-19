@@ -33,7 +33,8 @@ class ModuleGenerator:
     
     def __init__(self, curriculum_root: Path):
         self.curriculum_root = Path(curriculum_root)
-        self.modules_dir = curriculum_root / "modules"
+        self.modules_dir = curriculum_root / "modules"  # Legacy
+        self.patterns_dir = curriculum_root / "patterns"  # Library mode
         self.canonical_path = curriculum_root / "canonical_curriculum.json"
         
         # Load curriculum data
@@ -301,19 +302,22 @@ class ModuleGenerator:
         template = env.get_template('build_prompt.jinja2')
         
         # Format the data
+        # Support both 'description' and 'description_html' field names
+        description = problem_data.get('description_html') or problem_data.get('description', '')
+        
         formatted_problem = {
             'title': problem_data['title'],
             'url': problem_data['url'],
-            'difficulty': problem_data['difficulty'],
-            'acceptance_rate': problem_data['acceptance_rate'],
-            'topics': problem_data['topics'][:5] if problem_data['topics'] else [],  # Top 5 topics
-            'description_formatted': self.format_description(problem_data['description_html']),
-            'examples_formatted': self.format_examples(problem_data['examples']),
+            'difficulty': problem_data.get('difficulty', 'Unknown'),
+            'acceptance_rate': problem_data.get('acceptance_rate', 'N/A'),
+            'topics': problem_data.get('topics', [])[:5],  # Top 5 topics
+            'description_formatted': self.format_description(description),
+            'examples_formatted': self.format_examples(problem_data.get('examples', [])),
             'constraints_formatted': self.format_constraints(
-                problem_data['constraints'],
-                problem_data['description_html']
+                problem_data.get('constraints', []),
+                description
             ),
-            'hints': problem_data['hints']
+            'hints': problem_data.get('hints', [])
         }
         
         # Topic data (if available)
@@ -580,11 +584,17 @@ def main():
     parser.add_argument("--problem-id", help="Specific problem (e.g., LC-912)")
     parser.add_argument("--output-dir", help="Output directory (defaults to modules/[slug])")
     parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument("--all", action="store_true", help="Generate all problems (use with --limit-per-pattern)")
+    parser.add_argument("--limit-per-pattern", type=int, help="Limit number of problems per pattern (for breadth-first population)")
     
     args = parser.parse_args()
     
+    # Branch: batch mode or single problem mode
+    if args.all:
+        return batch_generate_all(args)
+    
     if not args.problem_id:
-        parser.error("--problem-id is required for PoC")
+        parser.error("--problem-id is required (or use --all for batch mode)")
     
     # Setup paths
     script_dir = Path(__file__).parent
@@ -673,6 +683,110 @@ def main():
     print(f"\n🔍 Compare generated files to originals:")
     print(f"   git diff {test_cases_path}")
     print(f"   git diff {build_prompt_path}")
+    
+    return 0
+
+
+def batch_generate_all(args):
+    """Generate problems in batch mode for Library curriculum."""
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    curriculum_root = repo_root / "curricula" / "cp_accelerator"
+    
+    generator = ModuleGenerator(curriculum_root)
+    
+    limit = args.limit_per_pattern or 999  # No limit if not specified
+    
+    print(f"\n{'='*70}")
+    print(f"Batch Generation - Library Mode")
+    print(f"{'='*70}")
+    print(f"Limit per pattern: {limit if limit < 999 else 'None (all)'}")
+    print(f"Force overwrite: {args.force}")
+    print()
+    
+    total_generated = 0
+    total_skipped = 0
+    
+    # Read canonical curriculum
+    with open(generator.canonical_path) as f:
+        canonical = json.load(f)
+    
+    # Iterate through topics (= patterns)
+    for topic in canonical['topics']:
+        topic_name = topic['name']
+        # Convert to pattern_id (e.g., "Sorting Algorithms" -> "sorting")
+        pattern_id = topic_name.lower().replace(' ', '_').replace('-', '_')
+        pattern_id = re.sub(r'[^a-z0-9_]', '', pattern_id)
+        pattern_id = pattern_id.replace('algorithms', '').replace('algorithm', '').strip('_')
+        
+        print(f"\n📦 Pattern: {topic_name} ({pattern_id})")
+        print(f"   Problems available: {len(topic['problems'])}")
+        
+        # Create pattern directory
+        pattern_dir = generator.patterns_dir / pattern_id
+        pattern_dir.mkdir(parents=True, exist_ok=True)
+        
+        problems_dir = pattern_dir / "problems"
+        problems_dir.mkdir(exist_ok=True)
+        
+        generated_count = 0
+        skipped_count = 0
+        
+        # Generate up to limit problems for this pattern
+        for problem in topic['problems'][:limit]:
+            problem_id = problem['id']
+            
+            # Convert problem ID to directory name (e.g., "LC-912" -> "lc_912")
+            problem_slug = problem_id.lower().replace('-', '_')
+            problem_dir = problems_dir / problem_slug
+            
+            # Check if exists
+            if problem_dir.exists() and not args.force:
+                print(f"   ⏭️  {problem_id}: Already exists, skipping")
+                skipped_count += 1
+                continue
+            
+            # Generate problem content
+            try:
+                problem_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Generate build_prompt.txt
+                problem_data = problem  # Already has all data from canonical
+                build_prompt = generator.generate_build_prompt(problem_data, 
+                    {'description': topic.get('description', 'Master this pattern.')},
+                    topic.get('resources', [])[:3]  # Top 3 resources
+                )
+                (problem_dir / "build_prompt.txt").write_text(build_prompt)
+                
+                # Generate test_cases.json
+                test_cases = generator.generate_test_cases(problem_data)
+                with open(problem_dir / "test_cases.json", 'w') as f:
+                    json.dump(test_cases, f, indent=2)
+                
+                # Generate validator.sh
+                validator = generator.create_validator_template(problem_data)
+                validator_path = problem_dir / "validator.sh"
+                validator_path.write_text(validator)
+                validator_path.chmod(0o755)
+                
+                print(f"   ✅ {problem_id}: Generated at {problem_dir.name}/")
+                generated_count += 1
+                
+            except Exception as e:
+                print(f"   ❌ {problem_id}: Error - {e}")
+        
+        total_generated += generated_count
+        total_skipped += skipped_count
+        print(f"   Summary: {generated_count} generated, {skipped_count} skipped")
+    
+    # Final summary
+    print(f"\n{'='*70}")
+    print(f"Batch Generation Complete!")
+    print(f"{'='*70}")
+    print(f"Total generated: {total_generated}")
+    print(f"Total skipped:   {total_skipped}")
+    print(f"\n📁 Output: {generator.patterns_dir}")
+    print()
     
     return 0
 
