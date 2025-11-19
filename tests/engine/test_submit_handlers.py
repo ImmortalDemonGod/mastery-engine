@@ -201,12 +201,13 @@ class TestSubmitBuildStage:
 class TestSubmitJustifyStage:
     """Tests for _submit_justify_stage handler with $EDITOR and LLM."""
     
+    @patch('engine.main.LLMService')
     @patch('subprocess.run')
     @patch('engine.main.JustifyRunner')
     @patch('builtins.open', new_callable=mock_open)
     @patch('os.unlink')
     def test_justify_fast_filter_rejects_shallow_answer(
-        self, mock_unlink, mock_file, mock_justify_cls, mock_subprocess
+        self, mock_unlink, mock_file, mock_justify_cls, mock_subprocess, mock_llm_cls
     ):
         """Should reject answer caught by fast keyword filter."""
         from engine.main import _submit_justify_stage
@@ -238,6 +239,11 @@ class TestSubmitJustifyStage:
             )
         ]
         mock_justify_runner.check_fast_filter.return_value = (True, "Your answer is too vague.")
+        
+        # Mock LLM service to not be in mock mode
+        mock_llm = MagicMock()
+        mock_llm_cls.return_value = mock_llm
+        mock_llm.use_mock = False  # Ensure production path
         
         # Mock editor writes answer
         mock_subprocess.return_value = MagicMock(returncode=0)
@@ -297,6 +303,7 @@ class TestSubmitJustifyStage:
         
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
+        mock_llm.use_mock = False  # Ensure production path (not auto-pass)
         mock_llm.evaluate_justification.return_value = LLMEvaluationResponse(
             is_correct=True,
             feedback="Excellent explanation!"
@@ -360,6 +367,7 @@ class TestSubmitJustifyStage:
         
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
+        mock_llm.use_mock = False  # Ensure production path (not auto-pass)
         mock_llm.evaluate_justification.return_value = LLMEvaluationResponse(
             is_correct=False,
             feedback="You're missing the normalization step."
