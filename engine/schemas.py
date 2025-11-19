@@ -9,13 +9,24 @@ Using Pydantic provides:
 - Automatic JSON serialization/deserialization
 """
 
-from typing import Optional
+from enum import Enum
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
+class CurriculumType(str, Enum):
+    """Type of curriculum structure."""
+    LINEAR = "linear"    # Sequential modules (e.g., cs336_a1)
+    LIBRARY = "library"  # Hierarchical patterns+problems (e.g., cp_accelerator)
+
+
+# --- Legacy / Linear Components ---
+
 class ModuleMetadata(BaseModel):
     """
-    Metadata for a single curriculum module.
+    Metadata for a single curriculum module (Linear mode).
+    
+    Used by LINEAR curricula like cs336_a1 where modules must be completed sequentially.
     
     Attributes:
         id: Unique identifier for the module (e.g., "rmsnorm", "multihead_attention")
@@ -23,6 +34,7 @@ class ModuleMetadata(BaseModel):
         path: Relative path to module directory within curriculum pack
         baseline_perf_seconds: Optional performance baseline from Phase 0 CI for novelty detection
         dependencies: Optional list of module IDs that must be completed first
+        module_type: Type classification (default: "standard")
         metadata: Optional dict for curriculum-specific extensions (e.g., rating_bracket, priority)
     """
     id: str
@@ -30,42 +42,123 @@ class ModuleMetadata(BaseModel):
     path: str
     baseline_perf_seconds: Optional[float] = None
     dependencies: list[str] = Field(default_factory=list)
+    module_type: str = "standard"
     metadata: dict = Field(default_factory=dict)
 
+
+# --- New / Hierarchical Components ---
+
+class ProblemMetadata(BaseModel):
+    """
+    Metadata for a specific practice problem (Library mode).
+    
+    Used by LIBRARY curricula like cp_accelerator where users can select problems freely.
+    
+    Attributes:
+        id: Unique identifier for the problem (e.g., "lc_912")
+        title: Human-readable problem name (e.g., "Sort an Array")
+        path: Relative path to problem directory (e.g., "patterns/sorting/problems/lc_912")
+        difficulty: Problem difficulty level (e.g., "Medium")
+        baseline_perf_seconds: Optional performance baseline
+        metadata: Optional dict for problem-specific data (e.g., leetcode_id, tags)
+    """
+    id: str
+    title: str
+    path: str
+    difficulty: str
+    baseline_perf_seconds: Optional[float] = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class PatternMetadata(BaseModel):
+    """
+    Metadata for a pattern container (Library mode).
+    
+    A pattern groups related problems and shared theory (e.g., "Sorting Algorithms").
+    
+    Attributes:
+        id: Unique identifier for the pattern (e.g., "sorting")
+        title: Human-readable pattern name (e.g., "Sorting Algorithms")
+        theory_path: Path to shared theory resources (e.g., "patterns/sorting/theory")
+        problems: List of problems in this pattern
+        metadata: Optional dict for pattern-specific data (e.g., estimated_hours, priority)
+    """
+    id: str
+    title: str
+    theory_path: str
+    problems: List[ProblemMetadata]
+    metadata: dict = Field(default_factory=dict)
+
+
+# --- Root Manifest ---
 
 class CurriculumManifest(BaseModel):
     """
     Root schema for a curriculum pack's manifest.json file.
     
+    Supports both LINEAR (sequential modules) and LIBRARY (hierarchical patterns) modes.
+    
     Attributes:
         curriculum_name: Unique identifier for the curriculum pack (e.g., "cs336_a1")
         author: Creator/maintainer of the curriculum
         version: Semantic version string (e.g., "1.0.0")
-        modules: Ordered list of modules in the curriculum
+        type: Curriculum structure type (LINEAR or LIBRARY, defaults to LINEAR for backward compat)
+        modules: Ordered list of modules (LINEAR mode only)
+        patterns: Hierarchical patterns with problems (LIBRARY mode only)
     """
     curriculum_name: str
     author: str
     version: str
-    modules: list[ModuleMetadata]
+    type: CurriculumType = CurriculumType.LINEAR  # Default maintains backward compatibility
+    
+    # Mutually exclusive based on type
+    modules: Optional[list[ModuleMetadata]] = None      # For LINEAR curricula
+    patterns: Optional[List[PatternMetadata]] = None    # For LIBRARY curricula
 
 
 class UserProgress(BaseModel):
     """
     Schema for .mastery_progress.json tracking user's learning state.
     
+    Supports both LINEAR and LIBRARY curriculum modes.
+    
     Attributes:
         curriculum_id: ID of the active curriculum pack
+        
+        Linear Mode State:
         current_module_index: Index into curriculum's modules list (0-based)
+        
+        Library Mode State:
+        active_pattern_id: Currently selected pattern ID (e.g., "sorting")
+        active_problem_id: Currently selected problem ID (e.g., "lc_912")
+        
+        Shared State:
         current_stage: Current stage within the BJH loop
-        completed_modules: List of module IDs the user has fully completed
+        completed_modules: List of module IDs fully completed (LINEAR mode)
+        completed_patterns: List of pattern IDs with theory completed (LIBRARY mode)
+        completed_problems: List of problem IDs fully completed (LIBRARY mode, format: "pattern_id/problem_id")
     """
     curriculum_id: str
+    
+    # Linear Mode State
     current_module_index: int = 0
+    
+    # Library Mode State (New in v2.0)
+    active_pattern_id: Optional[str] = None
+    active_problem_id: Optional[str] = None
+    
+    # Shared State
     current_stage: str = "build"  # "build", "justify", "harden", or "complete"
-    completed_modules: list[str] = Field(default_factory=list)
+    completed_modules: list[str] = Field(default_factory=list)     # Linear mode tracking
+    completed_patterns: list[str] = Field(default_factory=list)    # Library mode pattern theory
+    completed_problems: list[str] = Field(default_factory=list)    # Library mode problems
     
     def mark_stage_complete(self, stage: str) -> None:
-        """Advance to next stage in BJH loop or next module."""
+        """Advance to next stage in BJH loop or next module.
+        
+        NOTE: This method maintains legacy LINEAR behavior for backward compatibility.
+        LIBRARY mode logic will be implemented in Phase 2 (CLI refactor).
+        """
         if stage == "build":
             self.current_stage = "justify"
         elif stage == "justify":
