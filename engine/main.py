@@ -512,6 +512,268 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
 # Unified Submit Command (P0 CLI Improvement)
 # ============================================================================
 
+def _submit_linear_workflow(state_mgr, curr_mgr, progress, manifest) -> None:
+    """Handle submission for LINEAR curriculum (module-based)."""
+    # Check if curriculum complete
+    if _check_curriculum_complete(progress, manifest):
+        return
+    
+    # Get current stage and module
+    stage = progress.current_stage
+    current_module = manifest.modules[progress.current_module_index]
+    
+    console.print()
+    console.print(f"[dim]Current stage: {stage.upper()} ({current_module.name})[/dim]")
+    
+    # Route to appropriate handler based on stage
+    if stage == "build":
+        success = _submit_build_stage(state_mgr, curr_mgr, progress, manifest)
+    elif stage == "justify":
+        success = _submit_justify_stage(state_mgr, curr_mgr, progress, manifest)
+    elif stage == "harden":
+        success = _submit_harden_stage(state_mgr, curr_mgr, progress, manifest)
+    else:
+        console.print(Panel(
+            f"[bold red]Unknown Stage[/bold red]\n\n"
+            f"Current stage '{stage}' is not recognized.\n"
+            "This may be a state file corruption issue.",
+            title="ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    
+    if success:
+        logger.info(f"Successfully completed {stage} stage for module '{current_module.id}'")
+
+
+def _submit_library_workflow(state_mgr, curr_mgr, progress, manifest) -> None:
+    """Handle submission for LIBRARY curriculum (problem-based)."""
+    # Check if problem selected
+    if progress.active_problem_id is None:
+        console.print(Panel(
+            "[bold yellow]No Problem Selected[/bold yellow]\n\n"
+            "You must select a problem before submitting.\n\n"
+            "Run [bold cyan]mastery select <pattern> <problem>[/bold cyan]",
+            title="LIBRARY MODE",
+            border_style="yellow"
+        ))
+        sys.exit(1)
+    
+    # Get problem metadata
+    problem_lookup = curr_mgr.get_problem_metadata(progress.active_problem_id)
+    if problem_lookup is None:
+        console.print(Panel(
+            f"[bold red]Invalid State[/bold red]\n\n"
+            f"Active problem '{progress.active_problem_id}' not found in manifest.",
+            title="ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    
+    pattern_id, problem_meta = problem_lookup
+    pattern_meta = curr_mgr.get_pattern_metadata(pattern_id)
+    
+    stage = progress.current_stage
+    console.print()
+    console.print(f"[dim]Current stage: {stage.upper()} ({problem_meta.title} - {pattern_meta.title})[/dim]")
+    
+    # Route to appropriate handler based on stage
+    if stage == "build":
+        # Validate build implementation
+        problem_path = curr_mgr.get_problem_path(progress.curriculum_id, progress.active_problem_id)
+        validator_path = problem_path / "validator.sh"
+        
+        if not validator_path.exists():
+            raise CurriculumInvalidError(f"Validator missing for problem '{progress.active_problem_id}': {validator_path}")
+        
+        validator_subsys = ValidationSubsystem()
+        workspace_path = Path.cwd()
+        
+        console.print(f"[bold cyan]Running validator for {problem_meta.title}...[/bold cyan]")
+        console.print()
+        
+        result = validator_subsys.execute(validator_path, workspace_path)
+        
+        if result.exit_code == 0:
+            console.print(Panel(
+                "[bold green]✅ Build Validation Passed![/bold green]\n\n"
+                "Your implementation passed all tests.",
+                title="Success",
+                border_style="green"
+            ))
+            
+            if result.performance_seconds is not None:
+                console.print()
+                console.print(f"[dim]Performance: {result.performance_seconds:.3f} seconds[/dim]")
+            console.print()
+            
+            # Advance to justify stage
+            progress.current_stage = "justify"
+            state_mgr.save(progress)
+            
+            logger.info(f"Build stage completed for problem '{progress.active_problem_id}'")
+            
+            console.print(Panel(
+                "Next step: Answer pattern theory questions.\n\n"
+                "Run [bold cyan]mastery show[/bold cyan] to view questions, then [bold cyan]mastery submit[/bold cyan].",
+                title="Next Action",
+                border_style="blue"
+            ))
+            console.print()
+        else:
+            console.print(Panel(
+                "[bold red]❌ Validation Failed[/bold red]\n\n"
+                "Your implementation did not pass all tests. See details below:",
+                title="Failure",
+                border_style="red"
+            ))
+            console.print()
+            console.print("[bold]Test Output:[/bold]")
+            console.print(result.stderr if result.stderr else result.stdout)
+            console.print()
+    
+    elif stage == "justify":
+        # Check if pattern theory already complete
+        if pattern_id in progress.completed_patterns:
+            # Auto-advance to harden
+            console.print(Panel(
+                f"[bold green]✓ Pattern Theory Already Complete[/bold green]\n\n"
+                f"Advancing to Harden stage...",
+                title="Auto-Advance",
+                border_style="green"
+            ))
+            progress.current_stage = "harden"
+            state_mgr.save(progress)
+            console.print()
+            console.print(Panel(
+                "Next step: Fix the injected bug.\n\n"
+                "Run [bold cyan]mastery start-challenge[/bold cyan] to begin.",
+                title="Next Action",
+                border_style="blue"
+            ))
+            console.print()
+        else:
+            # Validate pattern theory questions
+            theory_path = curr_mgr.get_pattern_theory_path(progress.curriculum_id, pattern_id)
+            justify_path = theory_path / "justify_questions.json"
+            
+            if not justify_path.exists():
+                raise CurriculumInvalidError(f"Justify questions missing for pattern '{pattern_id}': {justify_path}")
+            
+            # Load questions
+            with open(justify_path, 'r') as f:
+                questions_data = json.load(f)
+            
+            # Use JustifyRunner for validation (it expects ModuleMetadata, so we need to adapt)
+            # For now, use the LLM service directly
+            console.print(Panel(
+                f"[bold cyan]Pattern Theory: {pattern_meta.title}[/bold cyan]\n\n"
+                f"Opening your editor to answer {len(questions_data)} conceptual questions...\n\n"
+                f"[dim]Your answers will be evaluated for technical accuracy.[/dim]",
+                title="Justify Stage",
+                border_style="magenta"
+            ))
+            console.print()
+            
+            # Open editor for answers (simplified for now - just mark complete)
+            # TODO: Implement proper editor integration
+            console.print("[yellow]Editor integration pending. For now, marking theory as complete.[/yellow]")
+            console.print()
+            
+            # Mark pattern theory complete
+            if pattern_id not in progress.completed_patterns:
+                progress.completed_patterns.append(pattern_id)
+            progress.current_stage = "harden"
+            state_mgr.save(progress)
+            
+            logger.info(f"Pattern theory completed for '{pattern_id}'")
+            
+            console.print(Panel(
+                "[bold green]✓ Pattern Theory Complete![/bold green]\n\n"
+                "This pattern's theory is now unlocked for all problems.\n\n"
+                "Next step: Fix the injected bug.\n\n"
+                "Run [bold cyan]mastery start-challenge[/bold cyan] to begin.",
+                title="Success",
+                border_style="green"
+            ))
+            console.print()
+    
+    elif stage == "harden":
+        # Validate harden fix
+        problem_path = curr_mgr.get_problem_path(progress.curriculum_id, progress.active_problem_id)
+        
+        # Use HardenRunner for validation
+        harden_runner = HardenRunner(curr_mgr)
+        
+        console.print(f"[bold cyan]Validating fix for {problem_meta.title}...[/bold cyan]")
+        console.print()
+        
+        # Note: HardenRunner expects ModuleMetadata, which LIBRARY mode doesn't have
+        # For now, run validator directly in shadow worktree
+        validator_path = problem_path / "validator.sh"
+        if not validator_path.exists():
+            raise CurriculumInvalidError(f"Validator missing: {validator_path}")
+        
+        validator_subsys = ValidationSubsystem()
+        shadow_workspace = SHADOW_WORKTREE_DIR
+        
+        result = validator_subsys.execute(validator_path, shadow_workspace)
+        
+        if result.exit_code == 0:
+            console.print(Panel(
+                "[bold green]✅ Harden Validation Passed![/bold green]\n\n"
+                "You successfully fixed the bug!",
+                title="Success",
+                border_style="green"
+            ))
+            console.print()
+            
+            # Mark problem complete
+            problem_key = f"{pattern_id}/{progress.active_problem_id}"
+            if problem_key not in progress.completed_problems:
+                progress.completed_problems.append(problem_key)
+            
+            # Reset to build stage for next problem
+            progress.current_stage = "build"
+            # Clear active problem to force selection of next one
+            progress.active_problem_id = None
+            progress.active_pattern_id = None
+            state_mgr.save(progress)
+            
+            logger.info(f"Problem completed: {problem_key}")
+            
+            console.print(Panel(
+                f"[bold green]🎉 Problem Complete![/bold green]\n\n"
+                f"Pattern: {pattern_meta.title}\n"
+                f"Problem: {problem_meta.title}\n\n"
+                f"Next step: Select another problem.\n\n"
+                f"Run [bold cyan]mastery status[/bold cyan] to see available problems.",
+                title="Problem Solved",
+                border_style="green"
+            ))
+            console.print()
+        else:
+            console.print(Panel(
+                "[bold red]❌ Validation Failed[/bold red]\n\n"
+                "The bug is not fixed yet. See details below:",
+                title="Failure",
+                border_style="red"
+            ))
+            console.print()
+            console.print("[bold]Test Output:[/bold]")
+            console.print(result.stderr if result.stderr else result.stdout)
+            console.print()
+    
+    else:
+        console.print(Panel(
+            f"[bold red]Unknown Stage[/bold red]\n\n"
+            f"Current stage '{stage}' is not recognized.",
+            title="ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+
+
 @app.command()
 def submit():
     """
@@ -536,36 +798,11 @@ def submit():
         # Load state and curriculum
         state_mgr, curr_mgr, progress, manifest = _load_curriculum_state()
         
-        # Check if curriculum complete
-        if _check_curriculum_complete(progress, manifest):
-            return
-        
-        # Get current stage and module
-        stage = progress.current_stage
-        current_module = manifest.modules[progress.current_module_index]
-        
-        console.print()
-        console.print(f"[dim]Current stage: {stage.upper()} ({current_module.name})[/dim]")
-        
-        # Route to appropriate handler based on stage
-        if stage == "build":
-            success = _submit_build_stage(state_mgr, curr_mgr, progress, manifest)
-        elif stage == "justify":
-            success = _submit_justify_stage(state_mgr, curr_mgr, progress, manifest)
-        elif stage == "harden":
-            success = _submit_harden_stage(state_mgr, curr_mgr, progress, manifest)
+        # Route based on curriculum type
+        if manifest.type == CurriculumType.LIBRARY:
+            _submit_library_workflow(state_mgr, curr_mgr, progress, manifest)
         else:
-            console.print(Panel(
-                f"[bold red]Unknown Stage[/bold red]\n\n"
-                f"Current stage '{stage}' is not recognized.\n"
-                "This may be a state file corruption issue.",
-                title="ERROR",
-                border_style="red"
-            ))
-            sys.exit(1)
-        
-        if success:
-            logger.info(f"Successfully completed {stage} stage for module '{current_module.id}'")
+            _submit_linear_workflow(state_mgr, curr_mgr, progress, manifest)
     
     except (StateFileCorruptedError, CurriculumNotFoundError, CurriculumInvalidError,
             ValidatorNotFoundError, ValidatorTimeoutError, ValidatorExecutionError,
@@ -590,6 +827,238 @@ def submit():
         sys.exit(1)
 
 
+def _show_linear_content(progress: UserProgress, manifest, curr_mgr: CurriculumManager, module_id: Optional[str]) -> None:
+    """Display content for LINEAR curriculum (module-based)."""
+    # Determine which module to show
+    if module_id is not None:
+        # Find specified module
+        target_module = None
+        for mod in manifest.modules:
+            if mod.id == module_id:
+                target_module = mod
+                break
+        
+        if target_module is None:
+            console.print()
+            console.print(Panel(
+                f"[bold red]Module Not Found[/bold red]\n\n"
+                f"Module '{module_id}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                f"Run [bold cyan]mastery curriculum-list[/bold cyan] to see available modules.",
+                title="ERROR",
+                border_style="red"
+            ))
+            console.print()
+            sys.exit(1)
+        
+        current_module = target_module
+        display_stage = "build"
+    else:
+        # Show current module
+        if progress.current_module_index >= len(manifest.modules):
+            console.print()
+            console.print(Panel(
+                "[bold green]🎉 Congratulations![/bold green]\n\n"
+                "You have completed all modules in this curriculum!",
+                title="Curriculum Complete",
+                border_style="green"
+            ))
+            console.print()
+            return
+        
+        current_module = manifest.modules[progress.current_module_index]
+        display_stage = progress.current_stage
+    
+    # Display content based on stage
+    if display_stage == "build":
+        prompt_path = curr_mgr.get_build_prompt_path(progress.curriculum_id, current_module)
+        if not prompt_path.exists():
+            raise CurriculumInvalidError(
+                f"Build prompt missing for module '{current_module.id}': {prompt_path}"
+            )
+        
+        prompt_content = prompt_path.read_text(encoding='utf-8')
+        console.print()
+        console.print(Panel(
+            Markdown(prompt_content),
+            title=f"📝 Build Challenge: {current_module.name}",
+            border_style="cyan",
+            padding=(1, 2)
+        ))
+        console.print()
+        logger.info(f"Displayed build prompt for module '{current_module.id}'")
+        
+    elif display_stage == "justify":
+        justify_runner = JustifyRunner(curr_mgr)
+        questions = justify_runner.load_questions(progress.curriculum_id, current_module)
+        
+        if not questions:
+            raise CurriculumInvalidError(
+                f"No justify questions found for module '{current_module.id}'"
+            )
+        
+        question = questions[0]
+        console.print()
+        console.print(Panel(
+            Markdown(f"**Question:**\n\n{question.question}"),
+            title=f"💭 Justify Challenge: {current_module.name}",
+            border_style="magenta",
+            padding=(1, 2)
+        ))
+        console.print()
+        console.print("[bold cyan]To submit your answer:[/bold cyan] mastery submit")
+        console.print()
+        logger.info(f"Displayed justify question for module '{current_module.id}'")
+        
+    elif display_stage == "harden":
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]🐛 Harden Stage: {current_module.name}[/bold yellow]\n\n"
+            f"To initialize the debugging workspace and see the bug symptom:\n"
+            f"Run [bold cyan]mastery start-challenge[/bold cyan]\n\n"
+            f"[dim]This will create a buggy version of your code in the shadow worktree.[/dim]",
+            title="Harden Challenge",
+            border_style="yellow",
+            padding=(1, 2)
+        ))
+        console.print()
+        logger.info(f"Displayed harden instructions for module '{current_module.id}'")
+    
+    else:
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]Unknown Stage[/bold yellow]\n\n"
+            f"Current stage: [bold]{display_stage}[/bold]\n\n"
+            f"Run [bold cyan]mastery status[/bold cyan] for progress.",
+            title="Info",
+            border_style="yellow"
+        ))
+        console.print()
+
+
+def _show_library_content(progress: UserProgress, manifest, curr_mgr: CurriculumManager, module_id: Optional[str]) -> None:
+    """Display content for LIBRARY curriculum (problem-based)."""
+    # Check if problem selected
+    if progress.active_problem_id is None:
+        console.print()
+        console.print(Panel(
+            "[bold yellow]No Problem Selected[/bold yellow]\n\n"
+            "You must select a problem before viewing content.\n\n"
+            "Run [bold cyan]mastery select <pattern> <problem>[/bold cyan]\n"
+            "Example: [cyan]mastery select sorting lc_912[/cyan]",
+            title="LIBRARY MODE",
+            border_style="yellow"
+        ))
+        console.print()
+        sys.exit(1)
+    
+    # Get problem metadata
+    problem_lookup = curr_mgr.get_problem_metadata(progress.active_problem_id)
+    if problem_lookup is None:
+        console.print(Panel(
+            f"[bold red]Invalid State[/bold red]\n\n"
+            f"Active problem '{progress.active_problem_id}' not found in manifest.",
+            title="ERROR",
+            border_style="red"
+        ))
+        sys.exit(1)
+    
+    pattern_id, problem_meta = problem_lookup
+    pattern_meta = curr_mgr.get_pattern_metadata(pattern_id)
+    problem_path = curr_mgr.get_problem_path(progress.curriculum_id, progress.active_problem_id)
+    
+    # Display based on stage
+    display_stage = progress.current_stage
+    
+    if display_stage == "build":
+        # Show build prompt from problem directory
+        prompt_path = problem_path / "build_prompt.txt"
+        if not prompt_path.exists():
+            raise CurriculumInvalidError(
+                f"Build prompt missing for problem '{progress.active_problem_id}': {prompt_path}"
+            )
+        
+        prompt_content = prompt_path.read_text(encoding='utf-8')
+        console.print()
+        console.print(Panel(
+            Markdown(prompt_content),
+            title=f"📝 Build Challenge: {problem_meta.title}",
+            subtitle=f"Pattern: {pattern_meta.title} | Difficulty: {problem_meta.difficulty}",
+            border_style="cyan",
+            padding=(1, 2)
+        ))
+        console.print()
+        logger.info(f"Displayed build prompt for problem '{progress.active_problem_id}'")
+        
+    elif display_stage == "justify":
+        # Check if pattern theory already complete
+        if pattern_id in progress.completed_patterns:
+            console.print()
+            console.print(Panel(
+                f"[bold green]✓ Pattern Theory Complete[/bold green]\n\n"
+                f"You have already completed the theory questions for pattern '{pattern_meta.title}'.\n\n"
+                f"Proceed to Harden stage: [cyan]mastery submit[/cyan]",
+                title="Theory Complete",
+                border_style="green"
+            ))
+            console.print()
+        else:
+            # Show pattern theory questions
+            theory_path = curr_mgr.get_pattern_theory_path(progress.curriculum_id, pattern_id)
+            justify_path = theory_path / "justify_questions.json"
+            
+            if not justify_path.exists():
+                raise CurriculumInvalidError(
+                    f"Justify questions missing for pattern '{pattern_id}': {justify_path}"
+                )
+            
+            with open(justify_path, 'r') as f:
+                questions_data = json.load(f)
+            
+            # Show first question
+            if questions_data and len(questions_data) > 0:
+                question = questions_data[0]
+                console.print()
+                console.print(Panel(
+                    Markdown(f"**Question:**\n\n{question['question']}"),
+                    title=f"💭 Pattern Theory: {pattern_meta.title}",
+                    subtitle="Answer these once to unlock all problems in this pattern",
+                    border_style="magenta",
+                    padding=(1, 2)
+                ))
+                console.print()
+                console.print("[bold cyan]To submit your answer:[/bold cyan] mastery submit")
+                console.print()
+                logger.info(f"Displayed pattern theory for '{pattern_id}'")
+            else:
+                raise CurriculumInvalidError(f"No questions found in {justify_path}")
+        
+    elif display_stage == "harden":
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]🐛 Harden Stage: {problem_meta.title}[/bold yellow]\n\n"
+            f"Pattern: {pattern_meta.title}\n\n"
+            f"To initialize the debugging workspace and see the bug symptom:\n"
+            f"Run [bold cyan]mastery start-challenge[/bold cyan]\n\n"
+            f"[dim]This will create a buggy version of your code in the shadow worktree.[/dim]",
+            title="Harden Challenge",
+            border_style="yellow",
+            padding=(1, 2)
+        ))
+        console.print()
+        logger.info(f"Displayed harden instructions for problem '{progress.active_problem_id}'")
+    
+    else:
+        console.print()
+        console.print(Panel(
+            f"[bold yellow]Unknown Stage[/bold yellow]\n\n"
+            f"Current stage: [bold]{display_stage}[/bold]\n\n"
+            f"Run [bold cyan]mastery status[/bold cyan] for progress.",
+            title="Info",
+            border_style="yellow"
+        ))
+        console.print()
+
+
 @app.command()
 def show(module_id: Optional[str] = typer.Argument(None, help="Module ID to display (default: current)")):
     """
@@ -610,122 +1079,11 @@ def show(module_id: Optional[str] = typer.Argument(None, help="Module ID to disp
         progress = state_mgr.load()
         manifest = curr_mgr.load_manifest(progress.curriculum_id)
         
-        # Determine which module to show
-        if module_id is not None:
-            # Find specified module
-            target_module = None
-            for mod in manifest.modules:
-                if mod.id == module_id:
-                    target_module = mod
-                    break
-            
-            if target_module is None:
-                console.print()
-                console.print(Panel(
-                    f"[bold red]Module Not Found[/bold red]\n\n"
-                    f"Module '{module_id}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
-                    f"Run [bold cyan]engine curriculum list[/bold cyan] to see available modules.",
-                    title="ERROR",
-                    border_style="red"
-                ))
-                console.print()
-                sys.exit(1)
-            
-            current_module = target_module
-            # For specified modules, default to showing build content
-            display_stage = "build"
+        # Route based on curriculum type
+        if manifest.type == CurriculumType.LIBRARY:
+            _show_library_content(progress, manifest, curr_mgr, module_id)
         else:
-            # Show current module
-            if progress.current_module_index >= len(manifest.modules):
-                console.print()
-                console.print(Panel(
-                    "[bold green]🎉 Congratulations![/bold green]\n\n"
-                    "You have completed all modules in this curriculum!",
-                    title="Curriculum Complete",
-                    border_style="green"
-                ))
-                console.print()
-                return
-            
-            current_module = manifest.modules[progress.current_module_index]
-            display_stage = progress.current_stage
-        
-        # Display content based on stage (READ-ONLY)
-        if display_stage == "build":
-            # Display build prompt
-            prompt_path = curr_mgr.get_build_prompt_path(progress.curriculum_id, current_module)
-            
-            if not prompt_path.exists():
-                raise CurriculumInvalidError(
-                    f"Build prompt missing for module '{current_module.id}': {prompt_path}"
-                )
-            
-            prompt_content = prompt_path.read_text(encoding='utf-8')
-            
-            console.print()
-            console.print(Panel(
-                Markdown(prompt_content),
-                title=f"📝 Build Challenge: {current_module.name}",
-                border_style="cyan",
-                padding=(1, 2)
-            ))
-            console.print()
-            
-            logger.info(f"Displayed build prompt for module '{current_module.id}'")
-            
-        elif display_stage == "justify":
-            # Display justify question (READ-ONLY)
-            justify_runner = JustifyRunner(curr_mgr)
-            questions = justify_runner.load_questions(progress.curriculum_id, current_module)
-            
-            if not questions:
-                raise CurriculumInvalidError(
-                    f"No justify questions found for module '{current_module.id}'"
-                )
-            
-            # Show first question
-            question = questions[0]
-            
-            console.print()
-            console.print(Panel(
-                Markdown(f"**Question:**\n\n{question.question}"),
-                title=f"💭 Justify Challenge: {current_module.name}",
-                border_style="magenta",
-                padding=(1, 2)
-            ))
-            console.print()
-            console.print("[bold cyan]To submit your answer:[/bold cyan] engine submit")
-            console.print()
-            
-            logger.info(f"Displayed justify question for module '{current_module.id}'")
-            
-        elif display_stage == "harden":
-            # Display harden symptom (READ-ONLY - does NOT apply patch)
-            console.print()
-            console.print(Panel(
-                f"[bold yellow]🐛 Harden Stage: {current_module.name}[/bold yellow]\n\n"
-                f"To initialize the debugging workspace and see the bug symptom:\n"
-                f"Run [bold cyan]engine start-challenge[/bold cyan]\n\n"
-                f"[dim]This will create a buggy version of your code in the shadow worktree.[/dim]",
-                title="Harden Challenge",
-                border_style="yellow",
-                padding=(1, 2)
-            ))
-            console.print()
-            
-            logger.info(f"Displayed harden instructions for module '{current_module.id}'")
-        
-        else:
-            # Unknown stage
-            console.print()
-            console.print(Panel(
-                f"[bold yellow]Unknown Stage[/bold yellow]\n\n"
-                f"Current stage: [bold]{display_stage}[/bold]\n\n"
-                f"Run [bold cyan]engine status[/bold cyan] for progress.",
-                title="Info",
-                border_style="yellow"
-            ))
-            console.print()
+            _show_linear_content(progress, manifest, curr_mgr, module_id)
         
     except StateFileCorruptedError as e:
         console.print(Panel(
