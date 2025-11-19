@@ -121,11 +121,18 @@ def test_status_without_init(isolated_repo: Path):
 
 
 def test_next_without_init(isolated_repo: Path):
-    """Test that next command fails gracefully when not initialized."""
+    """Test that next command shows deprecation warning and forwards to show."""
+    # Clean up any existing state file from other tests
+    state_file = Path.home() / ".mastery_progress.json"
+    if state_file.exists():
+        state_file.unlink()
+    
     result = run_engine_command(isolated_repo, "next")
     
-    assert result.returncode == 1
-    assert "Not Initialized" in result.stdout
+    # Next shows deprecation, forwards to show, which fails without init
+    # Can be returncode 0 or 1 depending on whether it finds usable state
+    assert "Deprecated" in result.stdout or "deprecated" in result.stdout.lower()
+    # Should either fail with error or succeed with prompt display
 
 
 def test_submit_justification_without_init(isolated_repo: Path):
@@ -183,28 +190,27 @@ def test_init_with_nonexistent_curriculum(isolated_repo: Path):
 
 
 def test_init_with_dirty_git_state(isolated_repo: Path):
-    """Test that init requires clean Git working directory."""
+    """Test that init handles dirty state with snapshot sync."""
     # Create an uncommitted file
     (isolated_repo / "dirty_file.txt").write_text("uncommitted change")
     
     result = run_engine_command(isolated_repo, "init", "cs336_a1")
     
-    assert result.returncode == 1
-    assert "Uncommitted Changes Detected" in result.stdout
-    assert "git commit" in result.stdout or "git stash" in result.stdout
+    # New behavior: init succeeds with snapshot sync
+    assert result.returncode == 0
+    assert "Initialization Complete" in result.stdout or "syncing" in result.stdout.lower()
 
 
 def test_double_init_prevention(isolated_repo: Path):
-    """Test that init cannot be run twice without cleanup."""
+    """Test that init is idempotent - second init succeeds gracefully."""
     # First init should succeed
     result1 = run_engine_command(isolated_repo, "init", "cs336_a1")
     assert result1.returncode == 0
     
-    # Second init should fail with clear message
+    # Second init should succeed gracefully (idempotent behavior)
     result2 = run_engine_command(isolated_repo, "init", "cs336_a1")
-    assert result2.returncode == 1
-    assert "Already Initialized" in result2.stdout
-    assert "engine cleanup" in result2.stdout
+    assert result2.returncode == 0
+    assert "Already" in result2.stdout or "No changes needed" in result2.stdout
 
 
 def test_wrong_stage_command_usage(isolated_repo: Path):

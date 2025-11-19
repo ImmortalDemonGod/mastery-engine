@@ -35,10 +35,8 @@ class TestHardenRunner:
         assert runner.curriculum_mgr == mock_curr_mgr
         assert runner.workspace_mgr == mock_workspace_mgr
     
-    @patch('engine.stages.harden.Path')
-    @patch('shutil.copy2')
-    def test_present_challenge_success(self, mock_copy, mock_path_cls):
-        """Should successfully set up harden challenge in shadow worktree."""
+    def test_present_challenge_success(self, tmp_path):
+        """Should successfully set up harden challenge in shadow worktree using AST mode."""
         # Setup
         mock_curr_mgr = MagicMock()
         mock_workspace_mgr = MagicMock()
@@ -47,30 +45,48 @@ class TestHardenRunner:
         module = ModuleMetadata(id="softmax", name="Softmax", path="modules/softmax")
         source_file = Path("utils.py")
         
-        # Mock shadow worktree exists
-        mock_shadow_worktree = MagicMock()
-        mock_shadow_worktree.exists.return_value = True
-        mock_path_cls.return_value = mock_shadow_worktree
+        # Create real file system structure for test
+        shadow_worktree = tmp_path / ".mastery_engine_worktree"
+        shadow_worktree.mkdir()
         
-        # Mock bugs directory and bug selection
+        # Create student source file
+        student_file = tmp_path / "utils.py"
+        student_file.write_text("def softmax(x):\\n    return x\\n", encoding='utf-8')
+        
+        # Mock bug selection - use JSON (AST mode) to avoid needing developer file
         mock_bugs_dir = MagicMock()
         mock_curr_mgr.get_bugs_dir.return_value = mock_bugs_dir
         
-        mock_patch_file = MagicMock()
-        mock_patch_file.name = "bug1.patch"
+        mock_bug_file = MagicMock()
+        mock_bug_file.name = "bug1.json"
+        mock_bug_file.suffix = ".json"
         mock_symptom_file = MagicMock()
         mock_symptom_file.read_text.return_value = "Function returns incorrect value"
         
-        runner._select_bug = MagicMock(return_value=(mock_patch_file, mock_symptom_file))
+        runner._select_bug = MagicMock(return_value=(mock_bug_file, mock_symptom_file))
         
-        # Execute
-        harden_file, symptom = runner.present_challenge("test_curriculum", module, source_file)
-        
-        # Verify
-        assert symptom == "Function returns incorrect value"
-        mock_curr_mgr.get_bugs_dir.assert_called_once_with("test_curriculum", module)
-        runner._select_bug.assert_called_once_with(mock_bugs_dir)
-        mock_workspace_mgr.apply_patch.assert_called_once()
+        # Mock AST injector to succeed (patch where it's imported from)
+        with patch('engine.ast_harden.generic_injector.GenericBugInjector') as mock_injector_cls:
+            mock_injector = MagicMock()
+            mock_injector_cls.return_value = mock_injector
+            mock_injector.inject.return_value = ("def softmax(x):\\n    # BUGGY\\n    return x\\n", True)
+            
+            # Change to temp directory for Path.cwd() calls
+            import os
+            old_cwd = os.getcwd()
+            os.chdir(tmp_path)
+            try:
+                # Execute
+                harden_file, symptom = runner.present_challenge("test_curriculum", module, source_file)
+                
+                # Verify
+                assert symptom == "Function returns incorrect value"
+                mock_curr_mgr.get_bugs_dir.assert_called_once_with("test_curriculum", module)
+                runner._select_bug.assert_called_once_with(mock_bugs_dir)
+                # In AST mode, no patch application
+                mock_workspace_mgr.apply_patch.assert_not_called()
+            finally:
+                os.chdir(old_cwd)
     
     @patch('engine.stages.harden.Path')
     def test_present_challenge_no_shadow_worktree(self, mock_path_cls):
@@ -108,7 +124,15 @@ class TestHardenRunner:
         mock_patch = MagicMock()
         mock_patch.stem = "bug1"
         mock_patch.name = "bug1.patch"
-        mock_bugs_dir.glob.return_value = [mock_patch]
+        mock_patch.suffix = ".patch"
+        # glob is called twice - once for .patch, once for .json
+        def glob_side_effect(pattern):
+            if pattern == "*.patch":
+                return [mock_patch]
+            elif pattern == "*.json":
+                return []
+            return []
+        mock_bugs_dir.glob.side_effect = glob_side_effect
         
         # Mock symptom file
         mock_symptom = MagicMock()
@@ -148,13 +172,16 @@ class TestHardenRunner:
         
         mock_bugs_dir = MagicMock()
         mock_bugs_dir.exists.return_value = True
-        mock_bugs_dir.glob.return_value = []  # No patches
+        # glob is called twice - once for .patch, once for .json
+        def glob_side_effect(pattern):
+            return []  # No files for either pattern
+        mock_bugs_dir.glob.side_effect = glob_side_effect
         
         # Execute & Verify
         with pytest.raises(HardenChallengeError) as exc_info:
             runner._select_bug(mock_bugs_dir)
         
-        assert "No bug patches found" in str(exc_info.value)
+        assert "No bug files found" in str(exc_info.value)
     
     def test_select_bug_missing_symptom(self):
         """Should raise error if symptom file is missing."""

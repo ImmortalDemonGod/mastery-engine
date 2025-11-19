@@ -91,43 +91,85 @@ class TestInitCommand:
         assert result.exit_code == 1
         assert "Not a Git Repository" in result.stdout
     
-    @patch('subprocess.run')
-    def test_init_dirty_working_directory(self, mock_subprocess):
-        """Should fail if working directory has uncommitted changes."""
-        # Setup
-        mock_subprocess.side_effect = [
-            MagicMock(returncode=0),  # git rev-parse (is git repo)
-            MagicMock(returncode=0, stdout=" M file.py\n"),  # git status (dirty)
-        ]
-        
-        # Execute
-        result = runner.invoke(app, ["init", "test_curriculum"])
-        
-        # Verify
-        assert result.exit_code == 1
-        assert "Uncommitted Changes Detected" in result.stdout
-        assert "git add" in result.stdout or "git stash" in result.stdout
-    
+    @patch('engine.main.StateManager')
+    @patch('engine.main.CurriculumManager')
     @patch('subprocess.run')
     @patch('engine.main.SHADOW_WORKTREE_DIR')
-    def test_init_already_initialized(self, mock_shadow_dir, mock_subprocess):
-        """Should fail if shadow worktree already exists."""
+    def test_init_dirty_working_directory(self, mock_shadow_dir, mock_subprocess, mock_curr_cls, mock_state_cls):
+        """Init succeeds with dirty working directory (snapshot sync behavior)."""
         # Setup
-        mock_shadow_dir.exists.return_value = True
-        mock_shadow_dir.__str__.return_value = ".mastery_engine_worktree"
+        mock_shadow_dir.exists.return_value = False
         
+        # Mock git commands - dirty state with snapshot sync
         mock_subprocess.side_effect = [
-            MagicMock(returncode=0),  # git rev-parse
-            MagicMock(returncode=0, stdout=""),  # git status (clean)
+            MagicMock(returncode=0, stdout="/tmp/repo", stderr=""),  # git rev-parse
+            MagicMock(returncode=0, stdout="M  file.py\n", stderr=""),  # git status (dirty)
+            MagicMock(returncode=0, stdout="file.py\n", stderr=""),  # git ls-files -m
+            MagicMock(returncode=0, stdout="", stderr=""),  # git worktree prune
+            MagicMock(returncode=0, stdout="", stderr=""),  # git worktree add
         ]
         
-        # Execute
+        # Mock curriculum
+        mock_curr_mgr = MagicMock()
+        mock_curr_cls.return_value = mock_curr_mgr
+        mock_curr_mgr.load_manifest.return_value = CurriculumManifest(
+            curriculum_name="Test",
+            author="Test",
+            version="1.0.0",
+            modules=[ModuleMetadata(id="m1", name="M1", path="modules/m1")]
+        )
+        
+        # Mock state - return None for load() to simulate fresh init
+        mock_state_mgr = MagicMock()
+        mock_state_cls.return_value = mock_state_mgr
+        mock_state_mgr.load.return_value = None  # No existing state
+        mock_state_mgr.progress = None
+        
         result = runner.invoke(app, ["init", "test_curriculum"])
         
-        # Verify
-        assert result.exit_code == 1
-        assert "Already Initialized" in result.stdout
-        assert "engine cleanup" in result.stdout
+        # New behavior: init succeeds with snapshot sync
+        assert result.exit_code == 0
+        assert "Initialization Complete" in result.stdout
+    
+    @patch('engine.main.StateManager')
+    @patch('engine.main.CurriculumManager')
+    @patch('subprocess.run')
+    @patch('engine.main.SHADOW_WORKTREE_DIR')
+    def test_init_already_initialized(self, mock_shadow_dir, mock_subprocess, mock_curr_cls, mock_state_cls):
+        """Init is idempotent - succeeds gracefully when already initialized."""
+        # Setup
+        mock_shadow_dir.exists.return_value = True
+        
+        # Mock git commands
+        mock_subprocess.side_effect = [
+            MagicMock(returncode=0, stdout="/tmp/repo"),  # git rev-parse
+            MagicMock(returncode=0, stdout=""),  # git status (clean)
+            MagicMock(returncode=0),  # git worktree prune
+            MagicMock(returncode=0, stdout=".mastery_engine_worktree"),  # git worktree list
+        ]
+        
+        # Mock curriculum
+        mock_curr_mgr = MagicMock()
+        mock_curr_cls.return_value = mock_curr_mgr
+        mock_curr_mgr.load_manifest.return_value = CurriculumManifest(
+            curriculum_name="Test",
+            author="Test",
+            version="1.0.0",
+            modules=[ModuleMetadata(id="m1", name="M1", path="modules/m1")]
+        )
+        
+        # Mock state with existing progress - same curriculum
+        mock_state_mgr = MagicMock()
+        mock_state_cls.return_value = mock_state_mgr
+        existing_progress = UserProgress(curriculum_id="test_curriculum", current_module_index=0, current_stage="build")
+        mock_state_mgr.load.return_value = existing_progress
+        mock_state_mgr.progress = existing_progress
+        
+        result = runner.invoke(app, ["init", "test_curriculum"])
+        
+        # New behavior: init is idempotent
+        assert result.exit_code == 0
+        assert "Already" in result.stdout or "No changes needed" in result.stdout
     
     @patch('engine.main.CurriculumManager')
     @patch('subprocess.run')

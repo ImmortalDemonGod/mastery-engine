@@ -15,7 +15,15 @@ class TestWorkspaceManager:
     """Test cases for WorkspaceManager."""
     
     def test_default_workspace_path(self):
-        """Should use default ./workspace directory."""
+        """Should use default ./workspace directory (absolute or relative fallback)."""
+        manager = WorkspaceManager()
+        # After find_project_root integration, this will be absolute or relative fallback
+        assert manager.workspace_root.name == "workspace"
+    
+    @patch('engine.workspace.find_project_root')
+    def test_default_workspace_path_fallback_on_error(self, mock_find_root):
+        """Should fall back to relative path when find_project_root fails."""
+        mock_find_root.side_effect = RuntimeError("No project root")
         manager = WorkspaceManager()
         assert manager.workspace_root == Path("workspace")
     
@@ -35,13 +43,16 @@ class TestWorkspaceManager:
         """Should return path to specific submission file."""
         manager = WorkspaceManager()
         submission_path = manager.get_submission_path("test_module", "solution.py")
-        assert submission_path == Path("workspace") / "solution.py"
+        # Check that the path ends with workspace/solution.py
+        assert submission_path.name == "solution.py"
+        assert submission_path.parent.name == "workspace"
     
     def test_get_submission_path_without_filename(self):
         """Should return workspace root when no filename provided."""
         manager = WorkspaceManager()
         submission_path = manager.get_submission_path("test_module")
-        assert submission_path == Path("workspace")
+        # Check that the path ends with workspace
+        assert submission_path.name == "workspace" or str(submission_path).endswith("workspace")
     
     def test_ensure_workspace_exists_creates_directory(self, tmp_path):
         """Should create workspace directory if it doesn't exist."""

@@ -14,13 +14,23 @@ from engine.curriculum import CurriculumManager, CurriculumNotFoundError, Curric
 from engine.schemas import CurriculumManifest, ModuleMetadata
 
 
+class TestCurriculumManagerInit:
+    """Tests for CurriculumManager initialization."""
+    
+    @patch('engine.curriculum.find_project_root')
+    def test_init_fallback_on_find_root_error(self, mock_find_root):
+        """Should fall back to cwd when find_project_root raises RuntimeError."""
+        mock_find_root.side_effect = RuntimeError("No project root")
+        manager = CurriculumManager()
+        assert manager._project_root == Path.cwd()
+
+
 @pytest.fixture
 def temp_curricula_dir(tmp_path):
     """Fixture to use a temporary curricula directory."""
     curricula_dir = tmp_path / "curricula"
     curricula_dir.mkdir()
-    with patch.object(CurriculumManager, 'CURRICULA_DIR', curricula_dir):
-        yield curricula_dir
+    yield curricula_dir
 
 
 @pytest.fixture
@@ -65,7 +75,7 @@ class TestLoadManifest:
     
     def test_load_valid_manifest(self, temp_curricula_dir, valid_curriculum):
         """Should successfully load and validate a correct manifest."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         
         assert manifest.curriculum_name == "test_curriculum"
@@ -78,7 +88,7 @@ class TestLoadManifest:
     
     def test_load_nonexistent_curriculum_raises_error(self, temp_curricula_dir):
         """Should raise CurriculumNotFoundError for missing curriculum."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         
         with pytest.raises(CurriculumNotFoundError, match="not found"):
             manager.load_manifest("nonexistent_curriculum")
@@ -89,7 +99,7 @@ class TestLoadManifest:
         curriculum_path = temp_curricula_dir / "no_manifest"
         curriculum_path.mkdir()
         
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         
         with pytest.raises(CurriculumInvalidError, match="missing manifest.json"):
             manager.load_manifest("no_manifest")
@@ -100,7 +110,7 @@ class TestLoadManifest:
         curriculum_path.mkdir()
         (curriculum_path / "manifest.json").write_text("{ invalid json }")
         
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         
         with pytest.raises(CurriculumInvalidError, match="malformed JSON"):
             manager.load_manifest("bad_json")
@@ -114,7 +124,7 @@ class TestLoadManifest:
         bad_manifest = {"curriculum_name": "test"}
         (curriculum_path / "manifest.json").write_text(json.dumps(bad_manifest))
         
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         
         with pytest.raises(CurriculumInvalidError, match="Failed to validate"):
             manager.load_manifest("bad_schema")
@@ -125,7 +135,7 @@ class TestPathResolution:
     
     def test_get_module_path(self, temp_curricula_dir, valid_curriculum):
         """Should return correct absolute path to module directory."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         module = manifest.modules[0]
         
@@ -136,7 +146,7 @@ class TestPathResolution:
     
     def test_get_build_prompt_path(self, temp_curricula_dir, valid_curriculum):
         """Should return correct path to build_prompt.txt."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         module = manifest.modules[0]
         
@@ -147,7 +157,7 @@ class TestPathResolution:
     
     def test_get_validator_path(self, temp_curricula_dir, valid_curriculum):
         """Should return correct path to validator.sh."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         module = manifest.modules[0]
         
@@ -158,7 +168,7 @@ class TestPathResolution:
     
     def test_get_justify_questions_path(self, temp_curricula_dir, valid_curriculum):
         """Should return correct path to justify_questions.json."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         module = manifest.modules[0]
         
@@ -169,7 +179,7 @@ class TestPathResolution:
     
     def test_get_bugs_dir(self, temp_curricula_dir, valid_curriculum):
         """Should return correct path to bugs directory."""
-        manager = CurriculumManager()
+        manager = CurriculumManager(curricula_dir=temp_curricula_dir)
         manifest = manager.load_manifest(valid_curriculum)
         module = manifest.modules[0]
         
