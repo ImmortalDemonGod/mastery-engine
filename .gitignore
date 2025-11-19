@@ -171,6 +171,9 @@ cs336_basics/
 .mastery_engine_worktree/
 .mastery_progress.json
 
+# Third-party source materials (fetched via scripts/fetch_sources.sh)
+.sources/
+
 # Temporary analysis files
 git_*.txt
 git_*.patch

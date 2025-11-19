@@ -4,7 +4,9 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![Test Coverage](https://img.shields.io/badge/coverage-78%25-green.svg)](https://github.com/yourusername/mastery-engine)
+[![Test Coverage](https://img.shields.io/badge/coverage-78%25-green.svg)](https://github.com/ImmortalDemonGod/mastery-engine)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey.svg)](https://github.com/ImmortalDemonGod/mastery-engine)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
 
@@ -189,10 +191,28 @@ Result: **Syntactically valid but semantically broken code.**
 - **uv** (fast Python package manager)
 - **Git**
 
-### Installation
+### ⚠️ System Requirements
+
+**Platform:** Linux, macOS, or Windows WSL2  
+**Why?** This engine uses POSIX features (`bash` scripts, symlinks via `ln -s`, `git worktree`).
+
+<details>
+<summary><b>Windows Users:</b> Install WSL2 (click to expand)</summary>
+
+```powershell
+# PowerShell (as Administrator)
+wsl --install
+wsl --set-default-version 2
+```
+
+Then continue installation inside WSL.
+</details>
+
+### Installation Steps
+
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mastery-engine.git
+git clone https://github.com/ImmortalDemonGod/mastery-engine.git
 cd mastery-engine
 
 # Install dependencies
@@ -362,9 +382,9 @@ Course content (where applicable) remains property of original authors. See indi
 
 ## 📞 Contact
 
-**Author:** [Your Name]  
-**GitHub:** [@yourusername](https://github.com/yourusername)  
-**Portfolio:** [yourwebsite.com](https://yourwebsite.com)
+**GitHub:** [@ImmortalDemonGod](https://github.com/ImmortalDemonGod)  
+**Project:** [mastery-engine](https://github.com/ImmortalDemonGod/mastery-engine)  
+**Issues:** [Report bugs or request features](https://github.com/ImmortalDemonGod/mastery-engine/issues)
 
 ---
 

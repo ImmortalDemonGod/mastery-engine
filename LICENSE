@@ -1,7 +1,52 @@
-Copyright 2025 Stanford University
+MIT License
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Copyright (c) 2024-2025 ImmortalDemonGod
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Third-Party Content Attributions
+
+### Stanford CS336 Curriculum Content
+The cs336_a1 curriculum is adapted from Stanford CS336 (Language Modeling) course materials.
+Original course: https://stanford-cs336.github.io/spring2024/
+Course content remains property of Stanford University and original authors.
+
+### LeetCode Problem Data
+The cp_accelerator curriculum references LeetCode problems for educational purposes.
+Problem descriptions and test cases are property of LeetCode LLC.
+
+### 30 Days of Python
+Python curriculum content adapted from "30 Days of Python" by Asabeneh Yetayeh.
+Original repository: https://github.com/Asabeneh/30-Days-Of-Python
+Licensed under MIT License.
+
+---
+
+## Mastery Engine: Original Contributions
+
+The following components are original engineering work:
+- Engine architecture (engine/)
+- AST mutation system (engine/ast_harden/)
+- Shadow worktree management (engine/workspace.py)
+- CLI tooling (engine/main.py)
+- Curriculum generation pipeline (scripts/generate_module.py)
+- Test suite (tests/)
+- Mock mode LLM fallback
