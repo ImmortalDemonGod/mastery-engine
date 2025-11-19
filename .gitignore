@@ -165,7 +165,8 @@ cython_debug/
 
 # Mastery Engine - Dual Mode System
 .active-mode
-cs336_basics/                  # Derived workspace (symlink to modes/)
+cs336_basics                   # Derived workspace (symlink to modes/)
+cs336_basics/                  # Also ignore if it's a directory
 .mastery_engine_worktree/
 .mastery_progress.json
 
