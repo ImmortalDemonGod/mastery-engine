@@ -56,12 +56,21 @@ class LLMService:
         if api_key is None:
             api_key = os.getenv("OPENAI_API_KEY")
         
+        # Enable mock mode if no API key (for demo/portfolio viewing)
         if not api_key:
-            raise ConfigurationError(
-                "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.\n"
-                "You can get an API key from: https://platform.openai.com/api-keys"
+            self.use_mock = True
+            self.client = None
+            self.model = model
+            self.timeout = timeout
+            logger.warning(
+                "⚠️  No OpenAI API key found. LLMService operating in MOCK mode.\n"
+                "   Justify stage will auto-pass with simulated feedback.\n"
+                "   Set OPENAI_API_KEY environment variable for production use.\n"
+                "   Get a key from: https://platform.openai.com/api-keys"
             )
+            return
         
+        self.use_mock = False
         self.model = model
         self.timeout = timeout
         
@@ -96,6 +105,22 @@ class LLMService:
             LLMResponseError: If response is malformed or unparsable
             LLMAPIError: If API call fails (network, auth, rate limit, etc.)
         """
+        # Mock mode: auto-pass for demo/portfolio viewing
+        if self.use_mock:
+            logger.info(f"[MOCK MODE] Auto-passing justify question '{question.id}'")
+            return LLMEvaluationResponse(
+                is_correct=True,
+                feedback=(
+                    "🎭 MOCK MODE: No OpenAI API key detected.\n\n"
+                    "In production, GPT-4o would evaluate your response against:\n"
+                    f"- Model Answer: {question.model_answer[:100]}...\n"
+                    f"- Required Concepts: {', '.join(question.required_concepts[:3])}\n"
+                    f"- Failure Modes: {', '.join(question.failure_modes[:3])}\n\n"
+                    "This step is auto-passed for demonstration purposes.\n"
+                    "Set OPENAI_API_KEY to enable real LLM evaluation."
+                )
+            )
+        
         try:
             # Construct Chain-of-Thought prompt
             prompt = self._build_cot_prompt(question, user_answer)
@@ -189,6 +214,11 @@ class LLMService:
         Raises:
             LLMAPIError: If API call fails
         """
+        # Mock mode: return placeholder
+        if self.use_mock:
+            logger.warning("[MOCK MODE] generate_completion called without API key - returning placeholder")
+            return "MOCK_RESPONSE: LLM generation not available in mock mode"
+        
         try:
             messages = []
             if system:

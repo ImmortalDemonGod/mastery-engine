@@ -210,21 +210,36 @@ Human expert refines:
 
 ## Current Status
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-11-17  
-**Modules**: 11 (foundation complete)
+**Version**: 1.0.0 (Demonstration)  
+**Last Updated**: 2025-11-19  
+**Problems**: 38 across 19 patterns (breadth-first)  
 
-### Completed Modules
-- ✅ `sorting` - Merge sort with bug injection
-- 🔄 `two_pointers_basics` - Scaffolded, needs curation
-- 🔄 `two_pointers_sliding_window` - Scaffolded
-- 🔄 `hash_table_basics` - Scaffolded
-- 🔄 ... 7 more foundation modules
+### 🎯 Demonstration Architecture Note
+
+This curriculum serves as a **proof-of-concept for the automated content generation pipeline**. The system demonstrates its ability to:
+
+1. **Parse** unstructured LeetCode problem data
+2. **Transform** into structured JSON schemas  
+3. **Generate** build prompts, test cases, and validators at scale
+4. **Organize** content in the `patterns/{pattern}/problems/{problem}/` hierarchy
+
+**Content Status:**
+- ✅ `sorting/lc_912` - Fully implemented with manual curation
+- ✅ `hash_table/lc_1` (Two Sum) - Manually curated reference implementation  
+- 🤖 **36 other problems** - Auto-generated via `scripts/generate_module.py --all --limit-per-pattern 2`
+
+**Why Breadth-First?**  
+Rather than deeply implementing 2-3 patterns, we generated 2 problems per pattern across all 19 patterns to demonstrate:
+- **Scalability**: Pipeline handles diverse problem types (graphs, DP, trees, etc.)
+- **Consistency**: Generated artifacts follow standardized schemas
+- **Taxonomy Coverage**: Full competitive programming skill map
+
+**For Portfolio Reviewers:**  
+This demonstrates data engineering and metaprogramming capabilities. The automated generation pipeline (`scripts/generate_module.py`) is the engineering achievement, not the individual problem implementations.
 
 ### Roadmap
-- **Short-term**: Complete all 11 foundation modules (0-1399 rating)
-- **Medium-term**: Expand to 19 modules (full DSA Taxonomy coverage)
-- **Long-term**: Add advanced modules (1900+ rating)
+- **Phase 8 Complete**: Breadth-first scaffolding (38 problems)
+- **Future**: Depth-first curation (full justify questions + bug injection for each problem)
 
 ## Sources
 
