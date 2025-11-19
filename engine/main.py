@@ -266,7 +266,42 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     
     question = questions[0]
     
-    # Open editor for answer
+    # Check if LLM service is in mock mode (no API key)
+    llm_service = LLMService()
+    if llm_service.use_mock:
+        # Auto-pass in mock mode without requiring editor input
+        console.print()
+        console.print(Panel(
+            "🎭 [bold yellow]MOCK MODE: No OpenAI API key detected[/bold yellow]\n\n"
+            "Justify stage auto-passing for demonstration purposes.\n\n"
+            "In production mode (with OPENAI_API_KEY set):\n"
+            "• You would answer conceptual questions in your $EDITOR\n"
+            "• GPT-4o would evaluate your understanding\n"
+            "• Socratic feedback would guide your learning\n\n"
+            f"[dim]Question: {question.question[:80]}...[/dim]\n\n"
+            "To enable real LLM evaluation, set OPENAI_API_KEY environment variable.\n"
+            "Get a key from: https://platform.openai.com/api-keys",
+            title="✓ Justify Stage (Mock Mode)",
+            border_style="yellow"
+        ))
+        console.print()
+        
+        # Advance state to harden
+        progress.mark_stage_complete("justify")
+        state_mgr.save(progress)
+        logger.info(f"Justify stage auto-passed (mock mode) for module '{current_module.id}'")
+        
+        # Show next action
+        console.print(Panel(
+            "Next step: Debug a buggy implementation.\n\n"
+            "Run [bold cyan]mastery submit[/bold cyan] to continue.",
+            title="Next Action",
+            border_style="blue"
+        ))
+        console.print()
+        return True
+    
+    # Production mode: Open editor for answer
     editor = os.getenv('EDITOR', os.getenv('VISUAL', 'nano'))
     
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tf:
@@ -341,8 +376,7 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     
     # Step B: LLM semantic evaluation
     try:
-        llm_service = LLMService()
-        
+        # llm_service already created above (line 270) for mock mode check
         console.print()
         console.print("[dim]Evaluating your answer...[/dim]")
         
