@@ -102,40 +102,92 @@ class ManifestGenerator:
         return True
     
     def generate_manifest(self, canonical_data: dict) -> dict:
-        """Generate manifest structure from canonical topics."""
+        """Generate manifest structure based on curriculum type."""
         print("\n🏗️  Generating manifest.json...")
         
-        modules = []
-        for topic in self.topics:
-            module = {
-                "id": topic['id'],
-                "name": topic['name'],
-                "path": f"modules/{topic['id']}",
-                "dependencies": topic.get('dependencies', []),
-                "metadata": {
-                    "rating_bracket": topic['rating_bracket'],
-                    "priority": topic['priority'],
-                    "taxonomy_source": topic['taxonomy_path'],
-                    "estimated_hours": topic.get('estimated_hours', 5)
-                }
-            }
-            modules.append(module)
+        # Detect curriculum type (default to linear for backward compatibility)
+        curr_type = canonical_data.get('curriculum_type', 'linear')
+        print(f"  📚 Curriculum type: {curr_type.upper()}")
         
+        # Base manifest structure
         manifest = {
             "curriculum_name": "cp_accelerator",
             "description": "Systematic competitive programming mastery via rating-based progression",
             "author": f"Curated from DSA-Taxonomies + CP Roadmap (v{canonical_data['version']})",
             "version": canonical_data['version'],
+            "type": curr_type,  # LINEAR or LIBRARY
             "metadata": {
                 "sources": canonical_data['sources'],
                 "rating_system": "Codeforces",
                 "target_audience": "0-1899 rating",
                 "last_generated": canonical_data['last_updated']
-            },
-            "modules": modules
+            }
         }
         
-        print(f"  ✓ Generated manifest with {len(modules)} modules")
+        if curr_type == "library":
+            # LIBRARY MODE: Generate patterns -> problems hierarchy
+            patterns = []
+            total_problems = 0
+            
+            for topic in self.topics:
+                pattern_obj = {
+                    "id": topic['id'],
+                    "title": topic['name'],
+                    "theory_path": f"patterns/{topic['id']}/theory",
+                    "metadata": {
+                        "rating_bracket": topic.get('rating_bracket', '0-999'),
+                        "priority": topic.get('priority', 'Helpful'),
+                        "taxonomy_source": topic.get('taxonomy_path', ''),
+                        "estimated_hours": topic.get('estimated_hours', 5)
+                    },
+                    "problems": []
+                }
+                
+                # Generate problem entries
+                for prob in topic.get('problems', []):
+                    # Sanitize problem ID (e.g., "LC-912" -> "lc_912")
+                    raw_id = prob.get('id', '')
+                    p_id = raw_id.lower().replace('-', '_').replace(' ', '_')
+                    
+                    pattern_obj["problems"].append({
+                        "id": p_id,
+                        "title": prob.get('title', 'Untitled Problem'),
+                        "path": f"patterns/{topic['id']}/problems/{p_id}",
+                        "difficulty": prob.get('difficulty', 'Medium'),
+                        "metadata": {
+                            "url": prob.get('url', ''),
+                            "platform": prob.get('platform', 'LeetCode'),
+                            "original_id": raw_id
+                        }
+                    })
+                    total_problems += 1
+                
+                patterns.append(pattern_obj)
+            
+            manifest["patterns"] = patterns
+            print(f"  ✓ Generated LIBRARY manifest with {len(patterns)} patterns and {total_problems} problems")
+        
+        else:
+            # LINEAR MODE: Generate flat modules list (Legacy)
+            modules = []
+            for topic in self.topics:
+                module = {
+                    "id": topic['id'],
+                    "name": topic['name'],
+                    "path": f"modules/{topic['id']}",
+                    "dependencies": topic.get('dependencies', []),
+                    "metadata": {
+                        "rating_bracket": topic.get('rating_bracket', '0-999'),
+                        "priority": topic.get('priority', 'Helpful'),
+                        "taxonomy_source": topic.get('taxonomy_path', ''),
+                        "estimated_hours": topic.get('estimated_hours', 5)
+                    }
+                }
+                modules.append(module)
+            
+            manifest["modules"] = modules
+            print(f"  ✓ Generated LINEAR manifest with {len(modules)} modules")
+        
         return manifest
     
     def write_manifest(self, manifest: dict):
