@@ -179,3 +179,6 @@ coverage_html/
 .repoprompt/
 .repoprompt/filepartitions-24d55c1b-61bf-4f13-95ea-83c7afe05353-36d2f09b-b014-400c-83f2-093479e01c56.json
 .repoprompt/filepartitions-24d55c1b-61bf-4f13-95ea-83c7afe05353.json
+
+# Prevent API key leaks
+.env.backup
