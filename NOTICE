@@ -1,0 +1,71 @@
+Mastery Engine
+Copyright (c) 2024-2025 ImmortalDemonGod
+
+================================================================================
+
+This product includes content adapted from the following sources:
+
+1. Stanford University CS336 (Spring 2024)
+   - Course: Language Modeling from Scratch
+   - Website: https://stanford-cs336.github.io/spring2024/
+   - Content: Problem statements, mathematical specifications, reference implementations
+   - Usage: Adapted for cs336_a1 curriculum
+   - Note: Course materials remain property of Stanford University and original instructors
+
+2. LeetCode
+   - Website: https://leetcode.com
+   - Content: Problem descriptions and test cases
+   - Usage: Competitive programming curriculum (cp_accelerator)
+   - Note: Problem descriptions remain property of LeetCode LLC
+
+3. DSA Taxonomies
+   - Repository: https://github.com/Yassir-aykhlf/DSA-Taxonomies
+   - Author: Yassir Aykhlf
+   - Content: Data structures and algorithms taxonomy
+   - Usage: Problem categorization in cp_accelerator
+
+4. 30 Days of Python
+   - Repository: https://github.com/Asabeneh/30-Days-Of-Python
+   - Author: Asabeneh Yetayeh
+   - License: MIT License
+   - Content: Python programming concepts and examples
+   - Usage: Python curricula (python_for_cp, job_prep_data_annotation)
+
+================================================================================
+
+ORIGINAL CONTRIBUTIONS (Mastery Engine Architecture):
+
+The following components are original engineering work by ImmortalDemonGod:
+
+- Engine architecture and orchestration (engine/)
+- AST mutation system (engine/ast_harden/)
+- Shadow worktree management (engine/workspace.py)
+- CLI tooling and command interface (engine/main.py)
+- LLM validation service with mock mode (engine/services/llm_service.py)
+- Curriculum generation pipeline (scripts/)
+- Test suite (tests/)
+- Build-Justify-Harden pedagogical implementation
+- Mock mode fallback system
+
+These components are licensed under the MIT License (see LICENSE file).
+
+================================================================================
+
+SEPARATION OF CONCERNS:
+
+This repository demonstrates a clear separation between:
+1. SYSTEM ENGINEERING: The Mastery Engine architecture (original work)
+2. EDUCATIONAL CONTENT: Curriculum materials (adapted from cited sources)
+
+The engineering achievement is the creation of a platform that enables:
+- Runtime AST-based bug injection
+- Shadow worktree process isolation  
+- Cost-optimized LLM evaluation
+- Automated curriculum generation
+
+The curriculum content serves as demonstration material for these capabilities.
+
+================================================================================
+
+For complete licensing terms, see the LICENSE file.
+For curriculum-specific attributions, see READMEs in curricula/ subdirectories.

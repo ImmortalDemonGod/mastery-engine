@@ -364,19 +364,34 @@ See [`docs/current/BUG_INJECTION_GUIDE.md`](docs/current/BUG_INJECTION_GUIDE.md)
 
 ## 📜 License & Attribution
 
-This project builds upon Stanford CS336 coursework. The core engine architecture (`engine/`), AST injection system, CLI tooling, and curriculum generation pipeline are original engineering contributions.
+This project is a dual-composition of original systems engineering and adapted educational content.
 
-Course content (where applicable) remains property of original authors. See individual curriculum READMEs for attribution.
+### The Mastery Engine (Original Work)
 
-**License:** See [LICENSE](LICENSE) file
+The core architecture is **original engineering work** licensed under the **MIT License**:
+- **CLI Orchestration:** Command-line interface and workflow management (`engine/main.py`)
+- **AST Mutation Engine:** Runtime code transformation system (`engine/ast_harden/`)
+- **Shadow Worktree System:** Process isolation via git internals (`engine/workspace.py`)
+- **Validation Pipeline:** Test harness and LLM evaluation (`engine/validator.py`, `engine/services/`)
+- **Curriculum Generation:** Automated content pipeline (`scripts/generate_module.py`)
 
----
+### Curriculum Content (Adapted)
 
-## 🙏 Acknowledgments
+Educational materials are adapted from the following sources:
 
-- **Stanford CS336** - Foundation for transformer curriculum  
-- **LeetCode** - Problem data for competitive programming curriculum  
-- **30 Days of Python** - Source material for Python curricula
+- **Deep Learning (cs336_a1):** Problem statements and mathematical specifications adapted from **[Stanford CS336 (Spring 2024)](https://stanford-cs336.github.io/spring2024/)**. Reference implementations derive from course assignments. The "Justify" questions and "Harden" bug patterns were engineered specifically for this platform.
+
+- **Competitive Programming (cp_accelerator):** Problem taxonomies derived from **[LeetCode](https://leetcode.com)** and **[DSA Taxonomies](https://github.com/Yassir-aykhlf/DSA-Taxonomies)**. Problem descriptions remain property of respective authors.
+
+- **Python Basics (python_for_cp, job_prep_data_annotation):** Concepts adapted from **[30 Days of Python](https://github.com/Asabeneh/30-Days-Of-Python)** by Asabeneh Yetayeh (MIT License).
+
+**See individual curriculum READMEs for detailed attribution.**
+
+### What This Means
+
+**Your Contribution:** The engineering achievement is the **system architecture** that enables runtime AST mutation, shadow worktree isolation, and cost-optimized LLM validation—not the specific curriculum problems.
+
+**License:** See [LICENSE](LICENSE) and [NOTICE](NOTICE) files for complete terms.
 
 ---
 

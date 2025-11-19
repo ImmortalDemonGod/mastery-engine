@@ -1,25 +1,26 @@
 # CS336 Assignment 1: Deep Learning Basics
 
-## Attribution
+## 📜 Attribution
 
-This curriculum is **adapted from Stanford CS336 (Language Modeling)** coursework.
+**Source:** Adapted from **[Stanford CS336: Language Modeling from Scratch (Spring 2024)](https://stanford-cs336.github.io/spring2024/)**.
 
-**Original Course:**
-- Institution: Stanford University
-- Course: CS336 - Language Modeling from Scratch
-- Website: https://stanford-cs336.github.io/spring2024/
-- Assignment: Assignment 1 - Basics
+### Content Ownership
 
-**Content Ownership:**
-Course materials, problem descriptions, and pedagogical structure remain property of Stanford University and the original course instructors.
+- **Problem Statements:** Mathematical specifications and implementation requirements derive from Stanford CS336 course assignments.
+- **Reference Implementations:** Build prompts and solution patterns follow the course structure.
+- **Intellectual Property:** Course materials remain property of Stanford University and the original course instructors.
 
-**What is Original (Mastery Engine Contributions):**
-- Engine architecture for Build-Justify-Harden pedagogy
-- AST-based bug injection system
-- Automated test harness and validation
-- LLM-powered justify evaluation
-- Shadow worktree harden challenges
-- Mock mode fallback for demo purposes
+### Mastery Engine Extensions (Original Work)
+
+The following components were **engineered specifically for this platform** and do not appear in the original Stanford course:
+
+1. **"Justify" Questions:** Conceptual understanding evaluation with LLM-powered Socratic dialogue
+2. **"Harden" Bug Patterns:** Semantic bug injection via AST mutation (not present in original coursework)
+3. **Test Harness:** Automated validation with performance metrics
+4. **Mock Mode:** Credential-free demo capability
+5. **Shadow Worktree:** Process isolation for safe bug debugging
+
+**Critical Distinction:** The reference implementations answer *what to build*. The Mastery Engine provides the *how to validate, explain, and debug*.
 
 ## Curriculum Overview
 

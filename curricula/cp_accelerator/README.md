@@ -2,13 +2,29 @@
 
 **Systematic rating-based progression from 0 to 1899 via pattern mastery**
 
+## 📜 Attribution
+
+**Sources:** Problem data and taxonomy adapted from:
+- **[LeetCode](https://leetcode.com)** - Problem descriptions, test cases, and difficulty ratings
+- **[DSA Taxonomies](https://github.com/Yassir-aykhlf/DSA-Taxonomies)** - Hierarchical pattern classification by Yassir Aykhlf
+
+### Content Ownership
+
+- **Problem Descriptions:** Remain property of LeetCode LLC
+- **Taxonomy Structure:** Derived from DSA Taxonomies repository
+- **Problem Selection:** Curated via rating analysis and pattern distribution
+
+### Mastery Engine Contributions (Original)
+
+The following were **engineered for this platform**:
+1. **Automated Breadth-First Generation:** Parsing 38 LeetCode problems into structured JSON schemas
+2. **Pattern-Problem Mapping:** Automated linkage between abstract patterns and concrete problems
+3. **LIBRARY Mode Implementation:** Freeform curriculum navigation (vs LINEAR sequences)
+4. **Canonical Source Architecture:** Single source of truth via `canonical_curriculum.json`
+
 ## Overview
 
-This curriculum fuses two authoritative sources:
-- **CP Roadmap**: Rating-based topic progression (what to learn when)
-- **DSA Taxonomy**: Hierarchical pattern breakdown (how to practice each topic)
-
-Powered by the Mastery Engine's **Build-Justify-Harden** loop for deep, resilient skill development.
+This curriculum fuses two authoritative sources for systematic skill development, powered by the Mastery Engine's **Build-Justify-Harden** loop.
 
 ## Architecture
 
