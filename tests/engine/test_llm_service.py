@@ -52,12 +52,13 @@ class TestLLMServiceInit:
         service = LLMService()
         assert service.client is not None
     
-    def test_init_missing_api_key_raises_error(self, monkeypatch):
-        """Should raise ConfigurationError if API key is missing."""
+    def test_init_missing_api_key_enables_mock_mode(self, monkeypatch):
+        """Should enable mock mode when API key is missing (for demo purposes)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         
-        with pytest.raises(ConfigurationError, match="API key not found"):
-            LLMService()
+        service = LLMService()
+        assert service.use_mock is True
+        assert service.client is None
     
     def test_init_custom_model_and_timeout(self):
         """Should accept custom model and timeout parameters."""
