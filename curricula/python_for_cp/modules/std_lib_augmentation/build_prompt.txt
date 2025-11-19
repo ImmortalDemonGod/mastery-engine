@@ -1,0 +1,199 @@
+# Build Challenge: Essential CP Libraries
+
+## Learning Objective
+Master the three most critical Python Standard Library modules for Competitive Programming: **`collections.deque`**, **`heapq`**, and **`bisect`**. These modules provide efficient implementations of fundamental algorithms that appear in 60%+ of CP problems.
+
+## Problem Statement
+Implement three classic algorithms using Python's standard library instead of naive implementations. This demonstrates when to leverage built-in tools vs. rolling your own.
+
+---
+
+## Part 1: BFS with `collections.deque`
+
+### Why deque?
+BFS requires $O(1)$ append and popleft operations. A list has $O(n)$ pop(0), making it unsuitable for large graphs.
+
+### Specification
+Implement the following in `cs336_basics/utils.py`:
+
+```python
+from collections import deque
+
+def shortest_path_bfs(graph: dict[int, list[int]], start: int, end: int) -> int:
+    """
+    Find shortest path length between start and end using BFS.
+    
+    Args:
+        graph: Adjacency list {node: [neighbors]}
+        start: Starting node
+        end: Target node
+    
+    Returns:
+        Shortest path length, or -1 if no path exists
+        
+    Example:
+        graph = {0: [1, 2], 1: [3], 2: [3], 3: []}
+        shortest_path_bfs(graph, 0, 3) == 2  # 0 -> 1 -> 3
+    """
+```
+
+### Critical deque Operations
+```python
+from collections import deque
+
+queue = deque([start])           # Initialize with starting node
+queue.append(node)                # Add to right (O(1))
+current = queue.popleft()         # Remove from left (O(1))
+if not queue:                     # Check if empty
+    break
+```
+
+**Compare to list:**
+- `list.append()` - O(1) ✅
+- `list.pop(0)` - O(n) ❌ (shifts all elements)
+- `deque.popleft()` - O(1) ✅
+
+---
+
+## Part 2: Dijkstra's Algorithm with `heapq`
+
+### Why heapq?
+Dijkstra requires repeatedly extracting the minimum-cost node. A min-heap does this in $O(\log n)$ vs. $O(n)$ for naive list searching.
+
+### Specification
+
+```python
+import heapq
+
+def dijkstra_shortest_path(graph: dict[int, list[tuple[int, int]]], 
+                          start: int, 
+                          end: int) -> int:
+    """
+    Find shortest weighted path using Dijkstra's algorithm.
+    
+    Args:
+        graph: Adjacency list {node: [(neighbor, weight), ...]}
+        start: Starting node
+        end: Target node
+    
+    Returns:
+        Minimum cost to reach end, or float('inf') if unreachable
+        
+    Example:
+        graph = {0: [(1, 4), (2, 1)], 1: [(3, 1)], 2: [(3, 5)], 3: []}
+        dijkstra_shortest_path(graph, 0, 3) == 5  # 0 -> 1 -> 3
+    """
+```
+
+### Critical heapq Operations
+```python
+import heapq
+
+heap = [(0, start)]              # List of (cost, node) tuples
+heapq.heappush(heap, (cost, node))  # Add element (O(log n))
+cost, node = heapq.heappop(heap)    # Extract minimum (O(log n))
+```
+
+**Key Insight:** Python's heapq is a **min-heap** by default. For max-heap, negate values: `heappush(heap, -value)`.
+
+---
+
+## Part 3: Binary Search with `bisect`
+
+### Why bisect?
+Binary search on sorted arrays appears in 1/3 of CP problems. `bisect` handles edge cases (duplicates, insertion points) that manual implementations get wrong.
+
+### Specification
+
+```python
+import bisect
+
+def count_in_range(sorted_arr: list[int], low: int, high: int) -> int:
+    """
+    Count elements in [low, high] in a sorted array.
+    
+    Args:
+        sorted_arr: Sorted list of integers
+        low: Lower bound (inclusive)
+        high: Upper bound (inclusive)
+    
+    Returns:
+        Number of elements in range
+        
+    Example:
+        count_in_range([1, 2, 4, 4, 5, 7], 3, 5) == 3  # [4, 4, 5]
+    """
+```
+
+### Critical bisect Operations
+```python
+import bisect
+
+# Find insertion point for value
+idx = bisect.bisect_left(arr, value)   # First position >= value
+idx = bisect.bisect_right(arr, value)  # First position > value
+
+# Insert while maintaining sort
+bisect.insort(arr, value)               # O(n) - use sparingly
+```
+
+**Algorithm:**
+```python
+# Count elements in [low, high]
+left_idx = bisect.bisect_left(sorted_arr, low)     # First >= low
+right_idx = bisect.bisect_right(sorted_arr, high)  # First > high
+count = right_idx - left_idx
+```
+
+---
+
+## Implementation Guidelines
+
+### Requirements
+1. **Import at top of file**: `from collections import deque`, `import heapq`, `import bisect`
+2. **Use library operations**: No manual list.pop(0) or heap implementations
+3. **Handle edge cases**: Empty graphs, unreachable nodes, empty arrays
+4. **Time complexity**: Must achieve optimal complexity using these libraries
+
+### Common Pitfalls
+1. **deque**: Using `list.pop(0)` instead of `deque.popleft()` (10x slower)
+2. **heapq**: Forgetting to check `visited` set (infinite loops on cycles)
+3. **bisect**: Confusing `bisect_left` and `bisect_right` for ranges
+
+---
+
+## Testing Your Implementation
+
+```bash
+mastery submit
+```
+
+The validator tests:
+- **BFS**: Small graphs, disconnected graphs, cycles
+- **Dijkstra**: Weighted graphs, negative reachability check
+- **Bisect**: Empty arrays, duplicates, boundary values
+- **Performance**: Large inputs to verify $O(\log n)$ vs. $O(n)$ complexity
+
+---
+
+## When to Use Each Library
+
+| Problem Type | Library | Time Complexity | Example Use Case |
+|--------------|---------|-----------------|------------------|
+| Shortest path (unweighted) | `deque` | O(V + E) | BFS, level-order traversal |
+| Shortest path (weighted) | `heapq` | O(E log V) | Dijkstra, A* search |
+| Kth largest/smallest | `heapq` | O(n log k) | Top K elements |
+| Binary search | `bisect` | O(log n) | Range queries, insertion point |
+| Sliding window max/min | `deque` | O(n) | Monotonic deque pattern |
+
+---
+
+## Resources
+- [collections.deque Documentation](https://docs.python.org/3/library/collections.html#collections.deque)
+- [heapq Documentation](https://docs.python.org/3/library/heapq.html)
+- [bisect Documentation](https://docs.python.org/3/library/bisect.html)
+- [Time Complexity Reference](https://wiki.python.org/moin/TimeComplexity)
+
+---
+
+**Success Criterion**: Your implementations must pass all test cases and achieve the correct time complexity (verified by performance tests on large inputs).

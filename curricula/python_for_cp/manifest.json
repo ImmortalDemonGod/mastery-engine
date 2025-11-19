@@ -1,0 +1,41 @@
+{
+  "curriculum_name": "python_for_cp",
+  "author": "Mastery Engine Curriculum Team",
+  "version": "1.0.0",
+  "description": "Python Standard Library mastery for Competitive Programming and Algorithmic Interviews (LeetCode, Codeforces)",
+  "modules": [
+    {
+      "id": "pythonic_structures",
+      "name": "Core Data Structures & O(1) Lookups",
+      "path": "modules/pythonic_structures",
+      "baseline_perf_seconds": 0.10,
+      "dependencies": [],
+      "metadata": {
+        "source": "30_days_05_Lists + 30_days_06_Tuples + 30_days_07_Sets + 30_days_08_Dictionaries",
+        "focus": "Hash maps, frequency counters, set operations, immutability"
+      }
+    },
+    {
+      "id": "concise_logic",
+      "name": "List Comprehensions & Pythonic Patterns",
+      "path": "modules/concise_logic",
+      "baseline_perf_seconds": 0.08,
+      "dependencies": ["pythonic_structures"],
+      "metadata": {
+        "source": "30_days_13_List_comprehension + 30_days_11_Functions",
+        "focus": "Writing terse, readable code for CP time constraints"
+      }
+    },
+    {
+      "id": "std_lib_augmentation",
+      "name": "Essential CP Libraries: collections, heapq, bisect",
+      "path": "modules/std_lib_augmentation",
+      "baseline_perf_seconds": 0.12,
+      "dependencies": ["pythonic_structures", "concise_logic"],
+      "metadata": {
+        "source": "Synthetic (Missing from 30 Days)",
+        "focus": "deque (BFS), heapq (Dijkstra), bisect (binary search)"
+      }
+    }
+  ]
+}

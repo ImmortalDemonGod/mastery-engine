@@ -1,0 +1,21 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -1,15 +1,15 @@
+ def shortest_path_bfs(graph: dict[int, list[int]], start: int, end: int) -> int:
+     """Find shortest path using BFS."""
+-    from collections import deque
+     
+     if start == end:
+         return 0
+     
+-    queue = deque([(start, 0)])
++    # BUG: Using list instead of deque
++    queue = [(start, 0)]
+     visited = {start}
+     
+     while queue:
+-        node, dist = queue.popleft()
++        node, dist = queue.pop(0)  # O(n) operation!
+         
+         for neighbor in graph.get(node, []):
+             if neighbor == end:
