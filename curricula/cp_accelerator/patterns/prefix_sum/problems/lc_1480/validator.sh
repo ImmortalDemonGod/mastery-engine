@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Running Sum of 1d Array
 # Runs solution against example test cases
 
 set -e

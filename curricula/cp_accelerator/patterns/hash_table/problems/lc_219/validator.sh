@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Contains Duplicate II
 # Runs solution against example test cases
 
 set -e

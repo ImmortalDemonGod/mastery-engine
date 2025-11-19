@@ -1,0 +1,53 @@
+{
+  "problem": "Remove Linked List Elements",
+  "source": "https://leetcode.com/problems/remove-linked-list-elements/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "head": [
+          1,
+          2,
+          6,
+          3,
+          4,
+          5,
+          6
+        ],
+        "val": 6
+      },
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "note": "Example 1"
+    },
+    {
+      "id": 2,
+      "input": {
+        "head": [],
+        "val": 1
+      },
+      "expected": [],
+      "note": "Example 2"
+    },
+    {
+      "id": 3,
+      "input": {
+        "head": [
+          7,
+          7,
+          7,
+          7
+        ],
+        "val": 7
+      },
+      "expected": [],
+      "note": "Example 3"
+    }
+  ]
+}

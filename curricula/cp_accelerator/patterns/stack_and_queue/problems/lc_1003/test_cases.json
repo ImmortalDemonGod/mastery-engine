@@ -1,0 +1,31 @@
+{
+  "problem": "Check If Word Is Valid After Substitutions",
+  "source": "https://leetcode.com/problems/check-if-word-is-valid-after-substitutions/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "s": "aabcbc"
+      },
+      "expected": "true",
+      "note": "Example 1"
+    },
+    {
+      "id": 2,
+      "input": {
+        "s": "abcabcababcc"
+      },
+      "expected": "true",
+      "note": "Example 2"
+    },
+    {
+      "id": 3,
+      "input": {
+        "s": "abccba"
+      },
+      "expected": "false",
+      "note": "Example 3: It is impossible to get \"abccba\" using the operati..."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "problem": "LRU Cache",
+  "source": "https://leetcode.com/problems/lru-cache/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {},
+      "expected": "[null, null, null, 1, null, -1, null, -1, 3, 4]",
+      "note": "Example 1: LRUCache lRUCache = new LRUCache(2);\nlRUCache.put(..."
+    }
+  ]
+}

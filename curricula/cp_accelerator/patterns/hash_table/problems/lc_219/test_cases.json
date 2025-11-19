@@ -1,0 +1,51 @@
+{
+  "problem": "Contains Duplicate II",
+  "source": "https://leetcode.com/problems/contains-duplicate-ii/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "nums": [
+          1,
+          2,
+          3,
+          1
+        ],
+        "k": 3
+      },
+      "expected": "true",
+      "note": "Example 1"
+    },
+    {
+      "id": 2,
+      "input": {
+        "nums": [
+          1,
+          0,
+          1,
+          1
+        ],
+        "k": 1
+      },
+      "expected": "true",
+      "note": "Example 2"
+    },
+    {
+      "id": 3,
+      "input": {
+        "nums": [
+          1,
+          2,
+          3,
+          1,
+          2,
+          3
+        ],
+        "k": 2
+      },
+      "expected": "false",
+      "note": "Example 3"
+    }
+  ]
+}

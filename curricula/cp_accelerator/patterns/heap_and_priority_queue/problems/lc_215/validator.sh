@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Kth Largest Element in an Array
 # Runs solution against example test cases
 
 set -e

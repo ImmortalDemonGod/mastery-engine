@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Range Sum Query - Immutable
 # Runs solution against example test cases
 
 set -e

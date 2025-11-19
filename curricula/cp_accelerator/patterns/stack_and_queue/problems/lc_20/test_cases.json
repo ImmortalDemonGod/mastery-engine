@@ -1,0 +1,47 @@
+{
+  "problem": "Valid Parentheses",
+  "source": "https://leetcode.com/problems/valid-parentheses/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "s": "()"
+      },
+      "expected": "true",
+      "note": "Example 1"
+    },
+    {
+      "id": 2,
+      "input": {
+        "s": "()[]{}"
+      },
+      "expected": "true",
+      "note": "Example 2"
+    },
+    {
+      "id": 3,
+      "input": {
+        "s": "(]"
+      },
+      "expected": "false",
+      "note": "Example 3"
+    },
+    {
+      "id": 4,
+      "input": {
+        "s": "([])"
+      },
+      "expected": "true",
+      "note": "Example 4"
+    },
+    {
+      "id": 5,
+      "input": {
+        "s": "([)]"
+      },
+      "expected": "false",
+      "note": "Example 5"
+    }
+  ]
+}

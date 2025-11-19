@@ -1,0 +1,98 @@
+# Build Challenge: Kth Largest Element in a Stream
+
+## Pattern Overview
+
+> Heaps are specialized tree-based data structures that satisfy the heap property, making them efficient for finding minimum or maximum elements. Priority queues are abstract data types typically implemented with heaps.
+
+## Problem Statement
+
+You are part of a university admissions office and need to keep track of the `kth` highest test score from applicants in real-time. This helps to determine cut-off marks for interviews and admissions dynamically as new applicants submit their scores.
+You are tasked to implement a class which, for a given integer `k`, maintains a stream of test scores and continuously returns the `k`th highest test score **after** a new score has been submitted. More specifically, we are looking for the `k`th highest score in the sorted list of all scores.
+Implement the `KthLargest` class:
+
+- `KthLargest(int k, int[] nums)` Initializes the object with the integer `k` and the stream of test scores `nums`.
+- `int add(int val)` Adds a new test score `val` to the stream and returns the element representing the `kth` largest element in the pool of test scores so far.
+
+**Example 1:**
+
+**Input:**
+["KthLargest", "add", "add", "add", "add", "add"]
+[[3, [4, 5, 8, 2]], [3], [5], [10], [9], [4]]
+**Output:** [null, 4, 5, 5, 8, 8]
+**Explanation:**
+KthLargest kthLargest = new KthLargest(3, [4, 5, 8, 2]);
+kthLargest.add(3); // return 4
+kthLargest.add(5); // return 5
+kthLargest.add(10); // return 5
+kthLargest.add(9); // return 8
+kthLargest.add(4); // return 8
+
+**Example 2:**
+
+**Input:**
+["KthLargest", "add", "add", "add", "add"]
+[[4, [7, 7, 7, 7, 8, 3]], [2], [10], [9], [9]]
+**Output:** [null, 7, 7, 7, 8]
+**Explanation:**
+KthLargest kthLargest = new KthLargest(4, [7, 7, 7, 7, 8, 3]);
+kthLargest.add(2); // return 7
+kthLargest.add(10); // return 7
+kthLargest.add(9); // return 7
+kthLargest.add(9); // return 8
+ 
+**Constraints:**
+
+- `0 <= nums.length <= 104`
+- `1 <= k <= nums.length + 1`
+- `-104 <= nums[i] <= 104`
+- `-104 <= val <= 104`
+- At most `104` calls will be made to `add`.
+
+**Difficulty:** Easy | **Acceptance Rate:** 60.4%  
+**Topics:** Tree, Design, Binary Search Tree, Heap (Priority Queue), Binary Tree
+
+**Problem Link:** https://leetcode.com/problems/kth-largest-element-in-a-stream/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/kth-largest-element-in-a-stream/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/8. Heap Priority Queue.md', 'title': 'Heap and Priority Queue Taxonomy'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

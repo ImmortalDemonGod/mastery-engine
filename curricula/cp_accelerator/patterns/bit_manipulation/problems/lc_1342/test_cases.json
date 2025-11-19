@@ -1,0 +1,31 @@
+{
+  "problem": "Number of Steps to Reduce a Number to Zero",
+  "source": "https://leetcode.com/problems/number-of-steps-to-reduce-a-number-to-zero/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "num": 14
+      },
+      "expected": 6,
+      "note": "Example 1: Step 1) 14 is even; divide by 2 and obtain 7.\u00a0\nSte..."
+    },
+    {
+      "id": 2,
+      "input": {
+        "num": 8
+      },
+      "expected": 4,
+      "note": "Example 2: Step 1) 8 is even; divide by 2 and obtain 4.\u00a0\nStep..."
+    },
+    {
+      "id": 3,
+      "input": {
+        "num": 123
+      },
+      "expected": 12,
+      "note": "Example 3"
+    }
+  ]
+}

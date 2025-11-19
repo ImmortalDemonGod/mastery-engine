@@ -1,0 +1,86 @@
+# Build Challenge: Permutations II
+
+## Pattern Overview
+
+> Combinatorics and Number Theory provide mathematical tools for counting, arrangement, and number properties, enabling efficient solutions to problems involving permutations, combinations, prime numbers, and modular arithmetic.
+
+## Problem Statement
+
+Given a collection of numbers, `nums`, that might contain duplicates, return all possible unique permutations **in any order**.
+ 
+**Example 1:**
+
+```
+
+**Input:** nums = [1,1,2]
+**Output:**
+[[1,1,2],
+ [1,2,1],
+ [2,1,1]]
+
+```
+
+**Example 2:**
+
+```
+
+**Input:** nums = [1,2,3]
+**Output:** [[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]]
+
+```
+
+**Constraints:**
+
+- `1 <= nums.length <= 8`
+- `-10 <= nums[i] <= 10`
+
+**Difficulty:** Medium | **Acceptance Rate:** 62.5%  
+**Topics:** Array, Backtracking, Sorting
+
+**Problem Link:** https://leetcode.com/problems/permutations-ii/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/permutations-ii/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/18. Combinatorics and Number Theory.md', 'title': 'Combinatorics and Number Theory Taxonomy'}
+
+2. {'type': 'video', 'title': 'Complete Probability/Combinatorics Practice - Noob to Expert | Topic Stream 4', 'url': 'https://www.youtube.com/watch?v=le2enQgQ7Ws'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

@@ -1,50 +1,58 @@
 {
-  "problem": "Sort an Array",
-  "source": "https://leetcode.com/problems/sort-an-array/",
+  "problem": "Two Sum II - Input Array Is Sorted",
+  "source": "https://leetcode.com/problems/two-sum-ii---input-array-is-sorted/",
   "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
   "tests": [
     {
       "id": 1,
       "input": {
-        "nums": [
-          5,
+        "numbers": [
           2,
-          3,
-          1
-        ]
+          7,
+          11,
+          15
+        ],
+        "target": 9
       },
       "expected": [
         1,
-        2,
-        3,
-        5
+        2
       ],
-      "note": "Example 1: After sorting the array, the positions of some num..."
+      "note": "Example 1: The sum of 2 and 7 is 9. Therefore, index1 = 1, in..."
     },
     {
       "id": 2,
       "input": {
-        "nums": [
-          5,
-          1,
-          1,
+        "numbers": [
           2,
-          0,
-          0
-        ]
+          3,
+          4
+        ],
+        "target": 6
       },
       "expected": [
-        0,
-        0,
         1,
-        1,
-        2,
-        5
+        3
       ],
-      "note": "Example 2: Note that the values of nums are not necessarily u..."
+      "note": "Example 2: The sum of 2 and 4 is 6. Therefore index1 = 1, ind..."
     },
     {
       "id": 3,
+      "input": {
+        "numbers": [
+          -1,
+          0
+        ],
+        "target": -1
+      },
+      "expected": [
+        1,
+        2
+      ],
+      "note": "Example 3: The sum of -1 and 0 is -1. Therefore index1 = 1, i..."
+    },
+    {
+      "id": 4,
       "input": {
         "nums": [
           1
@@ -56,7 +64,7 @@
       "note": "Single element"
     },
     {
-      "id": 4,
+      "id": 5,
       "input": {
         "nums": []
       },
@@ -64,7 +72,7 @@
       "note": "Empty array edge case"
     },
     {
-      "id": 5,
+      "id": 6,
       "input": {
         "nums": [
           3,
@@ -80,7 +88,7 @@
       "note": "Reverse sorted"
     },
     {
-      "id": 6,
+      "id": 7,
       "input": {
         "nums": [
           1,
@@ -100,7 +108,7 @@
       "note": "Already sorted"
     },
     {
-      "id": 7,
+      "id": 8,
       "input": {
         "nums": [
           -5,

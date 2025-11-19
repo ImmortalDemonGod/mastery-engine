@@ -2,7 +2,7 @@
 
 ## Pattern Overview
 
-> Sorting algorithms organize data in a specific order, enabling efficient searching, data analysis, and serving as building blocks for more complex algorithms.
+> Divide and conquer is an algorithmic paradigm that breaks a problem into smaller subproblems, solves them independently, and then combines their solutions to solve the original problem, often enabling efficient solutions through recursion.
 
 ## Problem Statement
 
@@ -72,9 +72,7 @@ These curated resources will help you understand the pattern deeply:
 
 
 
-1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/5. Sorting.md', 'title': 'Sorting Algorithms Taxonomy'}
-
-2. {'type': 'article', 'title': 'Sorting', 'url': 'https://www.topcoder.com/thrive/articles/Sorting'}
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/13. Divide and Conquer.md', 'title': 'Divide and Conquer Taxonomy'}
 
 
 

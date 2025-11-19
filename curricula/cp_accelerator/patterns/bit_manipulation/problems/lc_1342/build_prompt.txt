@@ -1,0 +1,112 @@
+# Build Challenge: Number of Steps to Reduce a Number to Zero
+
+## Pattern Overview
+
+> Bit manipulation involves directly manipulating the binary representation of numbers using bitwise operations, offering efficient solutions for various computational problems.
+
+## Problem Statement
+
+Given an integer `num`, return the number of steps to reduce it to zero.
+In one step, if the current number is even, you have to divide it by `2`, otherwise, you have to subtract `1` from it.
+ 
+**Example 1:**
+
+```
+
+**Input:** num = 14
+**Output:** 6
+**Explanation:** 
+Step 1) 14 is even; divide by 2 and obtain 7. 
+Step 2) 7 is odd; subtract 1 and obtain 6.
+Step 3) 6 is even; divide by 2 and obtain 3. 
+Step 4) 3 is odd; subtract 1 and obtain 2. 
+Step 5) 2 is even; divide by 2 and obtain 1. 
+Step 6) 1 is odd; subtract 1 and obtain 0.
+
+```
+
+**Example 2:**
+
+```
+
+**Input:** num = 8
+**Output:** 4
+**Explanation:** 
+Step 1) 8 is even; divide by 2 and obtain 4. 
+Step 2) 4 is even; divide by 2 and obtain 2. 
+Step 3) 2 is even; divide by 2 and obtain 1. 
+Step 4) 1 is odd; subtract 1 and obtain 0.
+
+```
+
+**Example 3:**
+
+```
+
+**Input:** num = 123
+**Output:** 12
+
+```
+
+**Constraints:**
+
+- `0 <= num <= 106`
+
+**Difficulty:** Easy | **Acceptance Rate:** 85.7%  
+**Topics:** Math, Bit Manipulation
+
+**Problem Link:** https://leetcode.com/problems/number-of-steps-to-reduce-a-number-to-zero/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/number-of-steps-to-reduce-a-number-to-zero/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+## Hints
+
+If you're stuck, consider these hints:
+
+
+1. Simulate the process to get the final answer.
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/16. Bit Manipulation.md', 'title': 'Bit Manipulation Taxonomy'}
+
+2. {'type': 'video', 'title': 'Bitwise Operations for Competitive Programming | Topic Stream 8', 'url': 'https://www.youtube.com/watch?v=1um-WUyjess'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

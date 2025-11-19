@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Two Sum Less Than K
 # Runs solution against example test cases
 
 set -e

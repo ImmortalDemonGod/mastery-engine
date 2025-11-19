@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Number of Steps to Reduce a Number to Zero
 # Runs solution against example test cases
 
 set -e

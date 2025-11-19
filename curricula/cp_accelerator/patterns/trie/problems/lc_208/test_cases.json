@@ -1,0 +1,13 @@
+{
+  "problem": "Implement Trie (Prefix Tree)",
+  "source": "https://leetcode.com/problems/implement-trie-prefix-tree/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {},
+      "expected": "[null, null, true, false, true, null, true]",
+      "note": "Example 1: Trie trie = new Trie();\ntrie.insert(\"apple\");\ntrie..."
+    }
+  ]
+}

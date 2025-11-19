@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local validator for Sort an Array
+# Local validator for Check If Word Is Valid After Substitutions
 # Runs solution against example test cases
 
 set -e
