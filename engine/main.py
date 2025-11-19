@@ -702,9 +702,6 @@ def _submit_library_workflow(state_mgr, curr_mgr, progress, manifest) -> None:
         # Validate harden fix
         problem_path = curr_mgr.get_problem_path(progress.curriculum_id, progress.active_problem_id)
         
-        # Use HardenRunner for validation
-        harden_runner = HardenRunner(curr_mgr)
-        
         console.print(f"[bold cyan]Validating fix for {problem_meta.title}...[/bold cyan]")
         console.print()
         
@@ -1142,62 +1139,116 @@ def start_challenge():
                 f"[bold yellow]Wrong Stage[/bold yellow]\n\n"
                 f"The [bold cyan]start-challenge[/bold cyan] command only works in the Harden stage.\n\n"
                 f"Current stage: [bold]{progress.current_stage.upper()}[/bold]\n\n"
-                f"Use [bold cyan]engine show[/bold cyan] to view your current challenge.",
+                f"Use [bold cyan]mastery show[/bold cyan] to view your current challenge.",
                 title="Not in Harden Stage",
                 border_style="yellow"
             ))
             console.print()
             sys.exit(1)
         
-        # Check completion
-        if progress.current_module_index >= len(manifest.modules):
-            console.print()
-            console.print(Panel(
-                "[bold green]🎉 Congratulations![/bold green]\n\n"
-                "You have completed all modules in this curriculum!",
-                title="Curriculum Complete",
-                border_style="green"
-            ))
-            console.print()
-            return
-        
-        # Get current module
-        current_module = manifest.modules[progress.current_module_index]
-        
         # Ensure shadow worktree exists
         require_shadow_worktree()
         workspace_mgr = WorkspaceManager()
         harden_runner = HardenRunner(curr_mgr, workspace_mgr)
         
-        # Determine source file based on module
-        if current_module.id == "softmax":
-            source_file = Path("cs336_basics/utils.py")
+        # Route based on curriculum type
+        if manifest.type == CurriculumType.LIBRARY:
+            # LIBRARY mode: problem-based
+            if progress.active_problem_id is None:
+                console.print(Panel(
+                    "[bold yellow]No Problem Selected[/bold yellow]\n\n"
+                    "You must select a problem before starting a harden challenge.",
+                    title="LIBRARY MODE",
+                    border_style="yellow"
+                ))
+                sys.exit(1)
+            
+            # Get problem metadata
+            problem_lookup = curr_mgr.get_problem_metadata(progress.active_problem_id)
+            if problem_lookup is None:
+                console.print(Panel(
+                    f"[bold red]Invalid State[/bold red]\n\n"
+                    f"Active problem '{progress.active_problem_id}' not found in manifest.",
+                    title="ERROR",
+                    border_style="red"
+                ))
+                sys.exit(1)
+            
+            pattern_id, problem_meta = problem_lookup
+            pattern_meta = curr_mgr.get_pattern_metadata(pattern_id)
+            problem_path = curr_mgr.get_problem_path(progress.curriculum_id, progress.active_problem_id)
+            
+            # Present challenge (WRITES FILES)
+            console.print()
+            console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
+            console.print()
+            
+            harden_file, symptom = harden_runner.present_library_challenge(
+                progress.curriculum_id,
+                pattern_id,
+                problem_meta,
+                problem_path
+            )
+            
+            console.print(Panel(
+                symptom,
+                title=f"🐛 Debug Challenge: {problem_meta.title}",
+                subtitle=f"Pattern: {pattern_meta.title}",
+                border_style="yellow",
+                padding=(1, 2)
+            ))
+            console.print()
+            console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
+            console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
+            console.print()
+            
+            logger.info(f"Initialized harden challenge for problem '{progress.active_problem_id}'")
+        
         else:
-            source_file = Path(f"{current_module.id}.py")
-        
-        # Present challenge (WRITES FILES)
-        console.print()
-        console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
-        console.print()
-        
-        harden_file, symptom = harden_runner.present_challenge(
-            progress.curriculum_id,
-            current_module,
-            source_file
-        )
-        
-        console.print(Panel(
-            symptom,
-            title=f"🐛 Debug Challenge: {current_module.name}",
-            border_style="yellow",
-            padding=(1, 2)
-        ))
-        console.print()
-        console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
-        console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
-        console.print()
-        
-        logger.info(f"Initialized harden challenge for module '{current_module.id}'")
+            # LINEAR mode: module-based
+            if progress.current_module_index >= len(manifest.modules):
+                console.print()
+                console.print(Panel(
+                    "[bold green]🎉 Congratulations![/bold green]\n\n"
+                    "You have completed all modules in this curriculum!",
+                    title="Curriculum Complete",
+                    border_style="green"
+                ))
+                console.print()
+                return
+            
+            # Get current module
+            current_module = manifest.modules[progress.current_module_index]
+            
+            # Determine source file based on module
+            if current_module.id == "softmax":
+                source_file = Path("cs336_basics/utils.py")
+            else:
+                source_file = Path(f"{current_module.id}.py")
+            
+            # Present challenge (WRITES FILES)
+            console.print()
+            console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
+            console.print()
+            
+            harden_file, symptom = harden_runner.present_challenge(
+                progress.curriculum_id,
+                current_module,
+                source_file
+            )
+            
+            console.print(Panel(
+                symptom,
+                title=f"🐛 Debug Challenge: {current_module.name}",
+                border_style="yellow",
+                padding=(1, 2)
+            ))
+            console.print()
+            console.print(f"[bold cyan]📍 Fix the bug in:[/bold cyan] {harden_file}")
+            console.print(f"[dim]Your original correct implementation remains safe in the main directory.[/dim]")
+            console.print()
+            
+            logger.info(f"Initialized harden challenge for module '{current_module.id}'")
         
     except StateFileCorruptedError as e:
         console.print(Panel(

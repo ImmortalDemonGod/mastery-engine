@@ -16,7 +16,7 @@ import logging
 import random
 from pathlib import Path
 
-from engine.schemas import ModuleMetadata
+from engine.schemas import ModuleMetadata, ProblemMetadata
 from engine.workspace import WorkspaceManager, WorkspaceError
 from engine.curriculum import CurriculumManager
 
@@ -222,6 +222,114 @@ class HardenRunner:
             )
         
         return selected_bug, symptom_file
+    
+    def present_library_challenge(
+        self,
+        curriculum_id: str,
+        pattern_id: str,
+        problem: ProblemMetadata,
+        problem_path: Path
+    ) -> tuple[Path, str]:
+        """
+        Set up and present a harden challenge for LIBRARY mode (problem-based).
+        
+        In LIBRARY mode, the reference solution lives in the problem directory itself
+        (e.g., patterns/hash_table/problems/lc_1/solution.py), not in modes/developer.
+        
+        Args:
+            curriculum_id: ID of the current curriculum
+            pattern_id: ID of the pattern the problem belongs to
+            problem: Problem metadata
+            problem_path: Path to the problem directory
+            
+        Returns:
+            Tuple of (harden_file_path_in_shadow_worktree, symptom_description)
+            
+        Raises:
+            HardenChallengeError: If challenge setup fails
+        """
+        try:
+            # Verify shadow worktree exists
+            shadow_worktree = Path('.mastery_engine_worktree')
+            if not shadow_worktree.exists():
+                raise HardenChallengeError(
+                    "Shadow worktree not found. Please run 'mastery init' first."
+                )
+            
+            # Select a bug from problem's bugs directory
+            bugs_dir = problem_path / "bugs"
+            bug_file, symptom_file = self._select_bug(bugs_dir)
+            
+            logger.info(f"Selected bug for {problem.id}: {bug_file.name}")
+            
+            # Create harden directory in shadow worktree
+            harden_dir = shadow_worktree / "workspace" / "harden"
+            harden_dir.mkdir(parents=True, exist_ok=True)
+            harden_file = harden_dir / "solution.py"
+            
+            # Get the reference solution from problem directory
+            reference_solution = problem_path / "solution.py"
+            if not reference_solution.exists():
+                raise HardenChallengeError(
+                    f"Reference solution not found: {reference_solution}"
+                )
+            
+            # Dispatch based on bug type (.json = AST, .patch = legacy)
+            if bug_file.suffix == '.json':
+                # AST-based bug injection
+                from engine.ast_harden.generic_injector import GenericBugInjector
+                
+                logger.info("Using AST-based bug injection for LIBRARY mode")
+                
+                # Load student's code from main workspace
+                student_code_path = Path.cwd() / "solution.py"
+                if not student_code_path.exists():
+                    raise HardenChallengeError(
+                        f"Could not find student solution at {student_code_path}"
+                    )
+                
+                student_source_code = student_code_path.read_text(encoding='utf-8')
+                
+                # Inject bug using generic AST transformation
+                injector = GenericBugInjector(bug_file)
+                buggy_source_code, success = injector.inject(student_source_code)
+                
+                if not success:
+                    raise HardenChallengeError(
+                        "The AST bug injector failed to find the required semantic pattern in your code. "
+                        "This can happen if your implementation style is highly unusual. "
+                        "Please ensure your implementation follows standard practices or flag this as an issue."
+                    )
+                
+                # Write buggy code to harden workspace
+                harden_file.write_text(buggy_source_code, encoding='utf-8')
+                logger.info(f"AST bug injected successfully into {harden_file}")
+                
+            else:
+                # Patch-based bug injection (use reference solution)
+                import shutil
+                
+                logger.info("Using patch-based bug injection for LIBRARY mode")
+                
+                # Copy reference solution to harden workspace
+                shutil.copy2(reference_solution, harden_file)
+                logger.info(f"Copied reference solution to {harden_file}")
+                
+                # Apply patch
+                self.workspace_mgr.apply_patch(harden_file, bug_file)
+                logger.info(f"Applied patch {bug_file.name}")
+            
+            # Read symptom description
+            symptom = symptom_file.read_text(encoding='utf-8')
+            
+            logger.info(f"Harden challenge prepared for problem {problem.id}")
+            
+            return harden_file, symptom
+            
+        except WorkspaceError as e:
+            raise HardenChallengeError(f"Failed to set up harden challenge: {e}") from e
+        except Exception as e:
+            raise HardenChallengeError(f"Unexpected error in harden setup: {e}") from e
 
 
 class HardenChallengeError(Exception):
