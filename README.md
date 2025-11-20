@@ -394,7 +394,7 @@ Educational materials are adapted from the following sources:
 
 ### What This Means
 
-**Your Contribution:** The engineering achievement is the **system architecture** that enables runtime AST mutation, shadow worktree isolation, and cost-optimized LLM validation—not the specific curriculum problems.
+**Our Contribution:** The engineering achievement is the **system architecture** that enables runtime AST mutation, shadow worktree isolation, and cost-optimized LLM validation—not the specific curriculum problems.
 
 **License:** See [LICENSE](LICENSE) and [NOTICE](NOTICE) files for complete terms.
 
