@@ -76,7 +76,7 @@ No OpenAI API key required for demo - the engine operates in mock mode automatic
 
 ## 📚 Included Curricula
 
-### 1. **cs336_a1** - Stanford CS336: Language Modeling (LINEAR)
+### 1. **cs336_a1** - ['Stanford CS336'](https://stanford-cs336.github.io/spring2025/): Language Modeling (LINEAR)
 - **Target**: Deep learning practitioners building transformers from scratch
 - **Modules**: 21 modules (BPE Tokenizer → Full Training Loop)
 - **Tech Stack**: PyTorch, einops, tiktoken
