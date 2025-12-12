@@ -2,6 +2,7 @@
   "curriculum_name": "job_prep_data_annotation",
   "author": "Mastery Engine Curriculum Team",
   "version": "1.0.0",
+  "workspace_root": "job_prep",
   "description": "Surgical Python training for DataAnnotation coding assessments: HTTP requests, HTML parsing, and 2D grid manipulation",
   "modules": [
     {
