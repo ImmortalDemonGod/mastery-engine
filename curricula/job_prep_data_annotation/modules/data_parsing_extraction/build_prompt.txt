@@ -19,7 +19,7 @@ Note the **inconsistent formatting**: Sometimes there are spaces around `=`, som
 
 ## Specification
 
-Implement the following function in `cs336_basics/utils.py`:
+Implement the following function in `job_prep/parser.py`:
 
 ```python
 def extract_coordinates(html: str) -> list[tuple[int, int, str]]:
