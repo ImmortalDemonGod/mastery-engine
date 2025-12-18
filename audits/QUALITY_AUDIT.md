@@ -7,6 +7,22 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 ---
 
+## Audit Status
+
+**Status:** Complete (Checklist I–VII)
+
+**Findings Count:**
+- High: 7
+- Medium: 13
+- Low: 3
+
+**Top Priority Remediation (Recommended Order):**
+1. Fix CP Accelerator CI manifest validation to support LIBRARY curricula (`patterns`, not `modules`).
+2. Fix LIBRARY mode problem identity/caching: enforce unique addressing (e.g., `(pattern_id, problem_id)`) and prevent duplicate `problem.id` entries.
+3. Make AST bug injection fail-safe: reject unknown `replacement.type` values (avoid silent deletions); align bug definitions accordingly (e.g., unsupported `move_after`).
+4. Align CI Python version with `pyproject.toml` (`>=3.11`).
+5. Resolve path/UX consistency issues that affect real users: shadow worktree path centralization and CLI name consistency (`mastery` vs `engine`).
+
 ## Audit Findings Log
 
 *Log observations here as they are discovered during the execution of the checklist below.*
@@ -30,6 +46,12 @@ This document serves as the primary artifact for a systematic code audit of the 
 | `engine/ast_harden/generic_injector.py` | Correctness | `target_function` is only checked for existence; pattern matching/transforms are not scoped to that function body, so matches elsewhere could inject bugs in the wrong location. | Medium | Scope matching/transforms to the target function node (or add an explicit scoping mechanism). |
 | `engine/main.py` | Resilience | `init` syncs only modified tracked files (`git ls-files -m`) into the shadow worktree, ignoring untracked files and deletions; validation env can still diverge from the user workspace. | Medium | Sync untracked files (opt-in) and handle deletions/renames, or document the limitation clearly. |
 | `engine/schemas.py` | Schema/Tooling | The Pydantic `BugDefinition` schema (extra=forbid + limited `Pattern` fields) does not match observed bug JSON shapes (e.g., `Compare.ops`, richer `metadata`), and runtime injection does not validate against it. | Medium | Align schema with real bug files and validate at load time, or clearly separate “authoring schema” vs “runtime contract”. |
+| `.github/workflows/validate_cp_manifest.yml` | CI/Correctness | CP Accelerator validation scripts assume `manifest["modules"]` exists, but CP Accelerator is `type: "library"` and uses `patterns`, so the workflow will error and/or fail to validate the authoritative shape. | High | Update CI checks to validate `patterns` structure for LIBRARY curricula and remove legacy `modules` assumptions. |
+| `scripts/generate_manifest.py` + `engine/curriculum.py` | Correctness | LIBRARY mode assumes globally-unique `problem.id` (cache key is `problem_id`), but generated manifests can contain duplicates (e.g., `lc_912` appears multiple times), causing cache overwrites and ambiguous `select` behavior. | High | Enforce unique `(pattern_id, problem_id)` addressing (or globally-unique problem IDs) and validate/dedupe during manifest generation + curriculum load. |
+| `curricula/cp_accelerator/.../build_prompt.txt` | UX/Docs | CP Accelerator prompts instruct users to run `engine submit`, but the installed CLI entrypoint is `mastery` (and engine messaging is mixed elsewhere). | Medium | Standardize prompts and docs on the user-facing command name (likely `mastery`). |
+| `curricula/cp_accelerator/.../validator.sh` | Resilience | CP Accelerator validators call `python3` directly and do not use `MASTERY_PYTHON`, risking execution in the wrong environment and inconsistent dependency resolution. | Medium | Follow the cs336_a1 validator pattern: prefer `MASTERY_PYTHON`, fall back to venv/python3/uv. |
+| `.github/workflows/tests.yml` | CI/Resilience | CI runs on Python 3.10 while `pyproject.toml` declares `requires-python = ">=3.11"`, risking CI failures or false confidence. | High | Align CI Python version with project requirement (≥3.11) or lower the project requirement if intentional. |
+| `tests/e2e/` | Testing | E2E tests exist (and document known infra edge cases) but are not executed in CI, leaving full-loop regressions possible despite strong unit coverage. | Medium | Add a separate CI job for a small smoke E2E subset (or run nightly) to protect the end-to-end BJH loop. |
 
 ---
 
@@ -97,19 +119,19 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 ### VI. Content Integrity (`curricula/`)
 
-- [ ] **Canonical Source (CP Accelerator)**
+- [x] **Canonical Source (CP Accelerator)**
     - **Synchronization:** Is there a guarantee that `manifest.json` is perfectly synced with `canonical_curriculum.json`? (Check CI workflow `validate_cp_manifest.yml`).
     - **Dependency Cycles:** Does the topological sort in `generate_manifest.py` correctly catch all cycles?
 
-- [ ] **Validator Scripts (`validator.sh`)**
+- [x] **Validator Scripts (`validator.sh`)**
     - **Execution Environment:** Do they rely on environment variables (like `PYTHONPATH`) that might differ between user shells?
     - **Timeout Safety:** Does `engine/validator.py` enforce a strict timeout to prevent infinite loops in student code from hanging the engine?
 
 ### VII. Testing Infrastructure (`tests/`)
 
-- [ ] **Test Isolation**
+- [x] **Test Isolation**
     - **Mocking:** Do engine unit tests correctly mock the file system and `subprocess` calls?
     - **Integration:** Do E2E tests (`test_main_workflows_real.py`) actually exercise the file system logic, or are they mocking too much?
 
-- [ ] **Stranger Testing**
+- [x] **Stranger Testing**
     - **Reproducibility:** Does the test suite run cleanly on a fresh clone without existing virtual environments or config files? (Reference `STRANGER_TEST_RESULTS.md`).
