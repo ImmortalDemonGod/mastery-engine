@@ -24,6 +24,12 @@ This document serves as the primary artifact for a systematic code audit of the 
 | `engine/curriculum.py` | Schema Validation | `CurriculumManifest` does not enforce that `modules` is present for `type="linear"` (or `patterns` for `type="library"`), so malformed curricula may validate but later crash. | Medium | Add Pydantic validation enforcing conditional required fields based on `type`. |
 | `engine/services/llm_service.py` | Security/Cost | LLM prompt embeds raw user answer without strong delimiting; `evaluate_justification()` does not set `max_tokens`, risking prompt injection and unbounded cost. | Medium | Delimit user content (e.g., fenced blocks / XML tags) and set a conservative `max_tokens` for evaluation responses. |
 | `engine/state.py` | Resilience | State file schema has no versioning/migration path; future schema changes can hard-fail old state loads. | Medium | Add `schema_version` to state file with migration/compat handling (or a graceful reset path). |
+| `engine/ast_harden/pattern_matcher.py` | Correctness | Unknown `replacement.type` values fall through and are treated as deletion (`None`), so unsupported operations can silently delete nodes and still count as a “successful replacement”. | High | Validate `replacement.type` and raise on unsupported values; do not treat unknown types as deletion. |
+| `curricula/cp_accelerator/.../insert_before_check.json` | Correctness | Bug definition uses `replacement.type: "move_after"`, which is not implemented by the AST injector, so injection behavior will be incorrect (currently interpreted as deletion). | High | Either implement `move_after` (statement reorder) or rewrite the bug to use supported replacement operations. |
+| `engine/ast_harden/generic_injector.py` | Architecture | `find_and_replace` passes currently match directly in the original AST (`transformer.visit(original_ast)`) despite comments describing a canonical two-phase approach, reducing robustness to variable renaming. | Medium | Use the two-phase `transform_original()` with the canonical AST (or update docs/comments and ensure patterns are authored for original AST only). |
+| `engine/ast_harden/generic_injector.py` | Correctness | `target_function` is only checked for existence; pattern matching/transforms are not scoped to that function body, so matches elsewhere could inject bugs in the wrong location. | Medium | Scope matching/transforms to the target function node (or add an explicit scoping mechanism). |
+| `engine/main.py` | Resilience | `init` syncs only modified tracked files (`git ls-files -m`) into the shadow worktree, ignoring untracked files and deletions; validation env can still diverge from the user workspace. | Medium | Sync untracked files (opt-in) and handle deletions/renames, or document the limitation clearly. |
+| `engine/schemas.py` | Schema/Tooling | The Pydantic `BugDefinition` schema (extra=forbid + limited `Pattern` fields) does not match observed bug JSON shapes (e.g., `Compare.ops`, richer `metadata`), and runtime injection does not validate against it. | Medium | Align schema with real bug files and validate at load time, or clearly separate “authoring schema” vs “runtime contract”. |
 
 ---
 
@@ -62,25 +68,25 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 ### III. AST Mutation Engine (`engine/ast_harden/`)
 
-- [ ] **Generic Injector (`generic_injector.py`)**
-    - **Parsing Robustness:** Can the injector handle code with comments, decorators, or unusual formatting without breaking the AST?
-    - **Round-Trip Fidelity:** Does `ast.unparse` (or `astor`) preserve code structure sufficiently well? Does it strip comments that might be pedagogically useful?
-    - **Pattern Matching (`pattern_matcher.py`)**: Are the node matching rules specific enough to avoid false positives (e.g., matching the wrong `Assign` node)?
+- [x] **Generic Injector (`generic_injector.py`)**
+     - **Parsing Robustness:** Can the injector handle code with comments, decorators, or unusual formatting without breaking the AST?
+     - **Round-Trip Fidelity:** Does `ast.unparse` (or `astor`) preserve code structure sufficiently well? Does it strip comments that might be pedagogically useful?
+     - **Pattern Matching (`pattern_matcher.py`)**: Are the node matching rules specific enough to avoid false positives (e.g., matching the wrong `Assign` node)?
 
-- [ ] **Bug Definitions (`.json`)**
-    - **Schema Compliance:** Do all JSON files in `curricula` match the v2.1 schema expected by `GenericBugInjector`?
-    - **Target Function:** Is the `target_function` field correctly used to scope the injection, or does it scan the whole file?
+- [x] **Bug Definitions (`.json`)**
+     - **Schema Compliance:** Do all JSON files in `curricula` match the v2.1 schema expected by `GenericBugInjector`?
+     - **Target Function:** Is the `target_function` field correctly used to scope the injection, or does it scan the whole file?
 
 ### IV. Workspace & Isolation (`engine/workspace.py`)
 
-- [ ] **Shadow Worktree Strategy**
-    - **Symlink Handling:** *Critical:* Verify the fix for symlink copying in `git worktree`. Does `engine init` correctly recreate symlinks (e.g., `cs336_basics`) inside `.mastery_engine_worktree`?
-    - **Dirty State:** How does the engine handle uncommitted changes in the main repo when synchronizing to the shadow worktree? (See `main.py` -> `init`).
-    - **Cleanup:** Does `cleanup` leave the repo in a clean git state? Does it prune worktree metadata?
+- [x] **Shadow Worktree Strategy**
+     - **Symlink Handling:** *Critical:* Verify the fix for symlink copying in `git worktree`. Does `engine init` correctly recreate symlinks (e.g., `cs336_basics`) inside `.mastery_engine_worktree`?
+     - **Dirty State:** How does the engine handle uncommitted changes in the main repo when synchronizing to the shadow worktree? (See `main.py` -> `init`).
+     - **Cleanup:** Does `cleanup` leave the repo in a clean git state? Does it prune worktree metadata?
 
-- [ ] **File Operations**
-    - **Permissions:** Does `apply_patch` require specific file permissions?
-    - **Path Traversal:** Are inputs like `module_id` sanitized to prevent writing files outside the workspace?
+- [x] **File Operations**
+     - **Permissions:** Does `apply_patch` require specific file permissions?
+     - **Path Traversal:** Are inputs like `module_id` sanitized to prevent writing files outside the workspace?
 
 ### V. External Services & Integration (`engine/services/`)
 
