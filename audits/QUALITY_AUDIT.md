@@ -15,7 +15,7 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 **Findings Count:**
 - High: 9
-- Medium: 19
+- Medium: 22
 - Low: 3
 
 **Top Priority Remediation (Recommended Order):**
@@ -26,6 +26,7 @@ This document serves as the primary artifact for a systematic code audit of the 
 5. Resolve path/UX consistency issues that affect real users: shadow worktree path centralization and CLI name consistency (`mastery` vs `engine`).
 6. Remove unsafe parsing + destructive defaults in curriculum automation scripts (`scripts/`): eliminate `eval()`, require explicit overwrite, and add dry-run/backup conventions.
 7. Add safety rails for cost-bearing LLM/dev scripts: parameterize model/path, add explicit overwrite/dry-run flags, and eliminate hardcoded absolute paths.
+8. Define and enforce a baseline operability contract for non-primary curricula packs (required stage assets, validator env contract, and policy for any network-dependent validators).
 
 ## Audit Findings Log
 
@@ -64,6 +65,9 @@ This document serves as the primary artifact for a systematic code audit of the 
 | `scripts/verify_curriculum_manifests.py` | Correctness/CI | Validator script only checks LINEAR curricula (`manifest["modules"]`) and does not validate LIBRARY curricula (`patterns`), risking false confidence when used against CP Accelerator. | Medium | Extend validation to LIBRARY manifests (patterns/problems layout) or split validators by curriculum type and ensure CI calls the right one. |
 | `engine/main.py` | Safety/Cost | The `create-bug` dev command hardcodes `gpt-4o` and writes JSON output directly to disk (overwriting without an explicit `--overwrite` gate). Help text includes an `engine create-bug ...` example despite the installed entrypoint being `mastery`. | Medium | Add `--model`/`--max-tokens`/`--timeout` flags (default to a cheaper model), add `--dry-run` and `--overwrite` (default safe), fail fast with a clear error when `OPENAI_API_KEY` is missing, and update help text/examples to `mastery create-bug`. |
 | `engine/dev_tools/bug_author.py` | Resilience | `_extract_full_function_from_patch()` assumes `Path.cwd()` is repo root and prepends `modes/developer` / `modes/student` to the patch header path, which can break when invoked from subdirectories or when patch paths already include `modes/...`. | Medium | Resolve repo root via the engine’s root-finding logic, normalize patch-relative paths before joining, and add tests for representative patch headers. |
+| `curricula/python_for_cp/` | Content Integrity | `manifest.json` declares modules `pythonic_structures` and `concise_logic`, but their module directories exist and are empty (no `build_prompt.txt`, `justify_questions.json`, `validator.sh`, etc.), making the curriculum non-runnable past the first missing asset. | Medium | Either add the missing stage assets for these modules or remove/disable them in the manifest; add a CI check that every manifest module has required files. |
+| `curricula/job_prep_data_annotation/manifest.json` | Schema/Correctness | Manifest includes `workspace_root`, but `CurriculumManifest` schema does not define it, so engine behavior is unclear (ignored vs error depending on schema settings). This risks doc/expectation drift for where students should work. | Medium | Decide whether `workspace_root` is a supported engine feature; if yes, add it to schema + implement behavior; if no, remove it from manifests/docs to avoid silent drift. |
+| `curricula/job_prep_data_annotation/modules/http_transport/validator.sh` | Resilience | Validator makes live network calls to `https://httpbin.org/*` and imports `requests`; it also runs `python3` directly rather than `MASTERY_PYTHON`. This can fail offline/CI and can run in the wrong environment. | Medium | Gate network-dependent validators behind an explicit opt-in flag (or provide offline fixtures), ensure dependencies are declared, and standardize validators to use `MASTERY_PYTHON` when available. |
 
 ---
 
@@ -166,7 +170,7 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 ### IX. Curriculum Packs Beyond Primary (`curricula/*` excluding `cs336_a1` / `cp_accelerator`)
 
-- [ ] **Baseline operability audit**
+- [x] **Baseline operability audit**
     - **Manifest Validity:** Each `manifest.json` loads under `CurriculumManifest`.
     - **Asset Presence:** Each declared module/problem has required stage assets.
     - **Validator Contract:** Validators work under `engine/validator.py` assumptions (env vars, timeouts, exit codes).
