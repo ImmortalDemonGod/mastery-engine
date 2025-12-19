@@ -197,6 +197,33 @@ The Quality Audit validated engine behavior and engine tests, but did **not** au
 - whether CI should run them (and if not, what guarantees we actually get)
 - whether curricula validators align with these tests
 
+### 8) Docs / README drift vs implementation (Not covered)
+
+ The Quality Audit did not include a systematic “docs truthfulness” pass (i.e., checking that docs match the current CLI, filesystem layout, and runtime behavior).
+
+ Preliminary signals of drift that warrant a follow-up audit:
+
+ - **CLI name drift (`engine` vs `mastery`)**
+   - `docs/user-guide/MASTERY_COMMAND_REFERENCE.md` clearly states the entrypoint is `mastery` and calls out that `engine <command>` docs are outdated.
+   - Many internal/archive docs still reference `engine submit` (found across multiple files under `docs/internal/archive/` and worklogs). This may be acceptable for archival material, but was not explicitly categorized as “historical only” vs “current instructions.”
+
+ - **CP Accelerator layout drift (`modules/` vs `patterns/`)**
+   - `curricula/cp_accelerator/` currently has `patterns/` (LIBRARY mode), but internal CP Accelerator docs describe a `modules/` hierarchy in several places.
+   - Follow-up audit should label each CP Accelerator doc as:
+     - “legacy linear layout” vs
+     - “current library layout”
+     and verify command examples and paths align.
+
+ - **Python version drift (README/CI vs `pyproject.toml`)**
+   - `pyproject.toml` requires Python `>=3.11`.
+   - The repository README advertises “Python 3.10+” (badge + prerequisites).
+   - CI currently runs Python 3.10.
+   - This is a cross-surface consistency issue (docs + CI + packaging) that was not explicitly audited as a cohesive contract.
+
+ - **Test documentation drift**
+   - `tests/integration/README.md` contains examples and cost estimates for “integration tests,” but the file naming and cost math are not guaranteed to match the current test module (`test_llm_service.py`).
+   - Follow-up audit should validate that test-running commands in docs map to files that exist and that cost/skip behavior matches reality.
+
 ## Recommended Follow-up Audit Backlog (Prioritized)
 
 1. **Audit `scripts/` safety + external side effects** (high)
@@ -204,6 +231,5 @@ The Quality Audit validated engine behavior and engine tests, but did **not** au
 3. **Audit LIBRARY mode uniqueness constraints end-to-end** (high)
 4. **Audit other curricula packs for baseline operability** (medium)
 5. **Audit `modes/` parity and guarantees** (medium)
-6. **Audit docs drift vs current CLI behavior** (medium)
+6. **Audit docs/README drift vs implementation (CLI names, layouts, versions, test commands)** (medium)
 7. **Audit dependency/supply-chain posture (`uv.lock`, licensing, pinning)** (medium)
-
