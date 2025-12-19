@@ -142,6 +142,22 @@ Minimum bar for each curriculum:
 - Each module/problem has required stage artifacts.
 - Each validator runs under `ValidationSubsystem` contracts.
 
+#### Preliminary inventory (baseline operability signals)
+
+- **`curricula/dummy_hello_world/`**
+  - Has `build_prompt.txt`, `justify_questions.json`, `validator.sh` for `hello_world`.
+  - `validator.sh` checks for a workspace-local `hello_world.py` and prints `PERFORMANCE_SECONDS` directly (does not use `SHADOW_WORKTREE` / `MASTERY_PYTHON`).
+- **`curricula/python_for_cp/`**
+  - `manifest.json` declares 3 modules.
+  - `modules/pythonic_structures/` is empty (no stage assets).
+  - `modules/concise_logic/` is empty (no stage assets).
+  - `modules/std_lib_augmentation/` has full assets including `validator.sh`.
+- **`curricula/job_prep_data_annotation/`**
+  - `manifest.json` includes `workspace_root` (engine support/expectations were not audited).
+  - Each module has `build_prompt.txt`, `justify_questions.json`, and `validator.sh`.
+  - Validators execute temp Python scripts via `mktemp` and call `python3` directly.
+  - `http_transport/validator.sh` makes real network calls to `https://httpbin.org/*` (offline/CI behavior not audited).
+
 ### 5) Mode parity audit (Not covered)
 
 Validate:
@@ -149,11 +165,37 @@ Validate:
 - Developer reference implementations exist for all patch-based bugs.
 - Student mode provides the expected stubs and doesn’t drift from tests.
 
+#### Preliminary file-level signal
+
+- `modes/student/cs336_basics/` and `modes/developer/cs336_basics/` are both populated with multiple Python modules (not just `utils.py`).
+- The two modes are not a trivial file-for-file mirror (e.g., student includes `generation.py` and a `tokenizer_stub.py` placeholder; developer does not).
+- No explicit audit was performed to ensure mode parity against:
+  - `tests/test_*.py` (assignment correctness)
+  - curriculum validators
+  - harden stage assumptions about “developer” reference correctness
+
 ### 6) CI scope audit (Partially covered)
 
 Validate:
 - CI runs with a Python version consistent with `pyproject.toml`.
 - CI covers the intended test matrix (engine-only vs full repo) and documents what is excluded.
+
+### 7) `tests/` beyond `tests/engine/` (Not covered)
+
+Follow-up audit should explicitly define and verify what these test suites mean and how they are expected to run:
+
+- **Assignment / learning tests (`tests/test_*.py`)**
+  - Exists at repo root `tests/` (e.g., tokenizer/model/nn_utils/optimizer). These are not part of the engine-only CI job.
+- **Integration tests (`tests/integration/`)**
+  - Contains live OpenAI API tests marked `pytest.mark.integration`.
+  - Skips when `OPENAI_API_KEY` is not set; requires cost budgeting and a CI policy.
+- **E2E tests (`tests/e2e/`)**
+  - Exist and have known infra caveats; currently not included in CI.
+
+The Quality Audit validated engine behavior and engine tests, but did **not** audit:
+- whether the non-engine tests are expected to pass in student mode vs developer mode
+- whether CI should run them (and if not, what guarantees we actually get)
+- whether curricula validators align with these tests
 
 ## Recommended Follow-up Audit Backlog (Prioritized)
 
