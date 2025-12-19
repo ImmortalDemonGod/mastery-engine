@@ -9,11 +9,13 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 ## Audit Status
 
-**Status:** Complete (Checklist I–VII)
+**Status:** In Progress (Expanded Checklist I–XIII)
+
+**Scope Note:** The initial audit completed Checklist I–VII. The checklist has now been expanded to cover additional high-risk repository surfaces that were not previously audited.
 
 **Findings Count:**
-- High: 7
-- Medium: 13
+- High: 9
+- Medium: 19
 - Low: 3
 
 **Top Priority Remediation (Recommended Order):**
@@ -22,6 +24,8 @@ This document serves as the primary artifact for a systematic code audit of the 
 3. Make AST bug injection fail-safe: reject unknown `replacement.type` values (avoid silent deletions); align bug definitions accordingly (e.g., unsupported `move_after`).
 4. Align CI Python version with `pyproject.toml` (`>=3.11`).
 5. Resolve path/UX consistency issues that affect real users: shadow worktree path centralization and CLI name consistency (`mastery` vs `engine`).
+6. Remove unsafe parsing + destructive defaults in curriculum automation scripts (`scripts/`): eliminate `eval()`, require explicit overwrite, and add dry-run/backup conventions.
+7. Add safety rails for cost-bearing LLM/dev scripts: parameterize model/path, add explicit overwrite/dry-run flags, and eliminate hardcoded absolute paths.
 
 ## Audit Findings Log
 
@@ -52,6 +56,14 @@ This document serves as the primary artifact for a systematic code audit of the 
 | `curricula/cp_accelerator/.../validator.sh` | Resilience | CP Accelerator validators call `python3` directly and do not use `MASTERY_PYTHON`, risking execution in the wrong environment and inconsistent dependency resolution. | Medium | Follow the cs336_a1 validator pattern: prefer `MASTERY_PYTHON`, fall back to venv/python3/uv. |
 | `.github/workflows/tests.yml` | CI/Resilience | CI runs on Python 3.10 while `pyproject.toml` declares `requires-python = ">=3.11"`, risking CI failures or false confidence. | High | Align CI Python version with project requirement (≥3.11) or lower the project requirement if intentional. |
 | `tests/e2e/` | Testing | E2E tests exist (and document known infra edge cases) but are not executed in CI, leaving full-loop regressions possible despite strong unit coverage. | Medium | Add a separate CI job for a small smoke E2E subset (or run nightly) to protect the end-to-end BJH loop. |
+| `scripts/generate_module.py` | Security | Script uses `eval()` to parse example inputs/outputs from HTML (`canonical_curriculum.json`), enabling arbitrary code execution if the curriculum source is compromised/tampered. | High | Replace `eval()` with `ast.literal_eval` (or a strict purpose-built parser), validate expected types, and treat canonical/enriched curriculum as untrusted input. |
+| `scripts/generate_ground_truth.py`, `scripts/systematic_llm_evaluation.py`, `scripts/migrate_bugs_llm.py` | Safety/Cost | Multiple dev scripts make cost-bearing OpenAI calls (some hardcode `gpt-4o`) and write/overwrite bug JSON or results; several also hardcode absolute repo paths and write to `/tmp` without explicit dry-run/overwrite gating. | High | Add explicit `--dry-run` and `--overwrite` flags (default safe), parameterize `--model` and repo root, and add cost/timeouts + output directory controls; eliminate hardcoded absolute paths. |
+| `scripts/enrich_problems.py` | Resilience/Safety | Fetches curriculum enrichment from a third-party API (`leetcode-api-pied.vercel.app`) and overwrites `curricula/cp_accelerator/canonical_curriculum.json` by default (`--output` default == `--input`). | Medium | Make default output a new file (or require explicit `--overwrite`), add caching and retry/backoff, and record provenance/versioning for reproducibility. |
+| `scripts/parse_sources.py` | Correctness/Docs | Declares `--validate-urls` and sets per-problem `verified` flags, but no URL reachability validation is implemented; also references `RoadmapResources.md` at repo root (actual file lives under `maintenance/`). | Medium | Either implement URL validation (network + timeouts) or remove the claim/flag; fix roadmap path and fail fast when sources are missing. |
+| `scripts/add_successful_to_golden.py`, `scripts/fix_draft_pattern.py` | Safety | Interactive prompts (`input()`) + hardcoded absolute paths can cause accidental overwrites of “golden” bug definitions during manual runs. | Medium | Add non-interactive mode + explicit output/backup strategy; parameterize repo root; require confirmation before overwriting existing JSON. |
+| `scripts/verify_curriculum_manifests.py` | Correctness/CI | Validator script only checks LINEAR curricula (`manifest["modules"]`) and does not validate LIBRARY curricula (`patterns`), risking false confidence when used against CP Accelerator. | Medium | Extend validation to LIBRARY manifests (patterns/problems layout) or split validators by curriculum type and ensure CI calls the right one. |
+| `engine/main.py` | Safety/Cost | The `create-bug` dev command hardcodes `gpt-4o` and writes JSON output directly to disk (overwriting without an explicit `--overwrite` gate). Help text includes an `engine create-bug ...` example despite the installed entrypoint being `mastery`. | Medium | Add `--model`/`--max-tokens`/`--timeout` flags (default to a cheaper model), add `--dry-run` and `--overwrite` (default safe), fail fast with a clear error when `OPENAI_API_KEY` is missing, and update help text/examples to `mastery create-bug`. |
+| `engine/dev_tools/bug_author.py` | Resilience | `_extract_full_function_from_patch()` assumes `Path.cwd()` is repo root and prepends `modes/developer` / `modes/student` to the patch header path, which can break when invoked from subdirectories or when patch paths already include `modes/...`. | Medium | Resolve repo root via the engine’s root-finding logic, normalize patch-relative paths before joining, and add tests for representative patch headers. |
 
 ---
 
@@ -71,7 +83,7 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 - [x] **Curriculum Loading (`curriculum.py`)**
     - **Path Resolution:** Does `find_project_root` robustly locate the root when running from deep subdirectories (e.g., inside a module folder)?
-    - **Schema Validation:** Are `manifest.json` files strictly validated against `CurriculumManifest`? Does it fail fast on invalid dependencies?
+    - **Schema Validation:** Are `manifest.json` files strictly validated against `CurriculumManifest`.
     - **Caching:** In `LIBRARY` mode, are pattern/problem lookups efficient (`O(1)`)? Is the cache invalidation logic handling curriculum updates correctly?
 
 ### II. The Pedagogical Loop (`engine/stages/`)
@@ -135,3 +147,62 @@ This document serves as the primary artifact for a systematic code audit of the 
 
 - [x] **Stranger Testing**
     - **Reproducibility:** Does the test suite run cleanly on a fresh clone without existing virtual environments or config files? (Reference `STRANGER_TEST_RESULTS.md`).
+
+### VIII. Tooling & Automation Surfaces (`scripts/`, `engine/dev_tools/`)
+
+- [x] **`scripts/` safety + correctness**
+     - **Side Effects Inventory:** Which scripts mutate curriculum/code in-place vs generate outputs? Are outputs atomic?
+     - **Idempotency:** Can scripts be safely re-run? Do they overwrite without backup?
+     - **Dry-Run / Validate-Only:** Do destructive scripts support a safe validation-only mode (and is it the default)?
+     - **External Calls:** Do scripts make network/LLM calls? Are API keys required and are cost/rate limits enforced?
+     - **Portability:** Do scripts rely on hardcoded absolute paths or machine-specific assumptions?
+     - **Unsafe Parsing:** Any uses of `eval()` / shell injection risks?
+
+- [x] **Bug authoring toolchain (`engine/dev_tools/bug_author.py`, `mastery create-bug`)**
+     - **Schema Alignment:** Does generated bug JSON match the injector/runtime contract? Is it validated at write time?
+     - **Cost Controls:** Are `max_tokens`, timeouts, model selection, and retries bounded?
+     - **Prompt Injection:** Are patch/symptom inputs delimited to reduce prompt injection risk?
+     - **File Write Safety:** Are output paths safe (no path traversal), and is overwrite behavior explicit?
+
+### IX. Curriculum Packs Beyond Primary (`curricula/*` excluding `cs336_a1` / `cp_accelerator`)
+
+- [ ] **Baseline operability audit**
+    - **Manifest Validity:** Each `manifest.json` loads under `CurriculumManifest`.
+    - **Asset Presence:** Each declared module/problem has required stage assets.
+    - **Validator Contract:** Validators work under `engine/validator.py` assumptions (env vars, timeouts, exit codes).
+    - **Offline/Network Assumptions:** Validators that make network calls are explicitly documented + gated.
+
+### X. Mode Parity & Packaging (`modes/`, `scripts/mode`)
+
+- [ ] **Student vs developer parity**
+    - **Switch Safety:** Does `scripts/mode` leave the repo in a coherent state for running tests/engine?
+    - **Expectation Alignment:** Are assignment tests and curricula validators compatible with student-mode stubs?
+    - **Reference Correctness:** Does harden-stage logic always source “developer reference” code correctly?
+
+### XI. Documentation & UX Consistency (`README.md`, `docs/`)
+
+- [ ] **Docs truthfulness audit**
+    - **CLI Naming:** Are docs consistently using `mastery` (or clearly labeled as historical)?
+    - **Filesystem Layout:** Do docs refer to correct curricula layouts (`patterns/` vs `modules/`)?
+    - **Version Contracts:** Do docs and CI match `pyproject.toml` Python requirements?
+    - **Test Running Instructions:** Are commands in docs correct and mapped to existing files?
+
+### XII. CI / Workflow Scope & Test Policy (`.github/workflows/`, `tests/`)
+
+- [ ] **CI scope and guarantees**
+    - **Python Version:** CI matches `pyproject.toml` requirement.
+    - **Test Scope:** Clear policy for engine tests vs assignment tests vs integration vs e2e.
+    - **Cost-Bearing Tests:** Integration tests that call OpenAI are gated and documented.
+    - **E2E Coverage:** CI executes at least a smoke subset, or there is a documented alternative (nightly).
+
+### XIII. Dependency / Supply Chain / Secrets
+
+- [ ] **Dependency posture**
+    - **Reproducibility:** `uv.lock` ensures reproducible installs and CI uses it.
+    - **Pinning Strategy:** Evaluate whether version constraints are sufficiently tight for stability.
+    - **Licensing/Compliance:** Ensure third-party content/deps are tracked and compatible.
+
+- [ ] **Secrets + config hygiene**
+    - **Env Vars:** API keys are never logged; `.env.example` matches real needs.
+    - **Logging Hygiene:** Logs avoid leaking secrets or user code.
+    - **Safe Defaults:** Network/LLM operations are opt-in where appropriate.
