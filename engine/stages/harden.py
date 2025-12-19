@@ -55,7 +55,7 @@ class HardenRunner:
         curriculum_id: str,
         module: ModuleMetadata,
         source_file_path: Path
-    ) -> tuple[Path, str]:
+    ) -> tuple[Path, str, str]:
         """
         Set up and present a harden challenge to the user in shadow worktree.
         
@@ -76,7 +76,7 @@ class HardenRunner:
             source_file_path: Path to user's correct implementation in main directory
             
         Returns:
-            Tuple of (harden_file_path_in_shadow_worktree, symptom_description)
+            Tuple of (harden_file_path_in_shadow_worktree, symptom_description, bug_id)
             
         Raises:
             HardenChallengeError: If challenge setup fails
@@ -92,6 +92,7 @@ class HardenRunner:
             # Select a bug
             bugs_dir = self.curriculum_mgr.get_bugs_dir(curriculum_id, module)
             bug_file, symptom_file = self._select_bug(bugs_dir)
+            bug_id = bug_file.stem
             
             logger.info(f"Selected bug: {bug_file.name}")
             
@@ -168,7 +169,7 @@ class HardenRunner:
             
             logger.info(f"Harden challenge prepared in shadow worktree: {module.id}")
             
-            return harden_file, symptom
+            return harden_file, symptom, bug_id
             
         except WorkspaceError as e:
             raise HardenChallengeError(f"Failed to set up harden challenge: {e}") from e
@@ -229,7 +230,7 @@ class HardenRunner:
         pattern_id: str,
         problem: ProblemMetadata,
         problem_path: Path
-    ) -> tuple[Path, str]:
+    ) -> tuple[Path, str, str]:
         """
         Set up and present a harden challenge for LIBRARY mode (problem-based).
         
@@ -243,7 +244,7 @@ class HardenRunner:
             problem_path: Path to the problem directory
             
         Returns:
-            Tuple of (harden_file_path_in_shadow_worktree, symptom_description)
+            Tuple of (harden_file_path_in_shadow_worktree, symptom_description, bug_id)
             
         Raises:
             HardenChallengeError: If challenge setup fails
@@ -259,6 +260,7 @@ class HardenRunner:
             # Select a bug from problem's bugs directory
             bugs_dir = problem_path / "bugs"
             bug_file, symptom_file = self._select_bug(bugs_dir)
+            bug_id = bug_file.stem
             
             logger.info(f"Selected bug for {problem.id}: {bug_file.name}")
             
@@ -324,7 +326,7 @@ class HardenRunner:
             
             logger.info(f"Harden challenge prepared for problem {problem.id}")
             
-            return harden_file, symptom
+            return harden_file, symptom, bug_id
             
         except WorkspaceError as e:
             raise HardenChallengeError(f"Failed to set up harden challenge: {e}") from e

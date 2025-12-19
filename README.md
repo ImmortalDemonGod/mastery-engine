@@ -3,7 +3,7 @@
 **A Python-based platform for interactive technical mastery via AST mutation and shadow-worktree isolation.**
 
 [![Tests](https://github.com/ImmortalDemonGod/mastery-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/ImmortalDemonGod/mastery-engine/actions/workflows/tests.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Test Coverage](https://img.shields.io/badge/coverage-78%25-green.svg)](https://github.com/ImmortalDemonGod/mastery-engine)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL2-lightgrey.svg)](https://github.com/ImmortalDemonGod/mastery-engine)
@@ -37,19 +37,23 @@ uv run mastery show
 
 # 6. Run Build Validation (Watch the engine validate the reference implementation)
 uv run mastery submit
-# Output: ✅ All tests passed! (25/25 test cases in 0.15s)
+# Output: ✅ Validation Passed!
+#         Performance: <seconds>
 
 # 7. Answer Justify Questions (Auto-passes in mock mode without OpenAI key)
 uv run mastery submit
 # Output: 🎭 MOCK MODE: Auto-passing justify stage
+#         (Panel explains mock mode and next steps)
 
 # 8. Inject Runtime Bug (Watch the engine mutate the code)
 uv run mastery start-challenge
-# Output: 💉 Injecting semantic bug 'off_by_one_loop'...
+# Output: 💉 Injecting semantic bug '<bug_id>'...
+#         (Bug is selected randomly from the module's bugs directory)
 
 # 9. See the Bug Fail
 uv run mastery submit
-# Output: ❌ Test failed: Expected 8, got 7 (off-by-one error)
+# Output: ❌ Fix Incomplete
+#         (Pytest output shows the failing assertion for the injected bug)
 ```
 
 **What Just Happened?**  
@@ -192,7 +196,7 @@ Result: **Syntactically valid but semantically broken code.**
 ## 📦 Installation & Setup
 
 ### Prerequisites
-- **Python 3.10+**
+- **Python 3.11+**
 - **uv** (fast Python package manager)
 - **Git**
 

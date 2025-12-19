@@ -271,6 +271,8 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     if llm_service.use_mock:
         # Auto-pass in mock mode without requiring editor input
         console.print()
+        console.print("[bold yellow]🎭 MOCK MODE: Auto-passing justify stage[/bold yellow]")
+        console.print()
         console.print(Panel(
             "🎭 [bold yellow]MOCK MODE: No OpenAI API key detected[/bold yellow]\n\n"
             "Justify stage auto-passing for demonstration purposes.\n\n"
@@ -1218,13 +1220,15 @@ def start_challenge():
             console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
             console.print()
             
-            harden_file, symptom = harden_runner.present_library_challenge(
+            harden_file, symptom, bug_id = harden_runner.present_library_challenge(
                 progress.curriculum_id,
                 pattern_id,
                 problem_meta,
                 problem_path
             )
             
+            console.print(f"[bold red]💉 Injecting semantic bug '{bug_id}'...[/bold red]")
+            console.print()
             console.print(Panel(
                 symptom,
                 title=f"🐛 Debug Challenge: {problem_meta.title}",
@@ -1266,12 +1270,14 @@ def start_challenge():
             console.print("[bold cyan]Initializing Harden challenge workspace...[/bold cyan]")
             console.print()
             
-            harden_file, symptom = harden_runner.present_challenge(
+            harden_file, symptom, bug_id = harden_runner.present_challenge(
                 progress.curriculum_id,
                 current_module,
                 source_file
             )
             
+            console.print(f"[bold red]💉 Injecting semantic bug '{bug_id}'...[/bold red]")
+            console.print()
             console.print(Panel(
                 symptom,
                 title=f"🐛 Debug Challenge: {current_module.name}",
