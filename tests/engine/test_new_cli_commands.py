@@ -230,7 +230,11 @@ class TestStartChallengeCommand:
     def test_start_challenge_in_harden_stage_succeeds(
         self, mock_state_cls, mock_curr_cls, mock_shadow, mock_workspace_cls, mock_harden_cls
     ):
-        """Should initialize harden workspace when in harden stage."""
+        """
+        Verifies the CLI starts a Harden challenge when the user's progress is in the Harden stage.
+        
+        Runs the "start-challenge" command with a mocked state and curriculum configured for the Harden stage; expects an exit code of 0, output containing "Debug Challenge" and the bug symptom, and that HardenRunner.present_challenge is called once.
+        """
         # Setup
         mock_state_mgr = MagicMock()
         mock_curr_mgr = MagicMock()
