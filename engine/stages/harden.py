@@ -57,29 +57,21 @@ class HardenRunner:
         source_file_path: Path
     ) -> tuple[Path, str, str]:
         """
-        Set up and present a harden challenge to the user in shadow worktree.
+        Prepare and present a harden challenge in the shadow worktree for a module.
         
-        SHADOW WORKTREE MODEL:
-        1. Selects a bug from the module's bugs directory
-        2. Copies DEVELOPER's reference implementation to shadow worktree harden directory
-        3. Applies the bug patch to the reference implementation (guaranteed to work)
-        4. Returns path to buggy file in shadow worktree for user to debug
+        Parameters:
+            curriculum_id (str): Identifier of the curriculum containing the module.
+            module (ModuleMetadata): Metadata for the target module.
+            source_file_path (Path): Path to the user's (main workspace) source file used as the target for hardening.
         
-        Note: We use the developer's implementation (not student's) because patch files
-        require exact byte-for-byte matches. Student code may have different variable names,
-        comments, or structure, causing patches to fail. This approach ensures consistent,
-        debuggable buggy code for all students regardless of their implementation style.
-        
-        Args:
-            curriculum_id: ID of the current curriculum
-            module: Metadata for the current module
-            source_file_path: Path to user's correct implementation in main directory
-            
         Returns:
-            Tuple of (harden_file_path_in_shadow_worktree, symptom_description, bug_id)
-            
+            tuple[Path, str, str]: A 3-tuple containing:
+                - Path: path to the buggy file placed in the shadow worktree's harden workspace,
+                - str: symptom description read from the bug's symptom file,
+                - str: bug identifier (the selected bug file's stem).
+        
         Raises:
-            HardenChallengeError: If challenge setup fails
+            HardenChallengeError: If the harden challenge cannot be prepared (missing worktree, missing files, injection/patch failures, or other setup errors).
         """
         try:
             # Verify shadow worktree exists

@@ -239,20 +239,23 @@ def _submit_build_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
 
 def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     """
-    Handle Justify stage submission with $EDITOR integration and full LLM evaluation.
+    Submit and evaluate the current module's Justify-stage answer and advance progress on success.
     
-    Opens user's editor for multi-line answer input, then evaluates response using:
-    1. Fast keyword filter (catches shallow/vague answers)
-    2. LLM semantic evaluation (if no keyword match)
+    Opens an editor for the learner to provide a multi-line justification, applies a fast keyword filter, and then requests a semantic evaluation from the configured LLM service. On acceptance the function advances the progress to the next stage and persists state.
     
-    Args:
-        state_mgr: State manager instance
-        curr_mgr: Curriculum manager instance
-        progress: User progress object
-        manifest: Curriculum manifest
-        
+    Parameters:
+        state_mgr: Manager responsible for loading and saving user progress.
+        curr_mgr: Curriculum manager that provides curriculum metadata and resources.
+        progress: Current user progress object (current module index and stage).
+        manifest: Curriculum manifest containing module definitions.
+    
     Returns:
-        True if answer accepted and progress advanced, False otherwise
+        True if the answer is accepted and progress is advanced to the next stage, False otherwise.
+    
+    Raises:
+        CurriculumInvalidError: If no justify questions exist for the current module.
+        ConfigurationError: If LLM or environment configuration is invalid (re-raised).
+        LLMAPIError, LLMResponseError: If the LLM service fails to evaluate the answer (re-raised).
     """
     import tempfile
     import os
@@ -1153,13 +1156,9 @@ def show(module_id: Optional[str] = typer.Argument(None, help="Module ID to disp
 @app.command(name="start-challenge")
 def start_challenge():
     """
-    Initialize the Harden stage workspace (applies bug patch).
+    Initialize and inject the Harden-stage buggy challenge into the shadow worktree.
     
-    This command MODIFIES FILES by creating a buggy version in the shadow worktree.
-    Only works in the Harden stage.
-    
-    Example:
-        engine start-challenge   # Apply bug patch and show symptom
+    Creates a buggy copy of the target file in the shadow worktree, displays the challenge symptom and the path of the file to fix, and logs the initialization. Only valid when the current progress stage is Harden; otherwise the command prints a notice and exits. In LIBRARY curricula this initializes a problem-based harden challenge; in LINEAR curricula this initializes a module-based harden challenge. On fatal state, curriculum, or harden errors the function prints an error panel and exits.
     """
     try:
         # Load state and curriculum
