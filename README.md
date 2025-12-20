@@ -29,7 +29,7 @@ uv sync
 uv pip install -e .
 
 # 4. Initialize a Curriculum (clean any previous state first)
-uv run mastery cleanup  # Skip if first-time setup
+uv run mastery cleanup  # Optional: removes shadow worktree but preserves progress
 uv run mastery init cs336_a1
 
 # 5. View Current Module
@@ -44,7 +44,8 @@ uv run mastery submit
 # 7. Answer Justify Questions (Auto-passes in mock mode without OpenAI key)
 uv run mastery submit
 # Output: 🎭 MOCK MODE: Auto-passing justify stage
-#         (Panel explains mock mode and next steps)
+#         ✓ Justify Stage (Mock Mode)
+#         Panel explains that Justify auto-passes without OpenAI API key
 
 # 8. Inject Runtime Bug (Watch the engine mutate the code)
 uv run mastery start-challenge
@@ -54,7 +55,7 @@ uv run mastery start-challenge
 # 9. See the Bug Fail
 uv run mastery submit
 # Output: ❌ Fix Incomplete
-#         (Pytest output shows the failing assertion for the injected bug)
+#         Test Output: [Pytest shows the specific failing assertion]
 ```
 
 **What Just Happened?**  

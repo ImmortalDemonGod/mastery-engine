@@ -160,12 +160,13 @@ class HardenRunner:
             symptom = symptom_file.read_text(encoding='utf-8')
             
             logger.info(f"Harden challenge prepared in shadow worktree: {module.id}")
-            
+
             return harden_file, symptom, bug_id
-            
+
         except WorkspaceError as e:
             raise HardenChallengeError(f"Failed to set up harden challenge: {e}") from e
         except Exception as e:
+            logger.exception(f"Unexpected error during harden setup: {type(e).__name__}")
             raise HardenChallengeError(f"Unexpected error in harden setup: {e}") from e
     
     def _select_bug(self, bugs_dir: Path) -> tuple[Path, Path]:
@@ -317,12 +318,13 @@ class HardenRunner:
             symptom = symptom_file.read_text(encoding='utf-8')
             
             logger.info(f"Harden challenge prepared for problem {problem.id}")
-            
+
             return harden_file, symptom, bug_id
-            
+
         except WorkspaceError as e:
             raise HardenChallengeError(f"Failed to set up harden challenge: {e}") from e
         except Exception as e:
+            logger.exception(f"Unexpected error during harden setup: {type(e).__name__}")
             raise HardenChallengeError(f"Unexpected error in harden setup: {e}") from e
 
 

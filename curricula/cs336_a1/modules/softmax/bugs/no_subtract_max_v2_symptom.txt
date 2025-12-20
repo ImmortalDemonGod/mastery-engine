@@ -10,7 +10,7 @@ x_shifted = x + 100  # Shift to large positive values
 
 result = softmax(x_shifted, dim=1)
 # Expected: valid probability distribution [0.09, 0.24, 0.67]
-# Actual: tensor([])
+# Actual: tensor([[nan, nan, nan]])
 ```
 
 ## Error Message
