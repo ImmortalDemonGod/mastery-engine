@@ -58,8 +58,9 @@ class TestHardenRunner:
         mock_curr_mgr.get_bugs_dir.return_value = mock_bugs_dir
         
         mock_bug_file = MagicMock()
-        mock_bug_file.name = "bug1.json"
+        mock_bug_file.name = "test_bug.json"
         mock_bug_file.suffix = ".json"
+        mock_bug_file.stem = "test_bug"  # Explicitly set stem for bug_id extraction
         mock_symptom_file = MagicMock()
         mock_symptom_file.read_text.return_value = "Function returns incorrect value"
         
@@ -77,10 +78,11 @@ class TestHardenRunner:
             os.chdir(tmp_path)
             try:
                 # Execute
-                harden_file, symptom = runner.present_challenge("test_curriculum", module, source_file)
-                
+                harden_file, symptom, bug_id = runner.present_challenge("test_curriculum", module, source_file)
+
                 # Verify
                 assert symptom == "Function returns incorrect value"
+                assert bug_id == "test_bug"  # bug_file.stem from mocked file
                 mock_curr_mgr.get_bugs_dir.assert_called_once_with("test_curriculum", module)
                 runner._select_bug.assert_called_once_with(mock_bugs_dir)
                 # In AST mode, no patch application
