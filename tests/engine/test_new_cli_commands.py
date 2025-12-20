@@ -254,7 +254,8 @@ class TestStartChallengeCommand:
         mock_harden_cls.return_value = mock_harden_runner
         mock_harden_runner.present_challenge.return_value = (
             Path("harden/utils.py"),
-            "Bug symptom: Function returns incorrect value"
+            "Bug symptom: Function returns incorrect value",
+            "test_bug"
         )
         
         # Execute
