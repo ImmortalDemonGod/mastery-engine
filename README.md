@@ -28,7 +28,8 @@ pip install uv
 uv sync
 uv pip install -e .
 
-# 4. Initialize a Curriculum
+# 4. Initialize a Curriculum (clean any previous state first)
+uv run mastery cleanup  # Skip if first-time setup
 uv run mastery init cs336_a1
 
 # 5. View Current Module
@@ -232,7 +233,7 @@ uv sync
 uv pip install -e .
 
 # Verify installation
-uv run mastery --version
+uv run mastery --help
 ```
 
 ### Optional: OpenAI API Key (for LLM evaluation)
@@ -269,6 +270,24 @@ uv run mastery submit     # Justify stage
 uv run mastery start-challenge  # Harden stage (injects bug)
 uv run mastery submit     # Fix the bug
 ```
+
+### Switching Curricula
+
+If you want to switch to a different curriculum after initialization:
+
+```bash
+# Clean up current state
+uv run mastery cleanup
+
+# Initialize new curriculum
+uv run mastery init <curriculum_id>
+
+# Example: Switch from cs336_a1 to cp_accelerator
+uv run mastery cleanup
+uv run mastery init cp_accelerator
+```
+
+**Note**: The `cleanup` command removes the shadow worktree but preserves your progress in `~/.mastery_progress.json`.
 
 ### Advanced Commands
 
