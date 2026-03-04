@@ -437,4 +437,17 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
             # NodeTransformer will remove it from parent's body
             return None
         
-        return None
+        else:
+            # Unknown replacement type — fail loudly instead of silently deleting
+            supported = ['replace_value_with', 'replace_with', 'remove_keyword_arg', 'delete_statement']
+            raise ValueError(
+                f"Unknown replacement type '{replacement_type}'. "
+                f"Supported types: {supported}. "
+                f"Bug definition may need to be updated."
+            )
+        
+        # A recognized type's logic failed to produce a replacement (e.g. path not found).
+        # Return the original node unchanged rather than silently deleting it.
+        if self.debug:
+            print(f"        ⚠️  Replacement type '{replacement_type}' matched but produced no result. Node unchanged.")
+        return node
