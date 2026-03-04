@@ -1,0 +1,27 @@
+# Bug Symptom: Off-by-One in Prefix Sum Query
+
+## What You'll Observe
+
+Your range sum is consistently missing the rightmost element of the range.
+
+## Expected Behavior
+
+- `sumRange([-2, 0, 3, -5, 2, -1], 0, 2)` → `1` (sum of -2, 0, 3)
+- `sumRange([1, 2, 3, 4, 5], 2, 2)` → `3` (single element)
+
+## Actual Behavior
+
+- `sumRange([-2, 0, 3, -5, 2, -1], 0, 2)` → `-2` ❌ (sum of -2, 0 only)
+- `sumRange([1, 2, 3, 4, 5], 2, 2)` → `0` ❌ (empty range)
+
+## Debugging Guide
+
+1. **Build the prefix array by hand** for [-2, 0, 3, -5, 2, -1]
+2. **Check the formula**: What does prefix[right] - prefix[left] actually compute?
+3. **Key insight**: prefix[i] = sum of first i elements, so prefix[right] only sums up to index right-1
+
+## Conceptual Understanding
+
+The prefix sum formula is prefix[right+1] - prefix[left] because prefix[i] stores
+the sum of elements BEFORE index i. Using prefix[right] instead of prefix[right+1]
+excludes nums[right] from the result. This is the most common prefix sum bug.
