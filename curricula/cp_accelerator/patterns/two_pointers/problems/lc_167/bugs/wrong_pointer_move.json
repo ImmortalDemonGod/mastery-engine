@@ -1,0 +1,42 @@
+{
+  "id": "two-sum-ii-wrong-pointer-move",
+  "description": "Swaps the pointer movement logic: moves left pointer when sum is too large and right pointer when sum is too small. This causes the algorithm to diverge from the solution instead of converging toward it.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "twoSum",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'current_sum < target' with 'current_sum > target' to swap the convergence direction",
+      "pattern": {
+        "node_type": "Compare",
+        "left": {
+          "node_type": "Name",
+          "id": "current_sum"
+        },
+        "ops": [
+          {
+            "node_type": "Lt"
+          }
+        ],
+        "comparators": [
+          {
+            "node_type": "Name",
+            "id": "target"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "current_sum > target"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}
