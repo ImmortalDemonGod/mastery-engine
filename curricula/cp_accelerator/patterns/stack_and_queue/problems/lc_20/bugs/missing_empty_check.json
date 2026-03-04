@@ -1,0 +1,35 @@
+{
+  "id": "valid-parens-missing-empty-check",
+  "description": "Removes the 'not stack' check before accessing stack[-1], causing an IndexError when a closing bracket appears with an empty stack (e.g., input ')(' or ']'). Teaches the importance of guarding stack operations.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "isValid",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'not stack or stack[-1] != matching[char]' with just 'stack[-1] != matching[char]' to remove the empty-stack guard",
+      "pattern": {
+        "node_type": "BoolOp",
+        "values": [
+          {
+            "node_type": "UnaryOp"
+          },
+          {
+            "node_type": "Compare"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "stack[-1] != matching[char]"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "fundamental"
+  }
+}
