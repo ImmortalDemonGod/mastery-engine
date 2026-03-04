@@ -1,0 +1,31 @@
+# Bug Symptom: Wrong Base Case in Climbing Stairs
+
+## What You'll Observe
+
+Your solution returns wrong answers for n=2 and propagates errors to all larger n.
+
+## Expected Behavior
+
+- `climbStairs(2)` → `2` (two ways: 1+1 or 2)
+- `climbStairs(3)` → `3`
+- `climbStairs(5)` → `8`
+
+## Actual Behavior
+
+- `climbStairs(2)` → `1` ❌ (misses the "take 2 steps" option)
+- `climbStairs(3)` → `2` ❌
+- `climbStairs(5)` → `5` ❌
+
+Every answer is off because the base case for n=2 is wrong.
+
+## Debugging Guide
+
+1. **Manually count ways for n=2**: How many distinct paths are there?
+2. **Check your base case**: Does it handle n=2 correctly?
+3. **Key insight**: For n=2, there are TWO ways (1+1 and 2), not one
+
+## Conceptual Understanding
+
+DP base cases are the foundation of the entire computation. A wrong base case
+propagates errors to ALL larger values. Always verify your base cases by hand
+before trusting the recurrence for larger inputs.
