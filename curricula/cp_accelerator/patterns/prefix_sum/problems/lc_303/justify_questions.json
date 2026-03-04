@@ -1,0 +1,43 @@
+[
+  {
+    "id": "prefix_sum_why",
+    "question": "Explain how a prefix sum array enables O(1) range sum queries. Why is sum(nums[left..right]) equal to prefix[right+1] - prefix[left]?",
+    "model_answer": "**How prefix sums work:**\n\n1. **Definition:**\n   - prefix[0] = 0\n   - prefix[i] = nums[0] + nums[1] + ... + nums[i-1]\n   - So prefix[i] = sum of first i elements\n\n2. **Why the formula works:**\n   - prefix[right+1] = nums[0] + nums[1] + ... + nums[right]\n   - prefix[left] = nums[0] + nums[1] + ... + nums[left-1]\n   - Subtracting: prefix[right+1] - prefix[left] = nums[left] + ... + nums[right]\n   - This is exactly sum(nums[left..right])!\n\n3. **Concrete example:**\n   - nums = [-2, 0, 3, -5, 2, -1]\n   - prefix = [0, -2, -2, 1, -4, -2, -3]\n   - sum(nums[0..2]) = prefix[3] - prefix[0] = 1 - 0 = 1 ✓\n   - sum(nums[2..5]) = prefix[6] - prefix[2] = -3 - (-2) = -1 ✓\n\n4. **Why O(1):**\n   - After O(n) preprocessing, each query is just one subtraction\n   - No matter how large the range, it's always 2 array lookups + 1 subtraction\n   - Compare to naive approach: O(n) per query (sum the elements each time)\n\n**Key insight:** Prefix sums convert range operations into point operations. Instead of summing a range, we look up two precomputed values and subtract.",
+    "failure_modes": [
+      {
+        "category": "No Formula Derivation",
+        "keywords": ["prefix", "sum"],
+        "feedback": "You've described prefix sums, but can you DERIVE the formula? Write out what prefix[right+1] contains and what prefix[left] contains, then show why their difference gives the range sum."
+      },
+      {
+        "category": "Missing Concrete Example",
+        "keywords": ["O(1)", "precompute"],
+        "feedback": "Good complexity analysis! Can you trace through a specific example? Build the prefix array for [-2, 0, 3, -5, 2, -1] and compute sum(nums[0..2])."
+      }
+    ]
+  },
+  {
+    "id": "prefix_sum_off_by_one",
+    "question": "Why does the prefix sum array have length n+1 instead of n? What goes wrong with a length-n prefix array?",
+    "model_answer": "**Why n+1:**\n\n1. **The length-n approach (problematic):**\n   - prefix[i] = sum(nums[0..i])\n   - Range sum: prefix[right] - prefix[left-1]\n   - Problem: when left=0, we need prefix[-1] which doesn't exist!\n   - Requires special case: if left == 0: return prefix[right]\n\n2. **The length-(n+1) approach (clean):**\n   - prefix[0] = 0 (empty prefix sum)\n   - prefix[i] = sum(nums[0..i-1])\n   - Range sum: prefix[right+1] - prefix[left]\n   - When left=0: prefix[right+1] - prefix[0] = prefix[right+1] - 0 ✓\n   - No special cases needed!\n\n3. **The sentinel pattern:**\n   - prefix[0] = 0 acts as a sentinel value\n   - It represents 'the sum of zero elements'\n   - This is a common technique: add a dummy element to eliminate edge cases\n   - Used in: prefix sums, linked list dummy heads, DP base cases\n\n**Key insight:** The extra element at index 0 eliminates the edge case when the range starts at the beginning of the array. This 'sentinel' pattern appears throughout competitive programming.",
+    "failure_modes": [
+      {
+        "category": "No Edge Case Analysis",
+        "keywords": ["n+1", "extra"],
+        "feedback": "What specific edge case does the extra element handle? What happens when you query sum(nums[0..k]) with a length-n prefix array?"
+      }
+    ]
+  },
+  {
+    "id": "prefix_sum_applications",
+    "question": "Name three competitive programming problems where prefix sums are the key technique. How does the core idea generalize beyond simple range sums?",
+    "model_answer": "**Classic applications:**\n\n1. **Subarray sum equals K (LC-560)**\n   - Problem: Count subarrays with sum = k\n   - Key: sum(nums[i..j]) = prefix[j+1] - prefix[i] = k\n   - Rearranged: prefix[i] = prefix[j+1] - k\n   - Use hash map to count prefix sums → O(n)\n\n2. **Maximum subarray sum (Kadane's variant)**\n   - max(prefix[j] - prefix[i]) for j > i\n   - Track minimum prefix seen so far\n   - O(n) with one pass\n\n3. **2D range sum (LC-304)**\n   - Extend to 2D: prefix[i][j] = sum of rectangle (0,0) to (i-1,j-1)\n   - Query any rectangle in O(1) using inclusion-exclusion\n   - Build in O(n*m), query in O(1)\n\n**Generalizations:**\n\n- **Difference arrays**: Inverse of prefix sums — O(1) range updates, O(n) to read\n- **XOR prefix**: prefix[i] = nums[0] XOR ... XOR nums[i-1], used for range XOR queries\n- **Product prefix**: For range product queries (with care for zeros)\n- **Prefix min/max**: Using sparse tables for O(1) range min/max queries\n\n**The core generalization:** Any associative operation with an inverse can use prefix arrays for O(1) range queries. Addition has subtraction. XOR is its own inverse. Multiplication has division (with zero-handling).",
+    "failure_modes": [
+      {
+        "category": "Only Range Sum",
+        "keywords": ["sum", "range"],
+        "feedback": "Good understanding of range sums! But prefix sums power many other algorithms. Can you think of a problem where you combine prefix sums with a hash map?"
+      }
+    ]
+  }
+]
