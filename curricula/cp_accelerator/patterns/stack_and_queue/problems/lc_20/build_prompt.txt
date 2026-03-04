@@ -64,7 +64,7 @@ Every close bracket has a corresponding open bracket of the same type.
 After implementing your solution:
 
 ```bash
-engine submit
+mastery submit
 ```
 
 **Important Note on Validation:**
@@ -101,5 +101,5 @@ These curated resources will help you understand the pattern deeply:
 
 Once your solution passes local tests:
 ```bash
-engine submit
+mastery submit
 ```
