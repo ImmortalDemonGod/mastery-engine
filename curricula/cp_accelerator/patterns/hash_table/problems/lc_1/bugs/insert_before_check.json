@@ -1,6 +1,6 @@
 {
   "id": "two-sum-insert-before-check",
-  "description": "Inserts the current element into the hash table BEFORE checking for the complement, allowing the same element to be used twice (returning [i, i] when nums[i] * 2 == target)",
+  "description": "Replaces the complement lookup ('complement in seen') with a current-number lookup ('num in seen'), causing the function to check for duplicates instead of complements. This produces wrong answers on most inputs and teaches the importance of understanding what value to look up in the hash table.",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "twoSum",
@@ -8,50 +8,37 @@
     {
       "pass": 1,
       "type": "find_and_replace",
-      "description": "Swap the order of hash table insertion and complement check, causing same-index bug",
+      "description": "Replace 'complement' with 'num' in the membership test, so the code checks if the current number (not the complement) has been seen before",
       "pattern": {
-        "node_type": "If",
-        "test": {
-          "node_type": "Compare",
-          "left": {
+        "node_type": "Compare",
+        "left": {
+          "node_type": "Name",
+          "id": "complement"
+        },
+        "ops": [
+          {
+            "node_type": "In"
+          }
+        ],
+        "comparators": [
+          {
             "node_type": "Name",
-            "id": "complement"
-          },
-          "ops": [
-            {
-              "node_type": "In"
-            }
-          ],
-          "comparators": [
-            {
-              "node_type": "Name",
-              "id": "seen"
-            }
-          ]
-        }
+            "id": "seen"
+          }
+        ]
       },
       "replacement": {
-        "type": "move_after",
-        "target_node": {
-          "node_type": "Assign",
-          "targets": [
-            {
-              "node_type": "Subscript",
-              "value": {
-                "node_type": "Name",
-                "id": "seen"
-              }
-            }
-          ]
-        }
+        "type": "replace_value_with",
+        "source": "num in seen"
       }
     }
   ],
   "metadata": {
     "created": "2025-11-18",
+    "updated": "2026-03-04",
     "version": "2.1",
-    "author": "Generated (CP Accelerator)",
+    "author": "Generated (CP Accelerator), rewritten to use supported replacement types",
     "tier": "subtle",
-    "note": "This is a classic off-by-one style bug where order of operations matters. The correct approach is to check for the complement BEFORE inserting the current element."
+    "note": "Original bug used unsupported 'move_after' type. Redesigned to use 'replace_value_with' to change the lookup variable from complement to num. This tests whether the student understands that the hash table lookup must search for (target - current) not just current."
   }
 }
