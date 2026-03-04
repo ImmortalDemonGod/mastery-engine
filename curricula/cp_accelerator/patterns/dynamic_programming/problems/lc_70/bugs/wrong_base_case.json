@@ -1,0 +1,42 @@
+{
+  "id": "climb-stairs-wrong-base-case",
+  "description": "Replaces the base case 'if n <= 2: return n' with 'if n <= 1: return n', causing climbStairs(2) to enter the loop with incorrect initial values and return 1 instead of 2. Teaches the importance of correctly identifying all base cases in DP.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "climbStairs",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'n <= 2' with 'n <= 1' in the base case check",
+      "pattern": {
+        "node_type": "Compare",
+        "left": {
+          "node_type": "Name",
+          "id": "n"
+        },
+        "ops": [
+          {
+            "node_type": "LtE"
+          }
+        ],
+        "comparators": [
+          {
+            "node_type": "Constant",
+            "value": 2
+          }
+        ]
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "n <= 1"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}
