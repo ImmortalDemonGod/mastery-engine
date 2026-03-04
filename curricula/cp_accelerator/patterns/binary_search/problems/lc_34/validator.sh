@@ -14,7 +14,7 @@ if [ ! -f "$SCRIPT_DIR/solution.py" ]; then
 fi
 
 # Run tests
-python3 << 'EOF'
+${MASTERY_PYTHON:-python3} << 'EOF'
 import json
 import sys
 from pathlib import Path
