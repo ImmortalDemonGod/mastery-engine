@@ -1,0 +1,35 @@
+# Bug Symptom: Wrong Loop Condition in Binary Search
+
+## What You'll Observe
+
+Your binary search returns -1 (not found) for certain targets that ARE in the array.
+
+## Expected Behavior
+
+- `search([-1, 0, 3, 5, 9, 12], 9)` → `4`
+- `search([5], 5)` → `0`
+- `search([2, 5], 5)` → `1`
+
+## Actual Behavior
+
+- `search([-1, 0, 3, 5, 9, 12], 9)` → `4` (works by luck)
+- `search([5], 5)` → `-1` ❌ (FAILS — single element)
+- `search([2, 5], 5)` → `-1` ❌ (FAILS — target at boundary)
+
+The bug only manifests when the target is the LAST element remaining in the
+search space (when left == right).
+
+## Debugging Guide
+
+1. **Trace a single-element case**: What happens when left = 0, right = 0?
+2. **Check the loop condition**: Does your loop enter when left equals right?
+3. **Key insight**: When left == right, there's still ONE unchecked element
+
+## Conceptual Understanding
+
+Binary search off-by-one errors are the #1 source of binary search bugs.
+The loop condition defines when the search space is EMPTY:
+- `while left <= right`: search space [left, right] is empty when left > right ✓
+- `while left < right`: exits when left == right, skipping that element ✗
+
+Always verify your loop condition against a single-element array.
