@@ -1,0 +1,27 @@
+# Bug Symptom: Sorting by Start Time Instead of End Time
+
+## What You'll Observe
+
+Your solution returns wrong answers on inputs where a long interval overlaps
+multiple shorter intervals.
+
+## Expected Behavior
+
+- `eraseOverlapIntervals([[1,100],[2,3],[3,4]])` → `1` (remove [1,100])
+
+## Actual Behavior
+
+- `eraseOverlapIntervals([[1,100],[2,3],[3,4]])` → `2` ❌ (keeps [1,100], removes both short ones)
+
+## Debugging Guide
+
+1. **Check your sort key**: Are you sorting by start or end time?
+2. **Think about what "greedy" means here**: Which interval should you prefer to KEEP?
+3. **Key insight**: An interval that ends EARLIER leaves more room for future intervals
+
+## Conceptual Understanding
+
+The greedy choice for interval scheduling is: always keep the interval that ends
+earliest. Sorting by start time doesn't capture this — a long interval starting
+early blocks everything behind it. Sorting by end time ensures we always make
+the locally optimal choice that maximizes remaining capacity.

@@ -1,0 +1,35 @@
+{
+  "id": "greedy-sort-by-start",
+  "description": "Replaces sorting by end time (x[1]) with sorting by start time (x[0]), causing the greedy algorithm to keep long intervals that block many shorter ones. This produces suboptimal results on inputs with intervals of varying lengths.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "eraseOverlapIntervals",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace sort key x[1] (end time) with x[0] (start time)",
+      "pattern": {
+        "node_type": "Subscript",
+        "value": {
+          "node_type": "Name",
+          "id": "x"
+        },
+        "slice": {
+          "node_type": "Constant",
+          "value": 1
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "x[0]"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}

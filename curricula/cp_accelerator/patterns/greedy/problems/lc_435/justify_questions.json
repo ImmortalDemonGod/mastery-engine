@@ -1,0 +1,48 @@
+[
+  {
+    "id": "greedy_why_sort_by_end",
+    "question": "Why does sorting by end time (not start time) produce the optimal solution for the interval scheduling problem? What goes wrong if you sort by start time?",
+    "model_answer": "**Why sort by end time:**\n\n1. **Greedy choice: keep the interval that ends earliest**\n   - An interval that ends earlier 'frees up' more time for future intervals\n   - By always keeping the earliest-ending non-overlapping interval, we maximize the number of intervals we can keep\n   - Minimizing kept → maximizing removed is equivalent\n\n2. **What goes wrong with start-time sorting:**\n   - Example: [[1,100], [2,3], [3,4]]\n   - Sort by start: [1,100] comes first\n   - Keep [1,100] → must remove [2,3] and [3,4] → remove 2\n   - Sort by end: [2,3], [3,4], [1,100]\n   - Keep [2,3], keep [3,4] → remove [1,100] → remove 1\n   - Start-time sorting picks the long interval that blocks everything\n\n3. **Proof of optimality (exchange argument):**\n   - Suppose our greedy picks interval A (earliest end) but optimal picks B\n   - A ends no later than B (by our sorting)\n   - Replacing B with A in the optimal solution can only help (frees more space)\n   - So greedy is at least as good as optimal\n   - By induction on remaining intervals: greedy IS optimal\n\n**Key insight:** End time determines how much 'room' remains for future intervals. Start time tells you nothing about how much space an interval consumes.",
+    "failure_modes": [
+      {
+        "category": "No Counterexample",
+        "keywords": ["end time", "sort"],
+        "feedback": "You claim end-time sorting is better, but can you give a concrete example where start-time sorting produces a WRONG answer?"
+      },
+      {
+        "category": "Missing Proof",
+        "keywords": ["greedy", "optimal"],
+        "feedback": "You've stated greedy works, but how do you KNOW it produces the optimal solution? Can you sketch an exchange argument?"
+      }
+    ]
+  },
+  {
+    "id": "greedy_overlap_definition",
+    "question": "In this problem, are intervals [1,2] and [2,3] considered overlapping? Why does this boundary condition matter, and how does it affect the comparison operator?",
+    "model_answer": "**Boundary condition:**\n\n1. **[1,2] and [2,3] are NOT overlapping**\n   - They share endpoint 2, but don't overlap\n   - Think of them as time slots: [1,2) and [2,3) — the first ends exactly when the second starts\n   - The problem says 'intervals [1,2] and [2,3] are not considered to be overlapping'\n\n2. **Impact on comparison operator:**\n   - Overlap check: intervals[i][0] < prev_end (strict less than)\n   - NOT: intervals[i][0] <= prev_end\n   - Using <= would incorrectly flag [1,2],[2,3] as overlapping\n   - This would force removing one, giving wrong answer (1 instead of 0)\n\n3. **Example showing it matters:**\n   - intervals = [[1,2],[2,3],[3,4]]\n   - With <: no overlaps → remove 0 ✓\n   - With <=: [2,3] overlaps [1,2] at point 2 → remove 1 ✗\n\n**Key insight:** Whether endpoints are inclusive or exclusive changes the comparison from < to <=. Always check the problem statement for this detail. In CP, this is a common source of WA (Wrong Answer) on edge cases.",
+    "failure_modes": [
+      {
+        "category": "Wrong Operator",
+        "keywords": ["overlap", "<"],
+        "feedback": "You've used < or <=, but which one is correct for THIS problem? What does the problem statement say about touching endpoints?"
+      }
+    ]
+  },
+  {
+    "id": "greedy_vs_dp",
+    "question": "Could you solve this problem with dynamic programming instead of greedy? What would the time complexity be, and why is greedy preferred?",
+    "model_answer": "**DP approach (Weighted Interval Scheduling):**\n\n1. **Sort by end time**\n2. **dp[i] = max intervals we can keep using first i intervals**\n3. **Recurrence:** dp[i] = max(dp[i-1], 1 + dp[p(i)])\n   - p(i) = largest j < i such that interval j doesn't overlap with i\n   - Either skip interval i (dp[i-1]) or include it (1 + dp[p(i)])\n4. **Time:** O(n log n) — sort + binary search for p(i)\n5. **Space:** O(n) for dp array\n\n**Why greedy is preferred:**\n- Same O(n log n) time complexity\n- O(1) space vs O(n)\n- Simpler code (no binary search for p(i))\n- Greedy works here because all intervals have weight 1\n\n**When greedy DOESN'T work:**\n- Weighted interval scheduling (each interval has a value/profit)\n- Example: [[1,10], weight=100] vs [[1,3],[4,6],[7,10], weights=[1,1,1]]\n- Greedy picks the 3 short intervals (total 3)\n- DP picks the one long interval (total 100)\n- When intervals have different values, you MUST use DP\n\n**Key insight:** Greedy works for unweighted interval scheduling because the optimal substructure has equal weights. When weights differ, the greedy choice can be globally suboptimal.",
+    "failure_modes": [
+      {
+        "category": "Claims DP Always Better",
+        "keywords": ["DP", "optimal"],
+        "feedback": "DP does work, but is it necessary here? What property of this specific problem makes greedy sufficient?"
+      },
+      {
+        "category": "No Weighted Example",
+        "keywords": ["greedy", "works"],
+        "feedback": "Greedy works here, but when would it FAIL? Can you modify the problem slightly so that greedy gives a wrong answer?"
+      }
+    ]
+  }
+]
