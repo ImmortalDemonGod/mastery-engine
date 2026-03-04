@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import ast
 import json
 import re
 from pathlib import Path
@@ -116,8 +117,8 @@ class ModuleGenerator:
                     key = key.strip()
                     value = value.strip()
                     try:
-                        result[key] = eval(value)
-                    except:
+                        result[key] = ast.literal_eval(value)
+                    except (ValueError, SyntaxError):
                         result[key] = value
         
         return result
@@ -376,7 +377,7 @@ if [ ! -f "$SCRIPT_DIR/solution.py" ]; then
 fi
 
 # Run tests
-python3 << 'EOF'
+${MASTERY_PYTHON:-python3} << 'EOF'
 import json
 import sys
 from pathlib import Path
@@ -448,8 +449,8 @@ EOF
                 soup = BeautifulSoup(example['output'], 'html.parser')
                 output_clean = soup.get_text().strip()
                 try:
-                    expected = eval(output_clean)
-                except:
+                    expected = ast.literal_eval(output_clean)
+                except (ValueError, SyntaxError):
                     expected = output_clean
                 
                 # Clean explanation
