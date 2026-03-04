@@ -15,7 +15,7 @@ fi
 
 # Run tests
 cd "$SCRIPT_DIR"
-python3 << EOF
+${MASTERY_PYTHON:-python3} << EOF
 import json
 import sys
 import os
