@@ -1,0 +1,45 @@
+{
+  "id": "prefix-sum-off-by-one",
+  "description": "Replaces 'prefix[right + 1] - prefix[left]' with 'prefix[right] - prefix[left]', causing the range sum to exclude the rightmost element. This is the classic off-by-one error in prefix sum queries.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "sumRange",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'prefix[right + 1]' with 'prefix[right]' to exclude the right boundary element",
+      "pattern": {
+        "node_type": "Subscript",
+        "value": {
+          "node_type": "Name",
+          "id": "prefix"
+        },
+        "slice": {
+          "node_type": "BinOp",
+          "left": {
+            "node_type": "Name",
+            "id": "right"
+          },
+          "op": {
+            "node_type": "Add"
+          },
+          "right": {
+            "node_type": "Constant",
+            "value": 1
+          }
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "prefix[right]"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}
