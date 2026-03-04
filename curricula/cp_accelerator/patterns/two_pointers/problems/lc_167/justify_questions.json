@@ -1,0 +1,43 @@
+[
+  {
+    "id": "two_ptr_why_converge",
+    "question": "Explain why the two-pointer technique works for Two Sum II. Why does moving the left pointer right when the sum is too small, and the right pointer left when too large, guarantee we find the solution?",
+    "model_answer": "**Why two pointers work on sorted arrays:**\n\n1. **Sorted order creates monotonic behavior**\n   - numbers[left] is the smallest remaining candidate\n   - numbers[right] is the largest remaining candidate\n   - Moving left right INCREASES the sum\n   - Moving right left DECREASES the sum\n\n2. **Correctness proof (no valid pair is skipped):**\n   - Suppose the answer is (i, j) where i < j\n   - Initially left <= i and right >= j\n   - When left < i: sum = numbers[left] + numbers[right]\n     * If sum < target: we move left right (correct, we need a larger left)\n     * If sum > target: we move right left. But right >= j, so this is safe\n     * If sum == target: we found A solution (possibly different from (i,j))\n   - We never skip past both i and j simultaneously\n   - Therefore we must encounter a valid pair\n\n3. **Why O(n) and not O(n²):**\n   - Each step moves exactly one pointer inward\n   - left only moves right, right only moves left\n   - Total moves: at most n (left moves + right moves ≤ n)\n   - Compared to nested loops: n × n = n² comparisons\n\n**Key insight:** The sorted property lets us make a GLOBAL decision (which pointer to move) from a LOCAL comparison (current sum vs target).",
+    "failure_modes": [
+      {
+        "category": "No Proof of Completeness",
+        "keywords": ["move", "pointer", "smaller", "larger"],
+        "feedback": "You've explained WHEN to move each pointer, but how do you know you won't SKIP the correct pair? Can you prove that no valid pair is missed?"
+      },
+      {
+        "category": "Missing Sorted Requirement",
+        "keywords": ["two pointers", "converge"],
+        "feedback": "Your explanation assumes something about the input. What property must the array have for this to work? What breaks if it doesn't?"
+      }
+    ]
+  },
+  {
+    "id": "two_ptr_vs_hash",
+    "question": "Compare the two-pointer approach with the hash table approach from Two Sum (LC-1). When would you prefer each one?",
+    "model_answer": "**Two Pointers (this problem):**\n- Time: O(n), Space: O(1)\n- Requires: sorted input\n- Advantage: constant extra space\n\n**Hash Table (LC-1):**\n- Time: O(n), Space: O(n)\n- Works on: unsorted input\n- Advantage: works without sorted order\n\n**When to use each:**\n1. **Input already sorted** → Two pointers (saves O(n) space)\n2. **Input unsorted, single query** → Hash table (avoid O(n log n) sort cost)\n3. **Input unsorted, multiple queries** → Sort once O(n log n) + two pointers O(n) each\n4. **Memory constrained** → Sort in-place + two pointers\n\n**Key tradeoff:** Two pointers requires sorted order but uses O(1) space. Hash table works on any order but uses O(n) space. Same time complexity.",
+    "failure_modes": [
+      {
+        "category": "Only Complexity Comparison",
+        "keywords": ["O(n)", "O(1)"],
+        "feedback": "Good complexity analysis! But when would you actually CHOOSE one over the other in practice? Consider: what if the input is already sorted? What if memory is limited?"
+      }
+    ]
+  },
+  {
+    "id": "two_ptr_one_indexed",
+    "question": "This problem uses 1-indexed output. What subtle bugs can arise from index conversion, and how do you systematically avoid them?",
+    "model_answer": "**Common 1-indexed bugs:**\n\n1. **Off-by-one in output:**\n   - Internal: left=0, right=1 (0-indexed)\n   - Output: [1, 2] (1-indexed)\n   - Bug: returning [0, 1] (forgot to add 1)\n   - Bug: returning [2, 3] (added 1 twice or to wrong base)\n\n2. **Off-by-one in loop bounds:**\n   - 0-indexed: left starts at 0, right at len-1\n   - If confused with 1-indexed: left starts at 1 → misses first element\n\n3. **Systematic approach:**\n   - ALWAYS use 0-indexed internally (Python convention)\n   - Convert ONLY at the return statement: [left + 1, right + 1]\n   - Never mix indexing systems within the algorithm\n   - Test with the smallest input (2 elements) to catch off-by-one\n\n**Best practice:** Keep one consistent indexing system throughout your code and convert at the boundary (input/output). In Python, always use 0-indexed internally.",
+    "failure_modes": [
+      {
+        "category": "No Concrete Bug Example",
+        "keywords": ["add 1", "convert"],
+        "feedback": "Can you trace through a specific example showing what happens if you forget the conversion? What answer would you get for numbers=[2,7,11,15], target=9?"
+      }
+    ]
+  }
+]
