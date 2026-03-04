@@ -1,0 +1,31 @@
+# Bug Symptom: Missing Empty Stack Check
+
+## What You'll Observe
+
+Your solution crashes with an `IndexError: list index out of range` on certain inputs.
+
+## Expected Behavior
+
+- `isValid(")(")` → `False`
+- `isValid("]")` → `False`
+
+## Actual Behavior
+
+```
+IndexError: list index out of range
+```
+
+The crash occurs when a closing bracket appears before any opening bracket.
+
+## Debugging Guide
+
+1. **Trace the input `")"` step by step**: What's in the stack when you see `)`?
+2. **What does `stack[-1]` do when stack is empty?**
+3. **Key insight**: Before accessing the top of the stack, you must verify the stack is not empty
+
+## Conceptual Understanding
+
+Stack underflow is a classic bug in stack-based algorithms. Always guard
+stack access operations (`pop()`, `peek()`, `[-1]`) with an emptiness check.
+In bracket matching, an empty stack when seeing a closing bracket means
+there's no matching opener — the string is immediately invalid.

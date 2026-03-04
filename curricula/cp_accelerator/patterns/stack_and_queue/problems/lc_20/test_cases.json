@@ -5,43 +5,51 @@
   "tests": [
     {
       "id": 1,
-      "input": {
-        "s": "()"
-      },
-      "expected": "true",
-      "note": "Example 1"
+      "input": { "s": "()" },
+      "expected": true,
+      "note": "Example 1: Simple matching pair"
     },
     {
       "id": 2,
-      "input": {
-        "s": "()[]{}"
-      },
-      "expected": "true",
-      "note": "Example 2"
+      "input": { "s": "()[]{}" },
+      "expected": true,
+      "note": "Example 2: Multiple types, all matched"
     },
     {
       "id": 3,
-      "input": {
-        "s": "(]"
-      },
-      "expected": "false",
-      "note": "Example 3"
+      "input": { "s": "(]" },
+      "expected": false,
+      "note": "Example 3: Mismatched types"
     },
     {
       "id": 4,
-      "input": {
-        "s": "([])"
-      },
-      "expected": "true",
-      "note": "Example 4"
+      "input": { "s": "([])" },
+      "expected": true,
+      "note": "Example 4: Nested brackets"
     },
     {
       "id": 5,
-      "input": {
-        "s": "([)]"
-      },
-      "expected": "false",
-      "note": "Example 5"
+      "input": { "s": "([)]" },
+      "expected": false,
+      "note": "Example 5: Interleaved (not nested) — invalid"
+    },
+    {
+      "id": 6,
+      "input": { "s": "" },
+      "expected": true,
+      "note": "Edge case: empty string is valid"
+    },
+    {
+      "id": 7,
+      "input": { "s": "(((" },
+      "expected": false,
+      "note": "Edge case: only opening brackets"
+    },
+    {
+      "id": 8,
+      "input": { "s": "{[]}" },
+      "expected": true,
+      "note": "Edge case: nested different types"
     }
   ]
 }
