@@ -1,0 +1,35 @@
+# Bug Symptom: Missing Base Case in Merge Sort
+
+## What You'll Observe
+
+Your merge sort implementation crashes with a `RecursionError: maximum recursion depth exceeded`.
+
+## Expected Behavior
+
+- `sortArray([5, 2, 3, 1])` → `[1, 2, 3, 5]`
+- `sortArray([1])` → `[1]`
+- `sortArray([])` → `[]`
+
+## Actual Behavior
+
+```
+RecursionError: maximum recursion depth exceeded in comparison
+```
+
+The function never stops recursing because it has no stopping condition.
+
+## Debugging Guide
+
+1. **Trace the recursion**: What happens when `sortArray` is called on `[5]`?
+2. **What should stop recursion?**: Every recursive algorithm needs a base case
+3. **Key insight**: An array of 0 or 1 elements is already sorted — no work needed
+
+## Conceptual Understanding
+
+The base case is the foundation of any recursive algorithm:
+- **Without it**: The function calls itself forever (infinite recursion)
+- **With it**: The function reaches a point where the answer is trivial
+- **For merge sort**: A single element (or empty array) is inherently sorted
+
+This is one of the most fundamental bugs in recursive programming — always verify
+that your base case is present and correct before debugging the recursive logic.
