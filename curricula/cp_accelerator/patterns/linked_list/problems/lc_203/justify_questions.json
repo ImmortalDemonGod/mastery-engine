@@ -1,0 +1,38 @@
+[
+  {
+    "id": "linked_list_dummy_head",
+    "question": "In a true linked list implementation, why is a dummy/sentinel head node useful when removing elements? What edge case does it eliminate?",
+    "model_answer": "**The problem with removing the head:**\n\n1. **Without dummy node:**\n   - If the head itself needs to be removed, we need special-case code\n   - Example: [7, 7, 1, 2], remove 7\n   - Must advance head past ALL leading 7s before starting normal traversal\n   - Code becomes: while head and head.val == val: head = head.next\n   - Then ALSO handle interior nodes differently\n\n2. **With dummy node:**\n   - Create dummy node pointing to head: dummy.next = head\n   - Now head is just another interior node\n   - Single loop handles ALL cases uniformly:\n     if current.next.val == val: current.next = current.next.next\n     else: current = current.next\n   - Return dummy.next (the possibly-new head)\n\n3. **The edge case eliminated:**\n   - Head removal (first element matches)\n   - All elements match (entire list removed)\n   - Both are handled uniformly with dummy node\n\n**Key insight:** The dummy node pattern converts a special case (head modification) into a general case (interior node modification). This is a fundamental linked list technique used in many problems.",
+    "failure_modes": [
+      {
+        "category": "No Concrete Example",
+        "keywords": ["dummy", "sentinel"],
+        "feedback": "You mention the dummy node, but can you trace through a specific example? What happens with [7, 7, 1, 2] when removing 7, with and without a dummy node?"
+      }
+    ]
+  },
+  {
+    "id": "linked_list_vs_array",
+    "question": "Compare removing elements from a linked list vs an array. What are the time complexity differences, and why?",
+    "model_answer": "**Linked list removal: O(n) total**\n- Finding element: O(n) — must traverse\n- Removing once found: O(1) — just relink pointers\n- No shifting needed!\n- For removing ALL occurrences: O(n) single pass\n\n**Array removal: O(n) per removal**\n- Finding element: O(n) — linear scan (or O(log n) if sorted)\n- Removing once found: O(n) — must shift all subsequent elements left\n- For removing ALL occurrences: O(n²) naive, O(n) with two-pointer compaction\n\n**Key differences:**\n| Operation | Linked List | Array |\n|-----------|------------|-------|\n| Remove at known position | O(1) | O(n) shift |\n| Find + Remove | O(n) | O(n) |\n| Remove all occurrences | O(n) | O(n) with compaction |\n| Random access | O(n) | O(1) |\n| Memory overhead | O(n) pointers | None |\n\n**When to use each:**\n- Frequent insertions/deletions at arbitrary positions → linked list\n- Frequent random access → array\n- In CP: arrays almost always preferred (cache-friendly, simpler code)\n- In interviews: linked list problems test pointer manipulation skills",
+    "failure_modes": [
+      {
+        "category": "Missing Shift Cost",
+        "keywords": ["O(n)", "remove"],
+        "feedback": "You say array removal is O(n), but WHY? What physical operation must happen after removing an element from the middle of an array?"
+      }
+    ]
+  },
+  {
+    "id": "linked_list_in_place",
+    "question": "What does 'in-place' mean for linked list operations? How does the space complexity differ between creating a new list vs modifying the existing one?",
+    "model_answer": "**In-place linked list modification:**\n- Relink existing nodes' pointers — don't create new nodes\n- Space: O(1) extra (just a few pointer variables)\n- The removed nodes become unreachable (garbage collected in Python)\n- The original list is modified\n\n**Creating a new list:**\n- Traverse original, copy non-matching values to new nodes\n- Space: O(n) for new nodes\n- Original list is preserved\n- In Python with arrays: [x for x in head if x != val] creates new list\n\n**In competitive programming:**\n- Almost always work in-place when possible\n- O(1) extra space is a common constraint\n- For arrays: two-pointer technique achieves in-place removal\n\n**The pointer manipulation for in-place removal:**\n```\nprev.next = current.next  # Skip the node to remove\ncurrent = current.next     # Move forward\n```\n- No new memory allocated\n- Just changing which node 'prev' points to\n\n**Key insight:** In-place means modifying the data structure's internal pointers rather than creating a copy. For linked lists, this is O(1) per removal because we just redirect pointers.",
+    "failure_modes": [
+      {
+        "category": "Confuses In-Place",
+        "keywords": ["in-place", "modify"],
+        "feedback": "When you say 'in-place', what exactly are you modifying? Are you creating any new nodes, or just changing existing pointers? What's the space complexity?"
+      }
+    ]
+  }
+]

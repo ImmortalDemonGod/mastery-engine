@@ -1,0 +1,26 @@
+# Bug Symptom: Wrong Comparison Operator
+
+## What You'll Observe
+
+Your solution removes too many elements — not just the target value, but also
+all elements smaller than or equal to it.
+
+## Expected Behavior
+
+- `removeElements([1, 2, 6, 3, 4, 5, 6], 6)` → `[1, 2, 3, 4, 5]`
+
+## Actual Behavior
+
+- `removeElements([1, 2, 6, 3, 4, 5, 6], 6)` → `[]` ❌ (all elements ≤ 6 removed)
+
+## Debugging Guide
+
+1. **Check your filter condition**: Are you using `!=` or `>`?
+2. **Trace element 1**: Is 1 != 6? Yes. Is 1 > 6? No. Which keeps it?
+3. **Key insight**: `!= val` keeps everything except val. `> val` keeps only things larger.
+
+## Conceptual Understanding
+
+Using the wrong comparison operator is a subtle bug that can be hard to spot
+because the code "looks right" at a glance. Always verify your filter condition
+by mentally testing with a value that should be KEPT (not removed).
