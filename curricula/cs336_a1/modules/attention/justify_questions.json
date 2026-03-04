@@ -1,0 +1,63 @@
+[
+  {
+    "id": "attention_q1",
+    "question": "Why is scaling by √d_k essential for attention stability? Explain what happens to dot products as dimensionality increases, how this affects softmax behavior, and why the square root specifically is the correct normalization factor.",
+    "model_answer": "Scaling by √d_k is essential because dot products grow with dimensionality. If q and k are random unit variance vectors of dimension d_k, their dot product q·k is a sum of d_k independent products. By the central limit theorem, this sum has variance d_k (not standard deviation d_k—each term contributes variance 1, and variances add). Without scaling, as d_k increases: (1) Dot products grow in magnitude proportionally to √d_k. (2) Large dot products push softmax into saturated regions where most of the probability mass concentrates on the maximum element (nearly one-hot distribution). (3) Gradients of softmax become extremely small for non-maximum elements (vanishing gradients). (4) Training becomes unstable—slight changes in maximum value cause discrete shifts in attention. The √d_k factor specifically normalizes variance: Var(q·k / √d_k) = Var(q·k) / d_k = d_k / d_k = 1. This keeps softmax inputs in a reasonable range regardless of dimensionality, maintaining stable gradients throughout training. Without this, deep models with large d_k (e.g., 128, 256) would have extremely sharp attention patterns and poor gradient flow.",
+    "required_concepts": [
+      "Dot products of random vectors have variance d_k",
+      "Large dot products make softmax nearly one-hot",
+      "One-hot distributions have vanishing gradients",
+      "Square root normalizes variance to 1",
+      "Stability is crucial for training deep networks"
+    ]
+  },
+  {
+    "id": "attention_q2",
+    "question": "Attention uses softmax over the KEY dimension (dim=-1) rather than the QUERY dimension. Explain why this choice is crucial and what would go wrong if we applied softmax over queries instead. How does this relate to the interpretation of attention as a weighted average?",
+    "model_answer": "Softmax over keys (dim=-1) is crucial because it normalizes how much each QUERY attends to all available KEYS. For each query position, we get a probability distribution over all key positions, allowing that query to do a weighted average of all values. If we applied softmax over queries (dim=-2), we'd normalize how much each KEY is attended to by all QUERIES—fundamentally different! Problems with query-softmax: (1) Each value position would get a fixed contribution across all outputs, losing the query-specific weighting. (2) A single key couldn't be strongly attended to by multiple queries simultaneously—attention would be 'competed for' across queries. (3) We'd lose the interpretation of 'each output position independently choosing what to attend to'. (4) The output wouldn't be a weighted average from each query's perspective—it would be a mix where values are distributed across queries. The weighted average interpretation requires: for output position i, attention_weights[i] is a distribution over all value positions, and output[i] = Σⱼ attention_weights[i,j] × value[j]. This only works with key-dimension softmax. The current design lets each query independently decide what to look at, which is essential for the model to route information flexibly.",
+    "required_concepts": [
+      "Each query gets its own distribution over keys",
+      "Key-softmax enables weighted average per query",
+      "Query-softmax would couple attention across queries",
+      "Independence of query attention is crucial",
+      "Weighted average interpretation requires key-dimension normalization"
+    ]
+  },
+  {
+    "id": "attention_q3",
+    "question": "Causal masking sets future positions to -∞ before softmax, making them receive zero attention weight. Why must masking happen BEFORE softmax rather than after? Explain using the properties of softmax and what would happen with post-softmax masking.",
+    "model_answer": "Masking must happen before softmax because softmax normalizes to sum to 1, and we need masked positions to be genuinely excluded from this normalization. Pre-softmax masking: Setting scores to -∞ before softmax means softmax(-∞) = 0, and the remaining positions normalize to sum to 1. The masked positions are completely excluded. Post-softmax masking would fail: If we apply softmax first, then mask (multiply by 0), we get: (1) Softmax already normalized all positions including the ones we want to mask, so probabilities are 'wasted' on future positions. (2) After multiplying by 0, the remaining attention weights no longer sum to 1—they sum to less than 1. (3) This changes the scale of the output: output = sum of (scaled-down weights × values). (4) The model sees a different magnitude of information, not just different routing. (5) Gradients are wrong because softmax gradients flowed through the masked positions during the forward pass. With pre-softmax masking, softmax only normalizes over the valid (unmasked) positions, ensuring proper probability distribution, correct output magnitudes, and correct gradients. The -∞ value is chosen specifically because exp(-∞) = 0, cleanly removing positions from the exponential normalization in softmax.",
+    "required_concepts": [
+      "Softmax normalizes its inputs to sum to 1",
+      "Pre-masking excludes positions from normalization",
+      "Post-masking leaves weights not summing to 1",
+      "Output magnitude would be incorrect with post-masking",
+      "Gradients need masked positions excluded from softmax computation"
+    ]
+  },
+  {
+    "id": "attention_q4",
+    "question": "Attention is O(n²d) complexity where n is sequence length and d is dimension. Explain why the quadratic n² term arises, why this is problematic for long sequences, and how this constrains modern LLM context lengths despite having billions of parameters.",
+    "model_answer": "The n² complexity arises from computing pairwise interactions: Q @ K^T creates an (n × n) attention matrix where every query position must be compared to every key position. For n sequence positions: (1) QK^T: multiply (n × d) by (d × n) = n²d operations. (2) The attention weight matrix itself is (n × n), requiring n² memory. (3) Attention weights @ V: multiply (n × n) by (n × d) = n²d operations. Total: O(n²d) compute and O(n²) memory. This is problematic because: (1) Doubling sequence length quadruples cost (n=1024 vs n=2048 = 4x cost). (2) Memory grows quadratically—at n=100K, the attention matrix alone is 10 billion floats (40GB in fp32). (3) Compute becomes dominated by attention, not parameters—GPT-3 with 96 layers × 96 heads means ~9K attention computations per forward pass. (4) Even with billions of parameters (linear in d), the n² term dominates for long sequences. This constrains context: Most LLMs use n=2K-8K despite having 7B-70B parameters because attention cost explodes. A 70B model with 32K context spends most compute on attention, not the FFN parameters. Solutions like Flash Attention optimize memory layout but don't change fundamental O(n²) complexity. This is why research focuses on sub-quadratic attention (linear attention, etc.)—the quadratic wall is the main bottleneck for long context.",
+    "required_concepts": [
+      "Pairwise comparisons create n² attention matrix",
+      "Quadratic memory prevents extreme long context",
+      "Cost grows faster with sequence length than with parameters",
+      "Attention dominates compute for long sequences",
+      "Fundamental bottleneck for scaling context length"
+    ]
+  },
+  {
+    "id": "attention_q5",
+    "question": "Describe what attention learns to represent in practice across different layers of a Transformer language model. Why does attention in early layers differ from late layers, and what does this tell us about hierarchical representation learning?",
+    "model_answer": "Attention learns hierarchical patterns across layers: Early layers (1-5) typically learn local, syntactic patterns: (1) Adjacent token attention (bigrams, trigrams). (2) Simple positional patterns (attending to previous few tokens). (3) Basic syntax like matching punctuation, article-noun pairs. (4) These patterns are largely task-agnostic and structural. Middle layers (6-20) learn syntactic structure and dependencies: (1) Subject-verb agreement across longer distances. (2) Dependency parsing patterns (which words modify which). (3) Phrase structure (attending to phrase boundaries). (4) Coreference at syntactic level (pronouns to nearby nouns). Late layers (20+) learn semantic and task-specific patterns: (1) Long-range semantic dependencies (relating concepts far apart). (2) Coreference resolution across sentences. (3) Entity tracking (attending to all mentions of the same entity). (4) Task-specific reasoning (for fine-tuned models). This hierarchy tells us: (1) Transformers learn compositional representations—low-level features feed into high-level abstractions. (2) Attention is interpretable—visualization often reveals linguistically meaningful patterns. (3) Deep networks benefit from the depth—early layers extract basic features, late layers use them for reasoning. (4) The model builds a structured understanding, not just pattern matching—syntactic structure emerges in middle layers without explicit supervision. This mirrors human language processing: we process words → syntax → semantics hierarchically.",
+    "required_concepts": [
+      "Early layers focus on local, syntactic patterns",
+      "Middle layers capture syntactic structure",
+      "Late layers learn semantic relationships",
+      "Hierarchical composition from low to high level",
+      "Interpretability reveals linguistic structure",
+      "Depth enables compositional representation learning"
+    ]
+  }
+]

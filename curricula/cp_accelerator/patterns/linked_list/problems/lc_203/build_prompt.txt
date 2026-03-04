@@ -1,0 +1,91 @@
+# Build Challenge: Remove Linked List Elements
+
+## Pattern Overview
+
+> Linked lists are dynamic data structures that excel at insertion and deletion operations, forming the foundation for many advanced data structures and algorithms.
+
+## Problem Statement
+
+Given the `head` of a linked list and an integer `val`, remove all the nodes of the linked list that has `Node.val == val`, and return the new head.
+ 
+**Example 1:**
+
+```
+
+**Input:** head = [1,2,6,3,4,5,6], val = 6
+**Output:** [1,2,3,4,5]
+
+```
+
+**Example 2:**
+
+```
+
+**Input:** head = [], val = 1
+**Output:** []
+
+```
+
+**Example 3:**
+
+```
+
+**Input:** head = [7,7,7,7], val = 7
+**Output:** []
+
+```
+
+**Constraints:**
+
+- The number of nodes in the list is in the range `[0, 104]`.
+- `1 <= Node.val <= 50`
+- `0 <= val <= 50`
+
+**Difficulty:** Easy | **Acceptance Rate:** 53.2%  
+**Topics:** Linked List, Recursion
+
+**Problem Link:** https://leetcode.com/problems/remove-linked-list-elements/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/remove-linked-list-elements/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/4. Linked List.md', 'title': 'Linked List Taxonomy'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

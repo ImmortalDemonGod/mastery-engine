@@ -1,0 +1,20 @@
+# Bug Symptom: Typo in Greeting Message
+
+## Observed Behavior
+Your implementation now returns a greeting with a typo: "Hello, Mastery Enginne!" instead of the expected "Hello, Mastery Engine!".
+
+## Your Challenge
+Debug and fix the typo in your `hello_world.py` file.
+
+## Expected Output
+After your fix, the function should return:
+```
+Hello, Mastery Engine!
+```
+
+## Debugging Tips
+- Carefully review your `greet()` function
+- Check the spelling of each word in the return statement
+- Run the validator to confirm your fix: `engine submit-fix`
+
+This is a simple example bug to demonstrate the Harden stage workflow. In real curriculum modules, bugs would test deeper understanding of edge cases, algorithm correctness, and system behavior.

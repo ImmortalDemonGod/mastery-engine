@@ -1,0 +1,91 @@
+# Build Challenge: Binary Tree Preorder Traversal
+
+## Pattern Overview
+
+> Traversal algorithms systematically visit all elements in a data structure, using different strategies based on the structure and problem requirements.
+
+## Problem Statement
+
+Given the `root` of a binary tree, return the preorder traversal of its nodes' values.
+ 
+**Example 1:**
+
+**Input:** root = [1,null,2,3]
+**Output:** [1,2,3]
+**Explanation:**
+
+**Example 2:**
+
+**Input:** root = [1,2,3,4,5,null,8,null,null,6,7,9]
+**Output:** [1,2,4,5,6,7,3,8,9]
+**Explanation:**
+
+**Example 3:**
+
+**Input:** root = []
+**Output:** []
+
+**Example 4:**
+
+**Input:** root = [1]
+**Output:** [1]
+
+**Constraints:**
+
+- The number of nodes in the tree is in the range `[0, 100]`.
+- `-100 <= Node.val <= 100`
+
+**Follow up:** Recursive solution is trivial, could you do it iteratively?
+
+**Difficulty:** Easy | **Acceptance Rate:** 74.5%  
+**Topics:** Stack, Tree, Depth-First Search, Binary Tree
+
+**Problem Link:** https://leetcode.com/problems/binary-tree-preorder-traversal/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/binary-tree-preorder-traversal/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/6. Traversal Algorithms.md', 'title': 'Traversal Algorithms Taxonomy'}
+
+2. {'type': 'video', 'title': 'Recursion for DSA/CP : BEST way to Understand', 'url': 'https://www.youtube.com/watch?v=0UM_J1jE1dg'}
+
+3. {'type': 'video', 'title': 'Dynamic Programming lecture \\#1 - Fibonacci, iteration vs recursion', 'url': 'https://www.youtube.com/watch?v=YBSt1jYwVfU'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

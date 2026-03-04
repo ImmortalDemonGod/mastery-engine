@@ -1,0 +1,96 @@
+
+tests/engine/test_curriculum.py::TestLoadManifest::test_load_valid_manifest PASSED
+tests/engine/test_curriculum.py::TestLoadManifest::test_load_nonexistent_curriculum_raises_error PASSED
+tests/engine/test_curriculum.py::TestLoadManifest::test_load_missing_manifest_raises_error PASSED
+tests/engine/test_curriculum.py::TestLoadManifest::test_load_malformed_json_raises_error PASSED
+tests/engine/test_curriculum.py::TestLoadManifest::test_load_invalid_schema_raises_error PASSED
+tests/engine/test_curriculum.py::TestPathResolution::test_get_module_path PASSED
+tests/engine/test_curriculum.py::TestPathResolution::test_get_build_prompt_path PASSED
+tests/engine/test_curriculum.py::TestPathResolution::test_get_validator_path PASSED
+tests/engine/test_curriculum.py::TestPathResolution::test_get_justify_questions_path PASSED
+tests/engine/test_curriculum.py::TestPathResolution::test_get_bugs_dir PASSED
+tests/engine/test_llm_service.py::TestLLMServiceInit::test_init_with_api_key PASSED
+tests/engine/test_llm_service.py::TestLLMServiceInit::test_init_with_env_var PASSED
+tests/engine/test_llm_service.py::TestLLMServiceInit::test_init_missing_api_key_raises_error PASSED
+tests/engine/test_llm_service.py::TestLLMServiceInit::test_init_custom_model_and_timeout PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_correct_answer PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_incorrect_answer PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_empty_response_raises_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_malformed_json_raises_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_invalid_schema_raises_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_authentication_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_rate_limit_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_connection_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_api_error PASSED
+tests/engine/test_llm_service.py::TestEvaluateJustification::test_evaluate_unexpected_error 
+-------------------------------- live log call ---------------------------------
+ERROR    engine.services.llm_service:llm_service.py:164 Unexpected error during LLM evaluation: Unexpected!
+Traceback (most recent call last):
+  File "/Volumes/Totallynotaharddrive/assignment1-basics/engine/services/llm_service.py", line 106, in evaluate_justification
+    response = self.client.chat.completions.create(
+        model=self.model,
+    ...<15 lines>...
+        temperature=0.3,  # Lower temperature for consistent evaluation
+    )
+  File "/Users/tomriddle1/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/unittest/mock.py", line 1167, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/tomriddle1/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/unittest/mock.py", line 1171, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/tomriddle1/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/unittest/mock.py", line 1226, in _execute_mock_call
+    raise effect
+RuntimeError: Unexpected!
+PASSED
+tests/engine/test_llm_service.py::TestBuildCOTPrompt::test_build_cot_prompt_includes_all_elements PASSED
+tests/engine/test_llm_service.py::TestBuildCOTPrompt::test_build_cot_prompt_formats_required_concepts PASSED
+tests/engine/test_main.py::TestNextCommand::test_next_displays_build_prompt FAILED
+
+=================================== FAILURES ===================================
+_______________ TestNextCommand.test_next_displays_build_prompt ________________
+
+self = <tests.engine.test_main.TestNextCommand object at 0x11e535e50>
+mock_state_cls = <MagicMock name='StateManager' id='4809139136'>
+mock_curr_cls = <MagicMock name='CurriculumManager' id='4809142160'>
+
+    @patch('engine.main.CurriculumManager')
+    @patch('engine.main.StateManager')
+    def test_next_displays_build_prompt(self, mock_state_cls, mock_curr_cls):
+        """Should display build prompt when in build stage."""
+        # Mock state manager
+        mock_state_mgr = MagicMock()
+        mock_state_cls.return_value = mock_state_mgr
+        mock_state_mgr.load.return_value = UserProgress(
+            curriculum_id="test_curriculum",
+            current_module_index=0,
+            current_stage="build"
+        )
+    
+        # Mock curriculum manager
+        mock_curr_mgr = MagicMock()
+        mock_curr_cls.return_value = mock_curr_mgr
+        mock_curr_mgr.load_manifest.return_value = CurriculumManifest(
+            curriculum_name="test_curriculum",
+            author="Test",
+            version="1.0.0",
+            modules=[
+                ModuleMetadata(id="mod1", name="Module 1", path="modules/mod1")
+            ]
+        )
+    
+        mock_prompt_path = MagicMock()
+        mock_prompt_path.exists.return_value = True
+        mock_prompt_path.read_text.return_value = "# Test Build Prompt\n\nImplement something."
+        mock_curr_mgr.get_build_prompt_path.return_value = mock_prompt_path
+    
+        result = runner.invoke(app, ["next"])
+    
+>       assert result.exit_code == 0
+E       assert 1 == 0
+E        +  where 1 = <Result SystemExit(1)>.exit_code
+
+tests/engine/test_main.py:57: AssertionError
+=========================== short test summary info ============================
+FAILED tests/engine/test_main.py::TestNextCommand::test_next_displays_build_prompt
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+================= 1 failed, 26 passed, 17 deselected in 2.06s ==================

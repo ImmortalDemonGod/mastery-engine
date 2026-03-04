@@ -1,0 +1,105 @@
+# Build Challenge: Valid Parentheses
+
+## Pattern Overview
+
+> Stacks and queues are fundamental data structures that provide controlled access to elements, enabling elegant solutions to problems involving sequential processing, backtracking, and breadth-first exploration.
+
+## Problem Statement
+
+Given a string `s` containing just the characters `'('`, `')'`, `'{'`, `'}'`, `'['` and `']'`, determine if the input string is valid.
+An input string is valid if:
+
+Open brackets must be closed by the same type of brackets.
+Open brackets must be closed in the correct order.
+Every close bracket has a corresponding open bracket of the same type.
+
+**Example 1:**
+
+**Input:** s = "()"
+**Output:** true
+
+**Example 2:**
+
+**Input:** s = "()[]{}"
+**Output:** true
+
+**Example 3:**
+
+**Input:** s = "(]"
+**Output:** false
+
+**Example 4:**
+
+**Input:** s = "([])"
+**Output:** true
+
+**Example 5:**
+
+**Input:** s = "([)]"
+**Output:** false
+
+**Constraints:**
+
+- `1 <= s.length <= 104`
+- `s` consists of parentheses only `'()[]{}'`.
+
+**Difficulty:** Easy | **Acceptance Rate:** 43.2%  
+**Topics:** String, Stack
+
+**Problem Link:** https://leetcode.com/problems/valid-parentheses/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/valid-parentheses/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+## Hints
+
+If you're stuck, consider these hints:
+
+
+1. Use a stack of characters.
+
+2. When you encounter an opening bracket, push it to the top of the stack.
+
+3. When you encounter a closing bracket, check if the top of the stack was the opening for it. If yes, pop it from the stack. Otherwise, return false.
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/3. Stack and Queue.md', 'title': 'Stack and Queue Taxonomy'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

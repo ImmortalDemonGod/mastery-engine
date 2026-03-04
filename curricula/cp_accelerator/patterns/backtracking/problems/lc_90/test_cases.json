@@ -1,0 +1,55 @@
+{
+  "problem": "Subsets II",
+  "source": "https://leetcode.com/problems/subsets-ii/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "nums": [
+          1,
+          2,
+          2
+        ]
+      },
+      "expected": [
+        [],
+        [
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2
+        ],
+        [
+          2,
+          2
+        ]
+      ],
+      "note": "Example 1"
+    },
+    {
+      "id": 2,
+      "input": {
+        "nums": [
+          0
+        ]
+      },
+      "expected": [
+        [],
+        [
+          0
+        ]
+      ],
+      "note": "Example 2"
+    }
+  ]
+}

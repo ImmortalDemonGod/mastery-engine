@@ -1,0 +1,67 @@
+[
+  {
+    "id": "mha_q1",
+    "question": "Why do multiple small attention heads (e.g., 8 heads × 64 dims) outperform a single large head (1 head × 512 dims) despite having the same total parameter count? Explain using the concept of representation subspaces and attention pattern diversity.",
+    "model_answer": "Multiple small heads outperform a single large head because they learn DIVERSE attention patterns in different representation subspaces. With 8 heads × 64 dims: Each head operates in a different 64-dimensional subspace of the 512-dimensional space. Each head can specialize—Head 1 might learn syntactic dependencies (subject-verb), Head 2 semantic relationships (coreference), Head 3 local context, etc. The model learns an ensemble of attention patterns simultaneously. Different heads attend to different positions for the same query, providing multiple perspectives. With 1 head × 512 dims: Only ONE attention pattern per position—the model must choose a single weighted average over all keys. Can't simultaneously attend to multiple relevant positions in different ways. All 512 dimensions forced to learn one compromise pattern. The diversity benefit is like having multiple specialists vs one generalist—even with equal resources, specialists excel at their specific tasks. Empirically, the loss landscape is also easier to optimize with multiple heads: each head has a simpler learning problem (64d space) than one head trying to solve everything in 512d space. The concatenation of diverse heads creates a richer representation than any single attention pattern could achieve.",
+    "required_concepts": [
+      "Multiple heads create diverse attention patterns",
+      "Each head operates in different representation subspace",
+      "Specialization: heads learn different linguistic phenomena",
+      "Ensemble effect: multiple perspectives combined",
+      "Single head must compromise, can't simultaneously focus differently",
+      "Simpler optimization landscape with smaller subspaces"
+    ]
+  },
+  {
+    "id": "mha_q2",
+    "question": "Explain the critical importance of the reshape-transpose-attention-transpose-reshape sequence for batched multi-head computation. What would go wrong if you computed heads sequentially in a loop instead, and why does the transpose operation enable efficient batching?",
+    "model_answer": "The reshape-transpose sequence is critical for GPU efficiency. The sequence: (1) Reshape: (..., seq, d_model) → (..., seq, num_heads, d_head) splits dimensions. (2) Transpose: (..., seq, num_heads, d_head) → (..., num_heads, seq, d_head) moves heads to batch dimension. (3) Attention: operates on (..., num_heads, seq, d_head) treating num_heads as batch. (4) Transpose back and reshape to merge. Why transpose matters: PyTorch's batched operations (matmul, softmax) treat leading dimensions as batch dimensions. By transposing num_heads to a leading position, we get automatic batching—all heads computed in parallel with a single matmul call! Without transpose (sequential loop): Each head computed separately: 8 iterations of matmul, 8 softmaxes, 8 value weightings. GPU sits mostly idle—only using 1/8 of cores at a time. 8× slower (or worse with synchronization overhead). No kernel fusion opportunities. With batched computation: Single matmul handles all heads simultaneously. GPU fully utilized—all cores working in parallel. Kernel fusion optimizations apply. ~8× faster for 8 heads! The transpose is essentially free (just metadata change in PyTorch), but enables massive parallelization. This pattern is fundamental to modern deep learning: rearrange data to expose parallelism, let hardware handle it efficiently.",
+    "required_concepts": [
+      "Transpose moves num_heads to batch-like dimension",
+      "PyTorch batches operations over leading dimensions",
+      "Sequential loops underutilize GPU parallelism",
+      "Batched computation uses all GPU cores simultaneously",
+      "Transpose is cheap (metadata-only operation)",
+      "8× speedup from batching 8 heads vs sequential"
+    ]
+  },
+  {
+    "id": "mha_q3",
+    "question": "In multi-head attention with RoPE, why is RoPE applied AFTER splitting into heads (with d_head) rather than BEFORE splitting (with d_model)? What would be the implications of applying RoPE to the full d_model-dimensional projections before head splitting?",
+    "model_answer": "RoPE is applied after head splitting because: (1) RoPE requires even dimensions for pairing—d_head = d_model/num_heads is typically even by design, but d_model might not pair correctly if RoPE needs different pairing structure. (2) Each head learns position-sensitive patterns in its own subspace—RoPE rotations in d_head dimensions let each head interpret position differently. (3) The rotation frequencies (θᵢ) are calibrated for the dimension size—rotating in d_head=64 space uses appropriate frequencies for that dimensionality. If we applied RoPE to full d_model before splitting: (1) Position encoding would be 'shared' across all heads in the same way—all heads would see identical rotational position encoding, reducing their independence. (2) After splitting, each head would get different portions of the rotated dimensions, but without control over which rotations they receive. (3) The θᵢ frequencies would be spread across d_model (e.g., 512 dims), giving heads inconsistent frequency ranges when split. (4) Conceptually wrong: we want each head to independently encode position in its subspace, not inherit fragments of a global position encoding. Current design: Each head has complete position encoding in its d_head dimensions with properly scaled frequencies. This maintains head independence while still providing position information to each head's attention computation.",
+    "required_concepts": [
+      "RoPE after splitting gives each head complete position encoding",
+      "Frequencies calibrated for dimension size (d_head not d_model)",
+      "Each head interprets position in its own subspace",
+      "Pre-split RoPE would couple heads together",
+      "Heads would inherit fragments without control",
+      "Head independence requires per-head position encoding"
+    ]
+  },
+  {
+    "id": "mha_q4",
+    "question": "Multi-head attention uses separate projection matrices for Q, K, and V, then applies a final output projection O. Why is the output projection necessary after concatenating heads? What would happen if we concatenated heads and returned directly without the output projection?",
+    "model_answer": "The output projection W_O is necessary for several reasons: (1) Learn to combine heads: After concat, we have d_model dimensions that are just independent head outputs stuck together. W_O learns HOW to combine information from different heads—which heads are more important for which parts of the representation. Some heads might be noisy, others critical; W_O weights them appropriately. (2) Mix information across heads: Without W_O, head i's dimensions never interact with head j's dimensions. W_O allows cross-head communication, creating a unified representation rather than a concatenation of independent features. (3) Match residual stream: The output must integrate with the residual connection (x + attention(x)). W_O learns the right linear transformation to make the attention output compatible with the residual. (4) Additional representational capacity: W_O adds d_model² parameters, giving the model more expressiveness to transform the concatenated heads into a useful form. Without W_O (returning concat directly): Each head's output forever stays in its own subspace, never interacting with others. No learned weighting of head importance. The model can't learn that 'when head 2 and head 5 both fire, emphasize this combined pattern'. Residual connections get raw concatenated features without learned integration. Loss of significant modeling capacity. Empirically, removing W_O substantially hurts performance—it's not just a formality, it's crucial for combining the diverse head representations into a coherent output.",
+    "required_concepts": [
+      "W_O learns to combine information from different heads",
+      "Enables cross-head communication and interaction",
+      "Without it, heads remain independent forever",
+      "Learns relative importance of different heads",
+      "Integrates multi-head output with residual stream",
+      "Adds crucial representational capacity (d_model² parameters)"
+    ]
+  },
+  {
+    "id": "mha_q5",
+    "question": "Describe the memory complexity of multi-head attention and explain why it becomes prohibitive for very long sequences. For batch_size=32, seq_len=16K, d_model=4096, num_heads=32, calculate the memory required for attention scores alone and explain why techniques like Flash Attention are necessary.",
+    "model_answer": "Memory complexity of multi-head attention is O(batch × num_heads × seq_len²), dominated by the attention score matrix. Calculation for given parameters: Attention scores shape: (batch, num_heads, seq_len, seq_len) = (32, 32, 16384, 16384). Total elements: 32 × 32 × 16384 × 16384 = 274,877,906,944 elements ≈ 275 billion. Memory in fp32: 275B × 4 bytes = 1,100 GB = 1.1 TB! Even in fp16: 1,100 / 2 = 550 GB. This is impossibly large for typical GPUs (40-80 GB). Why this is prohibitive: (1) Quadratic growth: doubling seq_len quadruples memory (16K → 32K requires 4× memory). (2) Can't fit in GPU memory: 550 GB >> 80 GB A100 capacity. (3) Memory bandwidth bottleneck: moving this much data is slow even if it fit. (4) Backward pass also needs to store these scores for gradients, doubling requirements. Why Flash Attention is necessary: (1) Tiling: computes attention in small blocks, never materializing full attention matrix. (2) Kernel fusion: combines softmax, matmul in single kernel, reduces memory roundtrips. (3) Recomputation: recomputes attention scores in backward instead of storing them. (4) Reduces from O(n²) memory to O(n) memory! (5) For 16K context: Flash Attention uses ~32 GB vs 550 GB naive implementation. Without such optimizations, long-context models (32K, 100K tokens) would be impossible. The quadratic memory wall is THE bottleneck for scaling Transformers to longer sequences.",
+    "required_concepts": [
+      "Memory is O(batch × num_heads × seq_len²)",
+      "Quadratic growth: 2× length = 4× memory",
+      "Example: 16K sequence = 550 GB in fp16 (impossible!)",
+      "Flash Attention uses tiling to avoid materializing full matrix",
+      "Reduces O(n²) memory to O(n)",
+      "Quadratic memory is THE bottleneck for long context"
+    ]
+  }
+]

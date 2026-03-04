@@ -1,0 +1,25 @@
+Wrong Answer on Test 1
+
+Input: nums = [2, 7, 11, 15], target = 9
+Expected: [0, 1]
+Got: []
+
+Symptom: Your solution returns an empty list (no solution found) even though a 
+valid pair clearly exists.
+
+The function computes the complement correctly but then checks the WRONG variable 
+in the hash table lookup. Instead of searching for the complement, it searches for 
+the current number itself.
+
+Example walkthrough for the bug:
+- i = 0, nums[0] = 2, complement = 9 - 2 = 7
+- Check: is 2 in seen? NO (seen is empty)
+- Insert: seen[2] = 0
+- i = 1, nums[1] = 7, complement = 9 - 7 = 2  
+- Check: is 7 in seen? NO (seen = {2: 0}, but we checked for 7 not 2!)
+- Insert: seen[7] = 1
+- ... continues without finding the pair
+
+Debug hint: Look carefully at the membership test in your if-statement. WHAT value 
+are you looking up in the hash table? Is it the complement (target - num), or 
+something else? The variable name in the `in` check matters.

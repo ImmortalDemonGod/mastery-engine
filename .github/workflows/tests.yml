@@ -1,0 +1,89 @@
+name: Engine Tests
+
+on:
+  push:
+    branches: [ main, feature/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      
+      - name: Create cs336_basics symlink (required for package install)
+        run: |
+          echo "Creating cs336_basics symlink for CI..."
+          ln -s modes/student/cs336_basics cs336_basics
+          
+      - name: Install dependencies
+        run: uv sync
+        
+      - name: Run unit tests
+        run: |
+          # Only run engine tests (not cs336_basics assignment tests)
+          # Exclude integration tests that require OpenAI API keys
+          uv run pytest tests/engine/ -v \
+            -m "not integration" \
+            --tb=short
+        
+      - name: Generate coverage report
+        run: |
+          # Only run engine tests for coverage
+          uv run pytest tests/engine/ \
+            -m "not integration" \
+            --cov=engine \
+            --cov-report=term-missing \
+            --cov-report=html
+        
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      
+      - name: Create cs336_basics symlink (required for package install)
+        run: |
+          echo "Creating cs336_basics symlink for CI..."
+          ln -s modes/student/cs336_basics cs336_basics
+        
+      - name: Install dependencies
+        run: uv sync
+        
+      - name: Run ruff linter
+        run: uv run ruff check engine/ tests/ --output-format=github
+        continue-on-error: true
+        
+      - name: Run ruff formatter check
+        run: uv run ruff format engine/ tests/ --check
+        continue-on-error: true

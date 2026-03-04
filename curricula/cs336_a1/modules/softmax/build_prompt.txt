@@ -1,0 +1,106 @@
+# Build Challenge: Numerically Stable Softmax
+
+## Objective
+Implement a numerically stable softmax function that avoids overflow and underflow issues with large-magnitude inputs.
+
+## Background
+The softmax function is fundamental to neural networks, converting a vector of logits into a probability distribution. However, the naive implementation `softmax(x) = exp(x) / sum(exp(x))` is numerically unstable: exponentiating large positive values causes overflow (`inf`), and large negative values cause underflow (gradients vanish).
+
+## Where to Edit
+**FILE TO MODIFY:** `cs336_basics/utils.py`
+
+You will edit the `softmax` function **directly in this file** in your main working directory. The Mastery Engine will validate your implementation by running tests in an isolated environment.
+
+**IMPORTANT:** Other functions in `utils.py` (e.g., `cross_entropy`, `gradient_clipping`) are already implemented. Only modify the `softmax` function.
+
+## Requirements
+Implement `softmax(in_features, dim)` with the following specifications:
+
+### Function Signature
+```python
+def softmax(
+    in_features: Float[torch.Tensor, " ..."], 
+    dim: int
+) -> Float[torch.Tensor, " ..."]:
+    """
+    Numerically-stable softmax over the specified dimension.
+    
+    Args:
+        in_features: Input tensor of any shape
+        dim: Dimension along which to compute softmax
+        
+    Returns:
+        Probability distribution (sums to 1.0 along dim)
+    """
+```
+
+### Implementation Constraints
+1. **Numerical Stability**: Use the subtract-max trick to prevent overflow
+   - Before exponentiation, subtract `max(x)` from all elements
+   - This shifts the range to `(-inf, 0]`, making `exp(x)` safe
+   
+2. **Precision Policy**: 
+   - Upcast intermediate computations to `float32` for stability
+   - Cast final output back to input's original dtype
+   
+3. **Correctness**:
+   - Output must match `torch.nn.functional.softmax` to within `atol=1e-6`
+   - Must handle extreme inputs: `x + 100`, `x - 100`, mixed magnitudes
+
+### Mathematical Foundation
+**Subtract-Max Trick**:
+```
+softmax(x) = exp(x) / sum(exp(x))
+           = exp(x - max(x)) / sum(exp(x - max(x)))  [numerically equivalent]
+```
+
+**Why this works**:
+- `max(x - max(x)) = 0`, so largest exp is `exp(0) = 1.0` (no overflow)
+- Negative shifts are safe: `exp(-large)` → 0 gracefully (no underflow in sum)
+
+## Testing
+Your implementation will be tested against:
+- Normal inputs (standard range)
+- Large positive shifts: `x + 100`
+- Large negative shifts: `x - 100`  
+- Mixed magnitudes within same tensor
+
+## References
+**Primary Literature:**
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). "Deep Learning." MIT Press.
+  - Chapter 6.2.2.3: Softmax Units for Multinoulli Output Distributions
+  - Provides formal definition and directly discusses overflow problems
+  - Motivates the need for numerically stable implementation
+
+- Franke, M., & Degen, J. (2022). "The softmax function: Properties, motivation, and interpretation."
+  - In-depth academic treatment of softmax mathematical properties
+  - Derives softmax from first principles (maximum entropy)
+  - Explores parameter interpretation and theoretical foundations
+
+**Further Reading:**
+- Mody, J. (2022). "Numerically Stable Softmax and Cross Entropy."
+  - Step-by-step derivation of the subtract-max trick
+  - Demonstrates overflow instability with practical code examples
+  - Clear implementation guidance for numerical stability
+
+- Vieira, T. (2014). "Exp-normalize trick." Graduate Descent.
+  - Concise explanation of the stability mechanism
+  - Before-and-after code examples demonstrating the fix
+
+- Wikipedia. (2025). "Softmax function."
+  - General reference covering definition and interpretation
+  - Historical context: Boltzmann distribution in statistical mechanics
+  - Applications across machine learning domains
+
+## Submission
+Once implemented, run:
+```bash
+engine submit-build
+```
+
+The validator will run `pytest tests/test_nn_utils.py::test_softmax_matches_pytorch` and measure performance.
+
+## Hints
+- Use `tensor.max(dim=dim, keepdim=True)` to preserve dimensions
+- Remember to subtract max **before** `torch.exp()`
+- The shift doesn't change the mathematical result, only numerical stability

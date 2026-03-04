@@ -1,0 +1,53 @@
+[
+  {
+    "id": "subtract_max_trick",
+    "question": "Justify the subtract-max trick in your softmax implementation. Why is `softmax(x - max(x))` mathematically equivalent to `softmax(x)`, and what specific numerical problem does this solve?",
+    "model_answer": "The subtract-max trick exploits the mathematical identity: softmax(x) = softmax(x + c) for any constant c, because both numerator and denominator are scaled by exp(c) which cancels out. By choosing c = -max(x), we shift the input range to (-inf, 0], ensuring the largest exponent is exp(0) = 1.0. This prevents overflow (exp(large positive) → inf) while gracefully handling underflow (exp(large negative) → 0). Without this trick, inputs like x + 100 would cause exp() to overflow to infinity, producing NaN in the division.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["stability", "numerical", "better", "safer"],
+        "feedback": "You're on the right track mentioning numerical stability, but can you be more specific? What exact numerical problem occurs with naive exp(x) for large inputs? Try explaining with a concrete example like x = [1000, 1001]."
+      },
+      {
+        "category": "Incomplete (Missing Mechanism)",
+        "keywords": ["overflow", "prevent"],
+        "feedback": "Good! You've identified overflow as the problem. Now explain the mechanism: WHY does subtracting max(x) prevent overflow? What is the range of x - max(x), and why is that range safe for exp()?"
+      },
+      {
+        "category": "Conceptual Mismatch",
+        "keywords": ["approximation", "lossy", "trade-off"],
+        "feedback": "Important clarification: The subtract-max trick is NOT an approximation. It's mathematically exact. Can you explain why softmax(x) = softmax(x - c) for any constant c? Hint: factor out exp(c) from numerator and denominator."
+      }
+    ],
+    "required_concepts": [
+      "mathematical equivalence",
+      "exp(c) cancellation",
+      "overflow prevention", 
+      "range shift to (-inf, 0]"
+    ]
+  },
+  {
+    "id": "float32_upcasting",
+    "question": "Your implementation upcasts intermediate computations to float32 before casting back to the original dtype. Why is this necessary even when the input is already float32? What failure mode does this prevent for float16 inputs?",
+    "model_answer": "Upcasting to float32 provides additional precision headroom for intermediate operations, which is critical for float16 (half-precision) inputs. Float16 has only 10 bits of mantissa and can represent numbers with ~3 decimal digits of precision, while float32 has 23 bits and ~7 digits. During the exp() and division operations, rounding errors accumulate. For float16, these errors can compound to produce visibly incorrect probability distributions. Even for float32 inputs, using float32 intermediates is a defensive practice that ensures consistency across dtype, though the benefit is minimal when input is already float32.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["precision", "accuracy", "better"],
+        "feedback": "You're correct that it's about precision, but can you be more specific? What is the precision difference between float16 and float32 in terms of mantissa bits or decimal digits? How does this affect accumulated error in exp() and division?"
+      },
+      {
+        "category": "Incomplete (Missing Float16 Context)",
+        "keywords": ["float32", "precision"],
+        "feedback": "Your answer focuses on float32, but the critical case is float16 inputs. Can you explain what happens when a float16 tensor goes through exp() and division without upcasting? Why does the limited precision (10 bits mantissa) cause problems?"
+      }
+    ],
+    "required_concepts": [
+      "precision headroom",
+      "float16 vs float32 mantissa bits",
+      "error accumulation",
+      "rounding errors in exp/division"
+    ]
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "problem": "Climbing Stairs",
+  "source": "https://leetcode.com/problems/climbing-stairs/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "n": 2
+      },
+      "expected": 2,
+      "note": "Example 1: There are two ways to climb to the top.\n1. 1 step ..."
+    },
+    {
+      "id": 2,
+      "input": {
+        "n": 3
+      },
+      "expected": 3,
+      "note": "Example 2: There are three ways to climb to the top.\n1. 1 ste..."
+    }
+  ]
+}

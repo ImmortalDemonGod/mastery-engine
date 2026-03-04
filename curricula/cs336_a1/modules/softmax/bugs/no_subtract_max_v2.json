@@ -1,0 +1,72 @@
+{
+  "id": "softmax-no-subtract-max",
+  "description": "Removes the subtract-max trick, causing numerical overflow in softmax.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "softmax",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_track",
+      "description": "Find the variable assigned the result of .max() call",
+      "pattern": {
+        "node_type": "Assign",
+        "value": {
+          "node_type": "Call",
+          "func": {
+            "node_type": "Attribute",
+            "attr": "max"
+          }
+        }
+      },
+      "conditions": [
+        {
+          "check": "targets_length_equals",
+          "value": 1
+        },
+        {
+          "check": "target_is_name",
+          "index": 0
+        }
+      ],
+      "track_as": {
+        "max_var_name": "node.targets[0].id",
+        "tensor_var_name": "node.value.func.value.id"
+      }
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "description": "Find where tensor is subtracted by max_var and remove subtraction",
+      "pattern": {
+        "node_type": "Assign",
+        "value": {
+          "node_type": "BinOp",
+          "op": "Sub",
+          "left": {
+            "node_type": "Name",
+            "id": {
+              "from_context": "tensor_var_name"
+            }
+          },
+          "right": {
+            "node_type": "Name",
+            "id": {
+              "from_context": "max_var_name"
+            }
+          }
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "node.value.left"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "Cascade AI",
+    "note": "Generic JSON format for Phase 3 generalization"
+  }
+}

@@ -1,0 +1,42 @@
+# Bug Symptom: Numerical Overflow in Softmax
+
+## Observed Behavior
+Your softmax implementation produces `NaN` (Not a Number) values when processing inputs with large positive values.
+
+## Failing Test Case
+```python
+x = torch.tensor([[1.0, 2.0, 3.0]])
+x_shifted = x + 100  # Shift to large positive values
+
+result = softmax(x_shifted, dim=1)
+# Expected: valid probability distribution [0.09, 0.24, 0.67]
+# Actual: tensor([[nan, nan, nan]])
+```
+
+## Error Message
+```
+AssertionError: Softmax output contains NaN or Inf values
+```
+
+## Your Challenge
+The bug causes `exp()` to overflow when exponentiating large numbers (e.g., `exp(103) ≈ 10^44`), producing `inf`. When you divide `inf / inf`, the result is `NaN`.
+
+**Debug this issue by:**
+1. Identifying which operation produces `inf` values
+2. Understanding why your current implementation is numerically unstable
+3. Implementing the subtract-max trick to shift inputs to a safe range
+4. Verifying that the mathematical result remains unchanged
+
+## Expected Output After Fix
+After your fix, `softmax(x + 100, dim=1)` should produce the same probability distribution as `softmax(x, dim=1)` because softmax is invariant to constant shifts.
+
+## Debugging Tips
+- Print intermediate values: `exps`, `sums` before the division
+- Check for `inf` values: `torch.isinf(exps).any()`
+- Remember: `softmax(x) = softmax(x - c)` for any constant `c`
+- What constant `c` would shift your largest input to 0?
+
+## Hint
+The subtract-max trick is not an approximation—it's mathematically exact. It exploits the fact that `exp(a-c) / sum(exp(x-c)) = exp(a) / sum(exp(x))` because `exp(c)` cancels out.
+
+Run `engine submit-fix` once you've restored numerical stability.

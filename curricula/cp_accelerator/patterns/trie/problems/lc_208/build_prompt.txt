@@ -1,0 +1,91 @@
+# Build Challenge: Implement Trie (Prefix Tree)
+
+## Pattern Overview
+
+> Tries (prefix trees) are tree-like data structures used to store associative arrays where keys are usually strings, optimizing search operations for string-related problems.
+
+## Problem Statement
+
+A **trie** (pronounced as "try") or **prefix tree** is a tree data structure used to efficiently store and retrieve keys in a dataset of strings. There are various applications of this data structure, such as autocomplete and spellchecker.
+Implement the Trie class:
+
+- `Trie()` Initializes the trie object.
+- `void insert(String word)` Inserts the string `word` into the trie.
+- `boolean search(String word)` Returns `true` if the string `word` is in the trie (i.e., was inserted before), and `false` otherwise.
+- `boolean startsWith(String prefix)` Returns `true` if there is a previously inserted string `word` that has the prefix `prefix`, and `false` otherwise.
+
+**Example 1:**
+
+```
+
+**Input**
+["Trie", "insert", "search", "search", "startsWith", "insert", "search"]
+[[], ["apple"], ["apple"], ["app"], ["app"], ["app"], ["app"]]
+**Output**
+[null, null, true, false, true, null, true]
+
+**Explanation**
+Trie trie = new Trie();
+trie.insert("apple");
+trie.search("apple"); // return True
+trie.search("app"); // return False
+trie.startsWith("app"); // return True
+trie.insert("app");
+trie.search("app"); // return True
+
+```
+
+**Constraints:**
+
+- `1 <= word.length, prefix.length <= 2000`
+- `word` and `prefix` consist only of lowercase English letters.
+- At most `3 * 104` calls **in total** will be made to `insert`, `search`, and `startsWith`.
+
+**Difficulty:** Medium | **Acceptance Rate:** 68.8%  
+**Topics:** Hash Table, String, Design, Trie
+
+**Problem Link:** https://leetcode.com/problems/implement-trie-prefix-tree/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/implement-trie-prefix-tree/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/14. Trie.md', 'title': 'Trie Taxonomy'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

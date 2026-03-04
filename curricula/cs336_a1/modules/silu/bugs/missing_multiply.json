@@ -1,0 +1,43 @@
+{
+  "id": "silu-missing-multiply",
+  "description": "Removes the multiplication by input, returning only sigmoid(x) instead of x * sigmoid(x).",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "silu",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Find x * sigmoid(x) pattern and replace with just sigmoid(x)",
+      "pattern": {
+        "node_type": "BinOp",
+        "op": "Mult",
+        "left": {
+          "node_type": "Name"
+        },
+        "right": {
+          "node_type": "Call",
+          "func": {
+            "node_type": "Attribute",
+            "value": {
+              "node_type": "Name",
+              "id": "torch"
+            },
+            "attr": "sigmoid"
+          }
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.right"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "Cascade AI",
+    "tier": "simple",
+    "note": "Single-pass validation for generic engine"
+  }
+}

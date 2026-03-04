@@ -1,0 +1,47 @@
+{
+  "id": "silu-missing-multiply",
+  "description": "Removes the multiplication by input, returning only sigmoid(x) instead of x * sigmoid(x).",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "silu",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find x * sigmoid(x) pattern and replace with just sigmoid(x)",
+      "pattern": {
+        "node_type": "BinOp",
+        "targets": null,
+        "value": null,
+        "attr": null,
+        "op": "Mult",
+        "func": null,
+        "left": {
+          "node_type": "Name",
+          "op": null,
+          "attr": null
+        },
+        "right": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.right",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

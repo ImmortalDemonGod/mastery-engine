@@ -1,0 +1,230 @@
+name: CP Accelerator - Manifest Integrity Check
+
+on:
+  pull_request:
+    paths:
+      - 'curricula/cp_accelerator/**'
+      - 'scripts/generate_manifest.py'
+  push:
+    branches:
+      - main
+    paths:
+      - 'curricula/cp_accelerator/**'
+
+jobs:
+  validate-manifest:
+    name: Validate Manifest Integrity
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install uv
+        run: pip install uv
+      
+      - name: Create cs336_basics symlink (required for package install)
+        run: |
+          echo "Creating cs336_basics symlink for CI..."
+          ln -s modes/student/cs336_basics cs336_basics
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Validate canonical curriculum
+        run: |
+          echo "🔍 Validating canonical_curriculum.json..."
+          uv run python scripts/generate_manifest.py --validate-only
+      
+      - name: Regenerate manifest from canonical source
+        run: |
+          echo "🏗️  Regenerating manifest.json from canonical source..."
+          uv run python scripts/generate_manifest.py
+      
+      - name: Check for manual manifest edits (FORBIDDEN)
+        run: |
+          echo "🔒 Checking manifest integrity..."
+          if git diff --exit-code curricula/cp_accelerator/manifest.json; then
+            echo "✅ PASS: manifest.json is in sync with canonical_curriculum.json"
+          else
+            echo "❌ FAIL: manifest.json has been manually edited!"
+            echo ""
+            echo "The manifest.json file MUST be generated from canonical_curriculum.json."
+            echo ""
+            echo "To fix this:"
+            echo "  1. Revert manual changes to manifest.json"
+            echo "  2. Update curricula/cp_accelerator/canonical_curriculum.json instead"
+            echo "  3. Run: uv run python scripts/generate_manifest.py"
+            echo "  4. Commit both canonical_curriculum.json AND the generated manifest.json"
+            echo ""
+            echo "Diff of unauthorized changes:"
+            git diff curricula/cp_accelerator/manifest.json
+            exit 1
+          fi
+      
+      - name: Verify module directories exist
+        run: |
+          echo "📂 Verifying module directory structure..."
+          MODULE_ERRORS=0
+          
+          # Read module IDs from manifest
+          MODULE_IDS=$(python -c "
+          import json
+          with open('curricula/cp_accelerator/manifest.json') as f:
+              manifest = json.load(f)
+              for module in manifest['modules']:
+                  print(module['id'])
+          ")
+          
+          for module_id in $MODULE_IDS; do
+            module_dir="curricula/cp_accelerator/modules/$module_id"
+            if [ ! -d "$module_dir" ]; then
+              echo "⚠️  WARNING: Module directory missing: $module_dir"
+              MODULE_ERRORS=$((MODULE_ERRORS + 1))
+            else
+              echo "✓ $module_id"
+            fi
+          done
+          
+          if [ $MODULE_ERRORS -gt 0 ]; then
+            echo ""
+            echo "⚠️  $MODULE_ERRORS module directories are missing"
+            echo "   This is a warning (not a failure) during curriculum development"
+            echo "   Run content ingestion to create missing modules"
+          else
+            echo ""
+            echo "✅ All module directories exist"
+          fi
+
+  schema-validation:
+    name: Validate JSON Schemas
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Validate canonical_curriculum.json structure
+        run: |
+          echo "🔍 Validating canonical_curriculum.json structure..."
+          python -c "
+          import json
+          import sys
+          
+          required_fields = ['version', 'last_updated', 'sources', 'topics']
+          topic_required_fields = ['id', 'name', 'rating_bracket', 'priority', 
+                                   'taxonomy_path', 'description', 'dependencies']
+          
+          try:
+              with open('curricula/cp_accelerator/canonical_curriculum.json') as f:
+                  data = json.load(f)
+              
+              # Check top-level fields
+              for field in required_fields:
+                  if field not in data:
+                      print(f'❌ Missing required field: {field}')
+                      sys.exit(1)
+              
+              # Check each topic
+              for i, topic in enumerate(data['topics']):
+                  for field in topic_required_fields:
+                      if field not in topic:
+                          print(f'❌ Topic {i} ({topic.get(\"id\", \"unknown\")}) missing field: {field}')
+                          sys.exit(1)
+              
+              print(f'✅ Canonical curriculum structure valid ({len(data[\"topics\"])} topics)')
+          except json.JSONDecodeError as e:
+              print(f'❌ JSON syntax error: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'❌ Validation error: {e}')
+              sys.exit(1)
+          "
+      
+      - name: Validate manifest.json against engine schema
+        run: |
+          echo "🔍 Validating manifest.json against Mastery Engine schema..."
+          python -c "
+          import json
+          import sys
+          
+          try:
+              with open('curricula/cp_accelerator/manifest.json') as f:
+                  manifest = json.load(f)
+              
+              # Check required fields
+              required = ['curriculum_name', 'author', 'version', 'modules']
+              for field in required:
+                  if field not in manifest:
+                      print(f'❌ Missing required field: {field}')
+                      sys.exit(1)
+              
+              # Check modules structure
+              for module in manifest['modules']:
+                  if 'id' not in module or 'name' not in module or 'path' not in module:
+                      print(f'❌ Module missing required fields: {module}')
+                      sys.exit(1)
+              
+              print(f'✅ Manifest structure valid ({len(manifest[\"modules\"])} modules)')
+          except Exception as e:
+              print(f'❌ Validation error: {e}')
+              sys.exit(1)
+          "
+
+  dependency-graph-analysis:
+    name: Analyze Dependency Graph
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Generate dependency graph report
+        run: |
+          echo "📊 Generating dependency graph analysis..."
+          python -c "
+          import json
+          from collections import defaultdict, deque
+          
+          with open('curricula/cp_accelerator/manifest.json') as f:
+              manifest = json.load(f)
+          
+          modules = manifest['modules']
+          
+          # Build reverse dependency map
+          dependents = defaultdict(list)
+          for module in modules:
+              for dep in module.get('dependencies', []):
+                  dependents[dep].append(module['id'])
+          
+          # Find root nodes (no dependencies)
+          roots = [m['id'] for m in modules if not m.get('dependencies')]
+          
+          # Find leaf nodes (no dependents)
+          all_ids = {m['id'] for m in modules}
+          leaves = [mid for mid in all_ids if not dependents[mid]]
+          
+          print(f'📈 Dependency Graph Statistics:')
+          print(f'   Total modules: {len(modules)}')
+          print(f'   Root modules (no dependencies): {len(roots)}')
+          print(f'     {roots}')
+          print(f'   Leaf modules (nothing depends on them): {len(leaves)}')
+          print(f'     {leaves}')
+          print(f'')
+          print(f'✅ Dependency graph analysis complete')
+          "

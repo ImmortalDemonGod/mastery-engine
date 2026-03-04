@@ -1,0 +1,15 @@
+[
+  {
+    "id": "greeting_purpose",
+    "question": "Why did you choose to implement this as a function rather than just a print statement?",
+    "model_answer": "Using a function makes the code modular, testable, and reusable. It separates the logic of generating the greeting from the action of printing it.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["better", "good", "nice", "clean"],
+        "feedback": "Your intuition is correct, but can you be more specific? What concrete benefits does a function provide?"
+      }
+    ],
+    "required_concepts": ["function", "modular", "testable", "reusable"]
+  }
+]

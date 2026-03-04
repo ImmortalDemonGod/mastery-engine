@@ -1,0 +1,56 @@
+{
+  "id": "swiglu-missing-gate",
+  "description": "Removes the gate computation, reducing SwiGLU to a regular FFN with SiLU.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "swiglu",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find the gated computation and replace it with just the value path.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "gated"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Mult",
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": null,
+        "left": {
+          "node_type": "Name",
+          "op": null,
+          "attr": null
+        },
+        "right": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "node.value.left",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

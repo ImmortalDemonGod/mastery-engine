@@ -1,0 +1,71 @@
+# Bug Symptom: Incorrect Gradient Direction After Clipping
+
+## Observed Behavior
+Your gradient clipping implementation produces different results than `torch.nn.utils.clip_grad_norm_` even though individual gradient norms are within the threshold. The test detects that relative magnitudes between parameters are being distorted.
+
+## Failing Test Case
+```python
+# Two parameters with different gradient magnitudes
+param1 = torch.nn.Parameter(torch.zeros(10))
+param2 = torch.nn.Parameter(torch.zeros(10))
+
+param1.grad = torch.ones(10) * 8.0  # norm = 8.0
+param2.grad = torch.ones(10) * 2.0  # norm = 2.0
+
+# Global norm = sqrt(64 + 4) ≈ 8.25
+# Expected behavior with max_norm=5.0:
+#   Scale factor = 5.0 / 8.25 ≈ 0.606
+#   param1.grad becomes ones(10) * 4.85  # 8.0 * 0.606
+#   param2.grad becomes ones(10) * 1.21  # 2.0 * 0.606
+#   Ratio preserved: 4.85 / 1.21 ≈ 4.0 (same as original 8.0 / 2.0)
+
+gradient_clipping([param1, param2], max_l2_norm=5.0)
+
+# Actual (buggy) behavior:
+#   param1.grad becomes ones(10) * 5.0  # clipped to max_norm
+#   param2.grad stays ones(10) * 2.0     # not clipped (below threshold)
+#   Ratio distorted: 5.0 / 2.0 = 2.5 (not 4.0!)
+```
+
+## Error Message
+```
+AssertionError: Gradient clipping output doesn't match torch.nn.utils.clip_grad_norm_
+```
+
+## Your Challenge
+The bug is that you're clipping each parameter's gradients independently instead of computing a **global norm** and scaling **all gradients proportionally**. This destroys the relative magnitudes between parameters, effectively changing the direction of the optimization update.
+
+**Debug this issue by:**
+1. Understanding why per-parameter clipping is fundamentally incorrect
+2. Implementing the global norm computation: `sqrt(sum of all gradient norms squared)`
+3. Computing a single scaling factor based on the global norm
+4. Applying that scaling factor to ALL gradients, not just those exceeding the threshold
+
+## Expected Behavior After Fix
+After your fix, when the global norm exceeds the threshold:
+- ALL gradients should be scaled by the same factor: `max_norm / global_norm`
+- This preserves the 4:1 ratio in the example above
+- The direction of the combined gradient update is maintained
+- Only the magnitude is reduced to the threshold
+
+## Debugging Tips
+- Print gradient norms before and after clipping for each parameter
+- Compute the global norm manually: `sqrt(norm1^2 + norm2^2 + ...)`
+- Check if the ratio of gradient magnitudes is preserved after clipping
+- Compare with the ratio that `torch.nn.utils.clip_grad_norm_` produces
+
+## Mathematical Insight
+Gradient descent updates parameters by: `param -= learning_rate * grad`
+
+The combined update direction is determined by the **relative magnitudes** of all gradients. Per-parameter clipping changes these ratios, pointing the optimization in a different direction than intended. Global clipping maintains the direction while only limiting the step size.
+
+## Hint
+The correct algorithm is:
+1. Collect all gradients
+2. Compute global_norm = `torch.stack([g.norm(2) for g in grads]).norm(2)`
+3. If global_norm > max_norm: compute `clip_coef = max_norm / global_norm`
+4. Scale **all** gradients by clip_coef (even those individually below threshold)
+
+This ensures proportional scaling that preserves the optimization direction.
+
+Run `engine submit-fix` once you've fixed the clipping algorithm.

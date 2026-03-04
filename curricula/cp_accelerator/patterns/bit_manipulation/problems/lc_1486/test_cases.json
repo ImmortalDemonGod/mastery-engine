@@ -1,0 +1,25 @@
+{
+  "problem": "XOR Operation in an Array",
+  "source": "https://leetcode.com/problems/xor-operation-in-an-array/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {
+        "n": 5,
+        "start": 0
+      },
+      "expected": 8,
+      "note": "Example 1: Array nums is equal to [0, 2, 4, 6, 8] where (0 ^ ..."
+    },
+    {
+      "id": 2,
+      "input": {
+        "n": 4,
+        "start": 3
+      },
+      "expected": 8,
+      "note": "Example 2: Array nums is equal to [3, 5, 7, 9] where (3 ^ 5 ^..."
+    }
+  ]
+}

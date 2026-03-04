@@ -1,0 +1,67 @@
+[
+  {
+    "id": "transformer_block_q1",
+    "question": "Pre-norm architecture normalizes BEFORE each sublayer (x + sublayer(norm(x))), while post-norm normalizes AFTER (norm(x + sublayer(x))). Explain why pre-norm is more stable for deep networks, using gradient flow and activation magnitude arguments. What problems does pre-norm solve that post-norm suffers from?",
+    "model_answer": "Pre-norm is more stable because: (1) Bounded sublayer inputs: Every sublayer receives normalized input (mean 0, variance 1), preventing activation explosions. In post-norm, attention/FFN outputs can grow unbounded before normalization, especially in deep networks where small perturbations amplify. (2) Gradient highway: With pre-norm, gradients flow through the residual path (x) without passing through normalization. ∂L/∂x includes the direct path ∂L/∂output, ensuring gradient flow even if sublayer gradients vanish. Post-norm forces gradients through LayerNorm after the residual, which can bottleneck gradient flow. (3) No warmup needed: Pre-norm networks train stably from initialization. Post-norm requires careful learning rate warmup because early training can have explosive gradients when activations aren't yet controlled. (4) Deeper networks: Pre-norm enables 100+ layer models. Post-norm typically maxes out at ~20-30 layers before instability. (5) Residual initialization: In pre-norm, sublayers can be initialized to near-zero (output ≈ 0), making early training equivalent to identity (x ≈ x + 0). Post-norm can't do this safely. Empirically: Pre-norm consistently trains faster, reaches better performance, and is more robust to hyperparameters. This is why all modern LLMs (GPT-3+, LLaMA, PaLM) use pre-norm exclusively.",
+    "required_concepts": [
+      "Pre-norm bounds sublayer inputs through normalization",
+      "Post-norm allows unbounded activations before norm",
+      "Gradient highway: residuals bypass norm in pre-norm",
+      "Post-norm bottlenecks gradients through norm",
+      "Pre-norm enables deeper networks (100+ layers)",
+      "No warmup needed with pre-norm"
+    ]
+  },
+  {
+    "id": "transformer_block_q2",
+    "question": "Residual connections compute x = x + f(x) instead of x = f(x). Explain using the gradient equation ∂L/∂x = ∂L/∂output × (1 + ∂f/∂x) why the '+1' term is critical for training deep networks. What happens to gradients in a 100-layer network with vs without residuals?",
+    "model_answer": "The '+1' term provides a gradient highway for backpropagation. Gradient equation: With residual x_out = x_in + f(x_in), the gradient is ∂L/∂x_in = ∂L/∂x_out × (1 + ∂f/∂x_in). The '1' is the identity path gradient, always present regardless of f's behavior. Without residuals (x_out = f(x)): ∂L/∂x_in = ∂L/∂x_out × ∂f/∂x_in. Gradients MUST flow through every layer's Jacobian ∂f/∂x. In a 100-layer network without residuals: Gradient at layer 1 = ∂L/∂output × ∏(i=1 to 100) ∂f_i/∂x. If each ∂f/∂x < 1 (common with activations like sigmoid, tanh), gradients vanish: (0.9)^100 ≈ 0.000027. Even with ReLU, many neurons have ∂f/∂x = 0, creating dead gradient paths. With residuals: Gradient at layer 1 = ∂L/∂output × ∏(i=1 to 100) (1 + ∂f_i/∂x). Even if ∂f/∂x → 0 in many layers, the '1' maintains gradient flow. In the extreme case where all layers output zero (∂f/∂x = 0 everywhere), gradient = ∂L/∂output × 1^100 = ∂L/∂output, completely preserved! This gradient highway allows training 100+ layer networks. Residuals don't just help—they're essential. Without them, deep networks are fundamentally untrainable due to vanishing gradients.",
+    "required_concepts": [
+      "Residual gradient: ∂L/∂x = ∂L/∂output × (1 + ∂f/∂x)",
+      "The '+1' is identity path, always present",
+      "Without residuals, gradients multiply through all layers",
+      "100 layers: (0.9)^100 ≈ vanishes to zero",
+      "With residuals, '1' term maintains gradient flow",
+      "Enables training 100+ layer networks"
+    ]
+  },
+  {
+    "id": "transformer_block_q3",
+    "question": "The Transformer block maintains constant dimension d_model throughout (input, attention output, FFN output all d_model). Why is this constraint necessary given residual connections? What would happen if attention output was d_model but FFN output was 2×d_model? How does this constraint affect model capacity scaling?",
+    "model_answer": "Constant d_model is required because residual connections demand it. Residual: x = x + f(x) requires x and f(x) to have identical shapes—you can't add tensors of different dimensions. If attention outputs d_model but FFN outputs 2×d_model, the second residual (x + ffn_out) would fail: can't add (batch, seq, d_model) + (batch, seq, 2×d_model). You'd need to: (1) Project FFN output back to d_model (wasting parameters), or (2) Drop the residual connection (losing gradient highway). Neither is acceptable. This constraint means: (1) All sublayers are d_model → d_model transformations. (2) Attention has d_k = d_v = d_model (typically). (3) SwiGLU expands to d_ff internally but projects back to d_model. (4) Easy stacking—every layer has same I/O dimensions. Impact on capacity scaling: To increase model capacity, you can't just make individual layers output larger—you must increase d_model globally (affects all layers) OR stack more layers (depth). This is actually beneficial: (1) Forced consistency across layers. (2) Memory usage predictable (same per layer). (3) Encourages depth over width (depth often better for hierarchical learning). Modern LLMs scale both: GPT-3 175B has d_model=12288 (large per-layer capacity) × 96 layers (depth). The constraint doesn't limit capacity—it just changes how you scale it.",
+    "required_concepts": [
+      "Residual x + f(x) requires matching dimensions",
+      "Dimension mismatch breaks addition operation",
+      "All sublayers must be d_model → d_model",
+      "Forces consistent dimension across all layers",
+      "Capacity scales via d_model (width) or layers (depth)",
+      "Constraint is beneficial for consistency and depth"
+    ]
+  },
+  {
+    "id": "transformer_block_q4",
+    "question": "In a Transformer block, we apply two residual connections (after attention and after FFN) rather than one combined residual around both sublayers. Compare x = x + attention(norm(x)) + ffn(norm(x)) vs the current x = x + ffn(norm(x + attention(norm(x)))). Why is the two-residual design superior for gradient flow and training dynamics?",
+    "model_answer": "Two separate residuals are superior because they provide independent gradient highways for each sublayer. Current design (two residuals): x_1 = x_0 + attention(norm(x_0)) then x_2 = x_1 + ffn(norm(x_1)). Gradients: ∂L/∂x_0 includes paths through attention, through ffn, AND through both residuals (identity paths). Each sublayer has its own gradient highway. If attention learns poorly, gradients still flow through its residual. If FFN learns poorly, same—independent resilience. Combined residual (one residual around both): x_2 = x_0 + ffn(norm(x_0 + attention(norm(x_0)))). Problems: (1) Gradient coupling: FFN's gradient path includes attention's Jacobian: ∂ffn/∂x must backprop through attention. If attention has vanishing gradients, FFN's learning is impaired. (2) No identity path for attention alone: Can't bypass attention independently. (3) Information bottleneck: Attention output must pass through FFN before rejoining residual—can't directly add attention's contribution. (4) Harder optimization: Both sublayers must coordinate their gradients. Single residual at end can't help if early sublayer fails. Two residuals mean: Each sublayer is independently 'optional' from gradient perspective, can learn at its own pace, and errors in one don't block gradients to the other. This modular gradient flow is why stacking many blocks works—each sublayer is semi-independent.",
+    "required_concepts": [
+      "Two residuals provide independent gradient highways",
+      "Each sublayer has its own identity bypass path",
+      "Combined residual couples gradients between sublayers",
+      "Attention gradient failure doesn't block FFN with separate residuals",
+      "Modular learning: each sublayer learns independently",
+      "Enables reliable stacking of many blocks"
+    ]
+  },
+  {
+    "id": "transformer_block_q5",
+    "question": "A 100-layer Transformer with d_model=4096 and d_ff=11008 has approximately 3.5B parameters. Calculate where these parameters are distributed (attention vs FFN in each block), and explain why FFN dominates the parameter count despite attention being O(n²) in computation. What does this tell us about the different roles of attention and FFN?",
+    "model_answer": "Parameter calculation per block: Attention: 4 projection matrices (Q,K,V,O), each (d_model × d_model) = 4 × 4096² ≈ 67M parameters. FFN (SwiGLU): 3 weight matrices (W₁, W₂, W₃). W₁: (d_ff × d_model) = 11008 × 4096 ≈ 45M. W₂: (d_model × d_ff) = 4096 × 11008 ≈ 45M. W₃: (d_ff × d_model) = 11008 × 4096 ≈ 45M. Total FFN: 135M parameters. Per block: 67M (attention) + 135M (FFN) = 202M. FFN is 67% of parameters! For 100 layers: 100 × 202M ≈ 20B (not counting embeddings). Why FFN dominates parameters despite attention dominating computation (O(n²))? Because: (1) FFN parameters scale with d_model × d_ff (quadratic in dimensions). (2) Attention parameters scale with d_model² (also quadratic in dimensions). (3) But d_ff = (8/3) × d_model, so FFN weight matrices are larger: d_ff × d_model = (8/3)d² while attention is 4 × d². (4) Computation: attention is O(n² × d) with large constant from n², while FFN is O(n × d²). Different roles: Attention (fewer parameters, more computation): Dynamic routing, context gathering, token interactions—computational but parameter-efficient. FFN (more parameters, less computation): Non-linear transformation, feature processing—parameter-heavy but computationally cheaper (O(nd²) not O(n²d)). This split means: Models need large d_ff for capacity, and attention provides efficiency in using that capacity by dynamically routing information!",
+    "required_concepts": [
+      "Attention: 4×d² parameters (Q,K,V,O projections)",
+      "FFN: 3×d_ff×d parameters, d_ff=(8/3)d, so ~8d² parameters",
+      "FFN is ~67% of parameters per block",
+      "Attention O(n²d) dominates computation due to n² term",
+      "FFN O(nd²) cheaper computationally despite more parameters",
+      "Different roles: attention routes, FFN processes"
+    ]
+  }
+]

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "training_loop_q1",
+    "question": "Gradients accumulate by default in PyTorch - calling loss.backward() twice adds gradients together rather than replacing them. Explain why this behavior exists (hint: gradient accumulation for large batches), and why forgetting optimizer.zero_grad() causes training to fail catastrophically after a few steps.",
+    "model_answer": "PyTorch accumulates gradients by design to enable gradient accumulation - training with effective batch sizes larger than memory allows. Why accumulation exists: (1) Gradient accumulation technique: Want effective batch_size=1024 but GPU only fits batch_size=32. Solution: Run 32 forward/backward passes accumulating gradients, then one optimizer step. This averages gradients over 32 mini-batches = effective batch of 1024. (2) Multiple loss terms: Some training setups compute multiple losses (e.g., L_main + λ·L_regularization). Each loss.backward() adds its gradients to params, allowing combined optimization. Why forgetting zero_grad() catastrophes: Step 1: loss₁.backward() → grad₁ stored. optimizer.step() → update parameters. Step 2: loss₂.backward() → grad₁ + grad₂ stored (accumulation!). optimizer.step() → uses grad₁ + grad₂ instead of just grad₂. Step 3: loss₃.backward() → grad₁ + grad₂ + grad₃ stored. Updates use grad₁ + grad₂ + grad₃. Gradients keep growing! After 100 steps, gradient = Σ₁⁰⁰ grad_i, which is ~100× larger than it should be. This causes: (1) Massive parameter updates (100× too large). (2) Parameters explode to inf or NaN. (3) Training diverges within a few steps. (4) Loss goes to inf. The fix: optimizer.zero_grad() before each backward pass resets gradients to zero, ensuring only current batch's gradients are used. Critical rule: Every training step must have zero_grad() → backward() → step() sequence!",
+    "required_concepts": [
+      "Gradients accumulate by design for gradient accumulation technique",
+      "Enables effective batch sizes larger than memory",
+      "Multiple backward() calls add gradients together",
+      "Forgetting zero_grad() causes cumulative gradient explosion",
+      "After N steps, gradients are N× too large",
+      "Leads to parameter explosion and divergence"
+    ]
+  },
+  {
+    "id": "training_loop_q2",
+    "question": "The training loop order is: zero_grad() → backward() → clip_grad_norm_() → step(). Explain what goes wrong if you swap any adjacent operations (e.g., backward before zero_grad, or step before clip), using the state of gradients and parameters at each point.",
+    "model_answer": "Correct order: zero_grad() → backward() → clip → step. Each operation depends on the previous one's completion. Wrong order 1: backward() → zero_grad() → clip → step. After backward(): gradients computed and stored in param.grad. After zero_grad(): ALL GRADIENTS DELETED! param.grad = None or 0. After clip: Clipping operates on zero gradients (no-op). After step(): Optimizer uses zero gradients, parameters don't update at all! Result: Model never learns, loss doesn't decrease. Wrong order 2: zero_grad() → clip → backward() → step. After zero_grad(): Previous gradients cleared (correct). After clip: Tries to clip non-existent gradients (param.grad is None). Result: Error or no-op, then backward() computes unclipped gradients. After step(): Uses unclipped gradients, defeats purpose of clipping! Wrong order 3: zero_grad() → backward() → step() → clip. After backward(): Gradients computed (correct). After step(): Parameters already updated using unclipped gradients! After clip: Clipping gradients AFTER parameters updated does nothing. Result: Parameters can still explode from large gradients before clipping happens. Why correct order works: (1) zero_grad(): Clean slate, remove old gradients. (2) backward(): Compute new gradients for current loss. (3) clip: Limit gradient norms to prevent explosions BEFORE using them. (4) step(): Use (now-clipped) gradients to update parameters safely. The dependencies: Backward needs cleared gradients. Clip needs computed gradients. Step needs clipped gradients. Strict ordering required!",
+    "required_concepts": [
+      "zero_grad() must come first to clear previous gradients",
+      "backward() needs clean gradients to compute into",
+      "clip must come after backward (needs gradients to clip)",
+      "clip must come before step (must clip before using)",
+      "step() updates parameters using current gradients",
+      "Each operation depends on previous one's completion"
+    ]
+  },
+  {
+    "id": "training_loop_q3",
+    "question": "Language model training uses cross_entropy(logits.view(-1, vocab_size), targets.view(-1)) with flattening. Explain why we flatten from (batch, seq_len, vocab_size) to (batch*seq_len, vocab_size), and what this means for loss computation. How is this different from image classification?",
+    "model_answer": "Flattening treats each position as an independent prediction. Why flatten: (1) PyTorch cross_entropy expects: input shape (N, C) where N=batch size, C=num classes. targets shape (N,) with class indices. For language modeling, we have (batch, seq_len, vocab_size) - three dimensions! (2) Language modeling makes predictions at EVERY position: Position 0: predict token 1. Position 1: predict token 2. ... Position seq_len-1: predict token seq_len. Each position is a separate classification problem! (3) Flattening to (batch*seq_len, vocab_size): Treats all batch×seq_len positions as independent samples. Creates N = batch_size × seq_len samples, each choosing from vocab_size classes. Loss computed as average over ALL positions in ALL sequences. What this means: (1) Each token position contributes equally to loss. (2) If batch=32, seq_len=512, we're averaging loss over 32×512 = 16,384 independent predictions per step! (3) Longer sequences contribute more to gradient (more positions = more loss terms). Different from image classification: Image classification: One prediction per image. Input shape (batch, channels, height, width). Output shape (batch, num_classes). Loss averaged over batch only (batch predictions). Language modeling: Multiple predictions per sequence (one per position). Input shape (batch, seq_len, d_model). Output shape (batch, seq_len, vocab_size). Loss averaged over batch AND seq_len (batch×seq_len predictions). This is why language modeling is more sample-efficient than classification - each sequence provides seq_len training signals, not just one!",
+    "required_concepts": [
+      "cross_entropy expects (N, C) for N samples, C classes",
+      "Language modeling: prediction at every position",
+      "Flatten treats each position as independent sample",
+      "N = batch × seq_len total predictions",
+      "Loss averaged over all positions in all sequences",
+      "Different from image classification (one prediction per image)"
+    ]
+  },
+  {
+    "id": "training_loop_q4",
+    "question": "Training requires calling model.train() at the start and model.eval() for evaluation. Explain what these modes control (dropout, batch normalization), why using the wrong mode causes test performance to differ from training performance, and what happens if you forget to switch modes.",
+    "model_answer": "train() vs eval() modes control modules that behave differently during training vs inference. What they control: (1) Dropout: Training mode: Randomly drops activations with probability p, scales remaining by 1/(1-p). Eval mode: No dropout, uses all activations (effectively p=0). (2) BatchNorm: Training mode: Normalizes using current batch statistics, updates running mean/std. Eval mode: Uses stored running statistics, doesn't update them. Why wrong mode causes issues: Forget model.eval() during evaluation: (1) Dropout active: Randomly zeroing activations during test! Each evaluation run gives different results (stochastic). Performance lower than it should be because missing activations. (2) BatchNorm using batch stats: Test batch might have different distribution than training. Single-sample eval: batch stats from one sample are meaningless. Results are noisy and unreliable. Forget model.train() during training: (1) No dropout: Model doesn't learn robustness, overfits. Regularization effect of dropout lost. (2) BatchNorm not updating: Running stats become stale. Model fails to adapt to data distribution. Training becomes unstable. Concrete example: Model with 0.1 dropout trained correctly. Evaluated with train() mode (forgot eval()): Test accuracy 75% (should be 80%). Why? 10% of activations randomly dropped during test, hurts performance. Evaluated with eval() mode correctly: Test accuracy 80%. The fix is simple but critical: Training: model.train() at start of training loop. Evaluation: model.eval() before validation/testing. These modes ensure consistent behavior and proper performance!",
+    "required_concepts": [
+      "train() mode: dropout active, batchnorm updates statistics",
+      "eval() mode: dropout off, batchnorm uses running statistics",
+      "Forget eval(): stochastic test results, lower performance",
+      "Forget train(): no dropout regularization, overfitting",
+      "Mode affects dropout and normalization layers",
+      "Must switch modes for correct behavior"
+    ]
+  },
+  {
+    "id": "training_loop_q5",
+    "question": "Modern LLM training on a 40GB GPU with batch_size=32, seq_len=2048, d_model=4096 requires careful memory management. Calculate the approximate memory needed for: (1) model parameters, (2) optimizer states (AdamW), (3) activations, (4) gradients. Which dominates, and what techniques reduce memory usage?",
+    "model_answer": "Memory breakdown for described setup (assuming ~1B parameter model): (1) Model parameters: 1B parameters × 4 bytes (fp32) = 4 GB. Or 2 GB in fp16/bf16 mixed precision. (2) Gradients: Same size as parameters = 4 GB (fp32) or 2 GB (fp16). Every parameter needs gradient storage. (3) Optimizer states (AdamW): First moment (m): 4 GB. Second moment (v): 4 GB. Total optimizer: 8 GB (2× parameters). Stored in fp32 even with mixed precision training! (4) Activations (forward pass): Most memory-intensive! Per layer (96 layers for large model): Attention: batch × num_heads × seq_len² × d_head. FFN: batch × seq_len × d_ff. For batch=32, seq=2048, d=4096, 96 layers: Attention activations: 32 × 32 heads × 2048² × 128 ≈ 550 GB per layer! (Stored for backward). This is impossibly large! Memory total (naive): Parameters: 4 GB. Gradients: 4 GB. Optimizer: 8 GB. Activations: Multiple hundreds of GB (dominated by attention). Total: 500+ GB >> 40 GB available! What dominates: Activations, especially attention score matrices (seq_len²). Memory reduction techniques: (1) Gradient checkpointing (activation checkpointing): Don't store all activations. Store only subset (e.g., every Nth layer). Recompute missing activations during backward. Trades compute for memory (2× compute, 1/N memory). Can reduce activation memory by 10-20×. (2) Flash Attention: Never materialize full attention matrix. Computes attention in tiles, O(n) memory instead of O(n²). Reduces attention memory by 100×+ for long sequences. (3) Mixed precision (fp16/bf16): Halves parameter/gradient/activation memory. Stores optimizer states in fp32 for stability. (4) Gradient accumulation: Effective batch_size=128 via 4 × batch_size=32 with accumulation. Same results, 4× less memory. With these techniques, 40GB is sufficient for models up to ~7B parameters!",
+    "required_concepts": [
+      "Parameters: 4GB for 1B params",
+      "Gradients: same size as parameters",
+      "Optimizer (AdamW): 2× parameters (m and v states)",
+      "Activations dominate: O(batch×seq²) for attention",
+      "Gradient checkpointing: recompute activations, save memory",
+      "Flash Attention: O(n) not O(n²) attention memory"
+    ]
+  }
+]

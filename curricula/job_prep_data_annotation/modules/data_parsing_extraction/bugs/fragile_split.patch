@@ -1,0 +1,32 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -1,15 +1,19 @@
+ def extract_coordinates(html: str) -> list[tuple[int, int, str]]:
+     """Extract coordinate data from HTML spans."""
+     if not html:
+         raise ValueError("HTML must not be empty")
+     
+-    from bs4 import BeautifulSoup
+-    import re
+-    
+-    soup = BeautifulSoup(html, 'html.parser')
+-    spans = soup.find_all('span')
+     coords = []
+-    for span in spans:
+-        text = span.get_text()
+-        x = int(re.search(r'x\s*=\s*(\d+)', text).group(1))
+-        y = int(re.search(r'y\s*=\s*(\d+)', text).group(1))
+-        char = re.search(r'char\s*=\s*([A-Za-z])', text).group(1)
++    
++    # BUG: Using brittle split() instead of regex
++    from bs4 import BeautifulSoup
++    soup = BeautifulSoup(html, 'html.parser')
++    spans = soup.find_all('span')
++    
++    for span in spans:
++        text = span.get_text()
++        parts = text.split(',')
++        x = int(parts[0].split('=')[1])
++        y = int(parts[1].split('=')[1])
++        char = parts[2].split('=')[1]
+         coords.append((x, y, char))

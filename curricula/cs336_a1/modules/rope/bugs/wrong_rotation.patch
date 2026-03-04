@@ -1,0 +1,14 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -245,8 +245,9 @@ def rope(
+     x_odd = x_pairs[..., 1]
+     
+     # Apply 2D rotation
+-    x_rotated_even = x_even * cos_selected - x_odd * sin_selected
+-    x_rotated_odd = x_even * sin_selected + x_odd * cos_selected
++    # BUG: Wrong rotation formula! Missing the negative sign in first equation.
++    # This breaks the rotation matrix and doesn't properly encode position.
++    x_rotated_even = x_even * cos_selected + x_odd * sin_selected  # Should be minus!
++    x_rotated_odd = x_even * sin_selected + x_odd * cos_selected
+     
+     # Stack and reshape back

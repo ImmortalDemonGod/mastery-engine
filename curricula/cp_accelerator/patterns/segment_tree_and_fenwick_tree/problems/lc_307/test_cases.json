@@ -1,0 +1,13 @@
+{
+  "problem": "Range Sum Query - Mutable",
+  "source": "https://leetcode.com/problems/range-sum-query---mutable/",
+  "note": "These are example test cases from the problem statement. Full validation requires online judge submission.",
+  "tests": [
+    {
+      "id": 1,
+      "input": {},
+      "expected": "[null, 9, null, 8]",
+      "note": "Example 1: NumArray numArray = new NumArray([1, 3, 5]);\nnumAr..."
+    }
+  ]
+}

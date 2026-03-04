@@ -1,0 +1,52 @@
+{
+  "id": "text_generation-temperature-bug",
+  "description": "Applies temperature after softmax instead of before, causing incorrect scaling of the distribution.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "generate",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find softmax application and replace with temperature scaling before softmax.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "probs"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "softmax"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "F.softmax(next_logits / temperature, dim=-1)",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

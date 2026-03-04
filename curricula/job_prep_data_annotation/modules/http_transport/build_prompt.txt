@@ -1,0 +1,81 @@
+# Build Challenge: HTTP Transport Layer
+
+## Learning Objective
+Master the distinction between **file system I/O** and **network I/O** in Python. Understand why `open()` cannot fetch URLs and why HTTP requests require specialized libraries.
+
+## Problem Statement
+You are building a document fetcher for a web scraping pipeline. Your function must:
+1. Accept a URL as a string
+2. Make an HTTP GET request using the `requests` library
+3. Validate the HTTP status code
+4. Return the response body as text
+
+### Critical Requirement
+**DO NOT use `urllib` or `open()`.** You must use the `requests` library's high-level API.
+
+## Specification
+
+Implement the following function in `cs336_basics/utils.py`:
+
+```python
+def fetch_document(url: str) -> str:
+    """
+    Fetch a document from a URL using HTTP GET.
+    
+    Args:
+        url: The complete URL (e.g., 'https://example.com/data.html')
+    
+    Returns:
+        The response body as a string
+    
+    Raises:
+        ValueError: If the URL is invalid or empty
+        requests.exceptions.HTTPError: If the status code indicates failure (4xx, 5xx)
+    """
+```
+
+### Requirements
+1. **Validation**: Raise `ValueError` if `url` is empty or not a string
+2. **HTTP Request**: Use `requests.get(url)`
+3. **Status Check**: Call `response.raise_for_status()` to automatically raise `HTTPError` for bad status codes
+4. **Return**: Return `response.text` (not `.content` or `.json()`)
+
+### Example Usage
+```python
+# Success case
+html = fetch_document("https://httpbin.org/html")
+assert "<h1>" in html
+
+# Error case (404)
+try:
+    fetch_document("https://httpbin.org/status/404")
+except requests.exceptions.HTTPError as e:
+    print(f"Expected error: {e}")
+```
+
+## Common Pitfalls (What NOT to Do)
+1. **File I/O Confusion**: `open(url)` will raise `FileNotFoundError` because URLs are not file paths
+2. **urllib vs requests**: Using `urllib.request.urlopen()` is lower-level and requires manual error handling
+3. **Ignoring Status Codes**: Forgetting to check `response.status_code` or call `raise_for_status()`
+
+## Testing Your Implementation
+Run the validator to test your implementation:
+```bash
+mastery submit
+```
+
+The validator tests:
+- Valid HTTP requests (200 OK)
+- 404 errors (Not Found)
+- 500 errors (Server Error)
+- Empty URL validation
+- Performance (< 2 seconds for remote calls)
+
+## Resources
+- [Requests Library Documentation](https://requests.readthedocs.io/)
+- [HTTP Status Codes Reference](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+- Source: 30 Days of Python - Day 22 (Web Scraping), Day 28 (API)
+
+---
+
+**Success Criterion**: Your code must pass all validator tests with correct error handling for HTTP failures.

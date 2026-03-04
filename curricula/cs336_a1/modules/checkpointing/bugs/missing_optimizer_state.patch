@@ -1,0 +1,23 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -5,9 +5,10 @@ def save_checkpoint(model, optimizer, iteration, out):
+     """Save complete training state."""
+     checkpoint = {
+         'model_state_dict': model.state_dict(),
+-        'optimizer_state_dict': optimizer.state_dict(),
+         'iteration': int(iteration),
+     }
++    # BUG: Missing optimizer state! 
++    # Without optimizer momentum, training restarts poorly
+     
+     torch.save(checkpoint, out)
+ 
+@@ -16,7 +17,8 @@ def load_checkpoint(src, model, optimizer):
+     checkpoint = torch.load(src, map_location='cpu')
+     
+     model.load_state_dict(checkpoint['model_state_dict'])
+-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
++    # BUG: Can't load optimizer state - wasn't saved!
++    # KeyError: 'optimizer_state_dict'
+     
+     return int(checkpoint['iteration'])

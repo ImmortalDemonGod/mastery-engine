@@ -1,0 +1,21 @@
+--- cs336_basics/utils.py
++++ cs336_basics/utils.py
+@@ -38,9 +38,12 @@
+     logits = inputs
+     orig_dtype = logits.dtype
+     x32 = logits.float()
+     t = targets.long()
+-    # log-sum-exp for stability
+-    lse = torch.logsumexp(x32, dim=-1)
+-    # pick the logit for the correct class
+-    correct = x32.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)
+-    loss = (lse - correct).mean()
++    # BUG: Naive softmax + log instead of logsumexp - causes numerical instability!
++    # Compute softmax explicitly (without subtract-max trick for additional instability)
++    exp_logits = torch.exp(x32)
++    softmax_probs = exp_logits / exp_logits.sum(dim=-1, keepdim=True)
++    # Extract probabilities for target classes
++    target_probs = softmax_probs.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)
++    # Take log of probabilities (can produce -inf if prob is 0)
++    loss = -torch.log(target_probs).mean()
+     return loss.to(orig_dtype)

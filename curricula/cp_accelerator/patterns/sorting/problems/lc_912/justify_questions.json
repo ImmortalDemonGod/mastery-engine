@@ -1,0 +1,65 @@
+[
+  {
+    "id": "sorting_conceptual",
+    "question": "Explain the core invariant that merge sort maintains during the divide and conquer process. Why does this invariant guarantee correctness?",
+    "model_answer": "Merge sort maintains the invariant that every subarray returned from a recursive call is sorted. This is guaranteed by:\n\n1. **Base case**: Arrays of length 0 or 1 are already sorted by definition\n2. **Inductive step**: If we assume the recursive calls on left and right halves return sorted arrays, then the merge operation (which takes two sorted arrays and produces one sorted array) guarantees the combined result is sorted\n3. **Merge correctness**: The merge function maintains sorted order by always choosing the smallest remaining element from the two sorted input arrays\n\nThis divide-and-conquer approach with a correct merge operation guarantees the final array is sorted because we never break the invariant at any level of recursion.",
+    "failure_modes": [
+      {
+        "category": "Vague Hand-Waving",
+        "keywords": [
+          "moves",
+          "checks",
+          "looks at",
+          "compares things"
+        ],
+        "feedback": "Instead of describing what the code does, explain *why* the algorithm is correct. What property is preserved at each recursive level?"
+      },
+      {
+        "category": "Missing Induction",
+        "keywords": [
+          "divides",
+          "splits"
+        ],
+        "feedback": "You're on the right track mentioning the divide step, but why does dividing guarantee correctness? Think about proof by induction: what's the base case and inductive hypothesis?"
+      }
+    ]
+  },
+  {
+    "id": "sorting_complexity",
+    "question": "Analyze the time and space complexity of merge sort. How does O(n log n) compare to naive O(n²) sorting algorithms, and when might you choose one over the other?",
+    "model_answer": "**Time Complexity: O(n log n)**\n- The recursion tree has height log(n) because we divide the array in half at each level\n- At each level, we do O(n) work to merge all subarrays (each element is touched once per level)\n- Total: O(n) work × O(log n) levels = O(n log n)\n- This is optimal for comparison-based sorting (proven by information theory)\n\n**Space Complexity: O(n)**\n- Merge requires a temporary array proportional to input size\n- Recursion stack adds O(log n) space, but O(n) dominates\n\n**Comparison to O(n²) algorithms (bubble, insertion, selection sort):**\n- For n=1000: merge sort ~10,000 operations vs O(n²) ~1,000,000 operations (100× faster)\n- For n=1,000,000: merge sort ~20M operations vs O(n²) ~1 trillion operations (50,000× faster)\n\n**When to use O(n²):**\n- Small arrays (n < 10-20) where constant factors matter\n- Nearly sorted data (insertion sort is O(n) for sorted input)\n- Severe space constraints (bubble/insertion sort are O(1) space)\n- Simplicity is critical (insertion sort is 5 lines)\n\n**When to use O(n log n):**\n- Large datasets (n > 100)\n- Worst-case guarantees matter\n- Data is randomly ordered",
+    "failure_modes": [
+      {
+        "category": "Only States Complexity",
+        "keywords": [
+          "O(n log n)",
+          "fast"
+        ],
+        "feedback": "You've stated the complexity, but can you derive *why* it's O(n log n)? Walk through the recursion tree and explain the work at each level."
+      },
+      {
+        "category": "Ignores Space Tradeoff",
+        "keywords": [
+          "time",
+          "speed"
+        ],
+        "feedback": "You've analyzed time complexity, but what about space? Merge sort's O(n) space usage is a real tradeoff compared to in-place O(n²) algorithms."
+      }
+    ]
+  },
+  {
+    "id": "sorting_stability",
+    "question": "What is a 'stable' sort, and is merge sort stable? Why does stability matter in practice?",
+    "model_answer": "**Stability Definition**: A sorting algorithm is stable if it preserves the relative order of elements with equal keys.\n\nExample: Sorting [(1, 'a'), (2, 'b'), (1, 'c')] by first element\n- Stable result: [(1, 'a'), (1, 'c'), (2, 'b')] — original order preserved for 1s\n- Unstable result: [(1, 'c'), (1, 'a'), (2, 'b')] — order of 1s flipped\n\n**Is merge sort stable? YES**, if implemented correctly:\n- When merging, if left[i] == right[j], always take from left first (left[i] <= right[j])\n- This preserves original order for equal elements\n- If we used strict less-than (left[i] < right[j]), it would be unstable\n\n**Why stability matters in practice:**\n1. **Multi-level sorting**: Sort by secondary key first, then primary key\n   - Example: Sort students by grade (stable), then by name\n   - Preserves name order within each grade\n2. **UI sorting**: Users expect repeated sorts to maintain previous ordering\n3. **Database operations**: SQL ORDER BY with multiple columns relies on stability\n4. **TimSort (Python's default)**: Built on merge sort precisely because stability is required\n\nMany real-world applications need stable sorting, making merge sort's stability a key advantage over quicksort (which is typically unstable).",
+    "failure_modes": [
+      {
+        "category": "No Definition",
+        "keywords": [
+          "yes",
+          "stable"
+        ],
+        "feedback": "Can you define what 'stable' means? Give an example of when two sorting algorithms would produce different results due to stability."
+      }
+    ]
+  }
+]

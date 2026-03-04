@@ -1,0 +1,63 @@
+[
+  {
+    "id": "swiglu_q1",
+    "question": "SwiGLU uses three weight matrices (W₁, W₂, W₃) while traditional FFN uses only two. Explain the role of each matrix and why the third matrix (W₃) is essential for gating. What would happen if we eliminated W₃ and used SwiGLU(x) = W₂·SiLU(W₁·x)?",
+    "model_answer": "The three matrices serve distinct roles: W₁ (d_model→d_ff) computes the 'value' representation in the expanded space. W₂ (d_ff→d_model) projects back to the model dimension. W₃ (d_model→d_ff) computes the 'gate' that controls information flow. W₃ is essential because it provides a learned, input-dependent gating mechanism. Without W₃, using just SwiGLU(x) = W₂·SiLU(W₁·x) would reduce to a traditional feed-forward network with SiLU activation—losing the gating capability entirely. The power of SwiGLU comes from element-wise multiplication: SiLU(W₁·x) ⊙ W₃·x. This lets the network learn which dimensions to emphasize (when W₃·x is large) or suppress (when W₃·x is small). W₃ learns a data-dependent gate: for different inputs, different dimensions are activated. This selective routing is why SwiGLU outperforms traditional FFN—it's not just about the activation function, it's about adaptive gating.",
+    "required_concepts": [
+      "W₁ computes values in expanded space",
+      "W₂ projects back to model dimension",
+      "W₃ computes the learned gate",
+      "Element-wise multiplication creates data-dependent gating",
+      "Without W₃, SwiGLU reduces to traditional FFN",
+      "Gating enables selective information routing"
+    ]
+  },
+  {
+    "id": "swiglu_q2",
+    "question": "Why is d_ff typically set to (8/3)·d_model in SwiGLU instead of 4·d_model as in traditional FFN? Explain the parameter count calculation and why this choice ensures fair comparison between architectures.",
+    "model_answer": "The (8/3)·d_model choice ensures SwiGLU has approximately the same parameter count as traditional 4×d_model FFN, making comparisons fair. Parameter calculation: Traditional FFN has W₁: (4d × d) and W₂: (d × 4d) = 8d² total parameters. SwiGLU has three matrices: W₁: (d_ff × d), W₂: (d × d_ff), W₃: (d_ff × d) = 3·d_ff·d total parameters. Setting d_ff = (8/3)d gives 3·(8/3)d·d = 8d² parameters, matching the traditional FFN. This is crucial for fair comparison—we want to know if gating helps, not whether more parameters help. If we used d_ff = 4d in SwiGLU, it would have 12d² parameters (50% more than traditional), making it unclear whether improvements come from gating or just having more capacity. By matching parameter counts, empirical results showing SwiGLU > traditional FFN demonstrate that the gating mechanism itself provides value, not just parameter scaling. In practice, d_ff is also rounded to multiples of 64 for GPU tensor core efficiency (e.g., d_model=4096 → d_ff=11008, not exactly 10923).",
+    "required_concepts": [
+      "Traditional FFN has 8d² parameters with d_ff=4d",
+      "SwiGLU with 3 matrices needs d_ff=(8/3)d for same count",
+      "Fair comparison requires matched parameter budgets",
+      "More parameters alone doesn't prove architectural superiority",
+      "GPU efficiency requires rounding to multiples of 64"
+    ]
+  },
+  {
+    "id": "swiglu_q3",
+    "question": "In SwiGLU, the gating happens AFTER applying SiLU to W₁·x, not before: SiLU(W₁·x) ⊙ W₃·x. Why is this order important? What would be different if we computed SiLU((W₁·x) ⊙ (W₃·x)) instead—gating before activation?",
+    "model_answer": "The order SiLU(W₁·x) ⊙ W₃·x is critical because it separates the roles of activation and gating. Current order: (1) W₁·x computes values, (2) SiLU activates those values, introducing non-linearity, (3) W₃·x computes gates independently, (4) Element-wise multiplication combines them. This means the gate (W₃·x) operates on already-activated features, providing a second layer of non-linear transformation. If we did SiLU((W₁·x) ⊙ (W₃·x))—gating before activation—problems arise: (1) The gating becomes linear (just element-wise multiplication) before any non-linearity is applied, reducing expressiveness. (2) SiLU only gets applied once to the gated product, whereas current order applies non-linearity twice (SiLU on values, implicit non-linearity through multiplicative gating). (3) Gradient flow is worse—in current order, gradients flow through both SiLU and the gate independently, but pre-gating order creates a single gradient path through the product. (4) Interpretability: current order lets us think of SiLU(W₁·x) as 'what features are present' and W₃·x as 'how much to use them', but pre-gating conflates these roles. The current order maximizes expressiveness by having two independent non-linear transformations interact via multiplication.",
+    "required_concepts": [
+      "Activation and gating serve different roles",
+      "Current order applies non-linearity twice",
+      "Pre-gating would reduce to single non-linearity",
+      "Independent gradient paths improve optimization",
+      "Separation aids interpretability of value vs gate"
+    ]
+  },
+  {
+    "id": "swiglu_q4",
+    "question": "SwiGLU uses element-wise multiplication (Hadamard product) ⊙ for gating rather than other combination methods like addition or concatenation. Why is multiplicative gating particularly effective for neural networks? What properties does it have that make it superior to additive gating?",
+    "model_answer": "Multiplicative gating is superior because: (1) Provides hard suppression—when the gate is near zero, the output is near zero regardless of the value, enabling the network to completely shut off irrelevant features. Addition can't do this: x + 0 = x still passes information. (2) Amplification and suppression—gates can both increase (when > 1) and decrease (when < 1) signal strength, giving fine-grained control. Addition only shifts values, not scales them. (3) Input-dependent non-linearity—multiplication creates interactions between the gate and value that depend on both, making the effective non-linearity adaptive. f(x) = SiLU(W₁x) ⊙ W₃x means the function's behavior changes based on input. (4) Gradient properties—∂(a⊙b)/∂a = b and ∂(a⊙b)/∂b = a, so gradients flow through both paths proportionally to the other pathway's values. This creates a form of gradient gating that helps with credit assignment. (5) Biological inspiration—multiplicative interactions are common in neuroscience (shunting inhibition, gain modulation) and have proven effective. Concatenation followed by projection could work but requires extra parameters and doesn't provide the same interpretable separation of 'what' (values) and 'how much' (gates).",
+    "required_concepts": [
+      "Multiplication enables hard suppression to zero",
+      "Can amplify or suppress unlike addition",
+      "Creates input-dependent adaptive non-linearity",
+      "Gradient gating through proportional flow",
+      "Biological plausibility of multiplicative interactions"
+    ]
+  },
+  {
+    "id": "swiglu_q5",
+    "question": "Despite SwiGLU having 50% more weight matrices than traditional FFN (3 vs 2), the computational overhead is only about 10-15% in practice. Explain why the additional matrix multiplication (W₃·x) adds relatively little to total training time, and why this makes SwiGLU's performance gains particularly valuable.",
+    "model_answer": "The ~10-15% overhead despite 50% more matrices occurs because: (1) Matrix operations aren't the bottleneck—in modern LLMs, memory bandwidth, attention computation (O(n²d)), and data loading dominate. FFN is O(nd²) but often memory-bound, not compute-bound on modern accelerators. (2) The W₁ and W₃ operations happen in parallel—both multiply x by different matrices, and GPUs can batch these operations or execute them concurrently if memory allows. Only W₂ must wait for the gating result. (3) Element-wise operations (SiLU, multiplication) are extremely fast compared to matrix multiplications—these add negligible time. A d_ff-dimensional element-wise operation is trivial compared to d_model × d_ff matrix multiply. (4) Modern hardware optimization—GPUs/TPUs have specialized tensor cores optimized for matmuls. The three separate matmuls can better utilize these cores than one large matmul. (5) Amortized cost—in full Transformer training, FFN is maybe 30-40% of total compute, so 15% more FFN compute = 5-7% total training time increase. This modest overhead makes SwiGLU valuable: if it provides 0.5-1% accuracy improvement for 5-7% more time, that's an excellent trade-off. In a $10M training run, spending $700K more for meaningfully better results is worth it.",
+    "required_concepts": [
+      "Memory bandwidth and attention often bottleneck, not FFN compute",
+      "W₁ and W₃ can be parallelized",
+      "Element-wise ops are cheap vs matrix multiplies",
+      "Hardware tensor cores efficiently handle multiple matmuls",
+      "Small percentage of total training time makes trade-off favorable"
+    ]
+  }
+]

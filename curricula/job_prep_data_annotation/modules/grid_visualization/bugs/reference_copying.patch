@@ -1,0 +1,20 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -1,15 +1,15 @@
+ def render_grid(coords: list[tuple[int, int, str]]) -> list[str]:
+     """Convert sparse coordinates to dense 2D grid."""
+     if not coords:
+         raise ValueError("Coordinates list cannot be empty")
+     
+     max_x = max(x for x, y, char in coords)
+     max_y = max(y for x, y, char in coords)
+     width = max_x + 1
+     height = max_y + 1
+     
+-    # Correct: Each row is a separate list object
+-    grid = [[' '] * width for _ in range(height)]
++    # BUG: All rows are references to the same list
++    grid = [[' '] * width] * height
+     
+     for x, y, char in coords:
+         grid[y][x] = char

@@ -1,0 +1,19 @@
+--- a/cs336_basics/optimizer.py
++++ b/cs336_basics/optimizer.py
+@@ -85,10 +85,11 @@ class AdamW(torch.optim.Optimizer):
+             exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+             exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+             
+-            # Bias correction
+-            bias_correction1 = 1 - beta1 ** state['step']
+-            bias_correction2 = 1 - beta2 ** state['step']
+-            step_size = lr / bias_correction1
++            # BUG: Missing bias correction! Without this, early updates are biased
++            # toward zero (10× too small at step 1), severely slowing initial training.
++            # Should compute: bias_correction1 = 1 - beta1 ** state['step']
++            #                 bias_correction2 = 1 - beta2 ** state['step']
++            step_size = lr  # Should be: lr / bias_correction1
+             
+             # Compute update
+-            denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
++            denom = exp_avg_sq.sqrt().add_(eps)  # Should divide by sqrt(bias_correction2)

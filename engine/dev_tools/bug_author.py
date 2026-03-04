@@ -1,0 +1,975 @@
+"""
+LLM-Powered Bug Authoring Tool
+
+Automates the creation of JSON bug definitions from legacy .patch files
+using few-shot learning with the golden dataset.
+"""
+from __future__ import annotations
+
+import ast
+import json
+from pathlib import Path
+from typing import Optional
+
+from engine.ast_harden.generic_injector import GenericBugInjector
+from engine.services.llm_service import LLMService
+
+
+class BugAuthor:
+    """
+    Generates JSON bug definitions from patch files using LLM with validation loop.
+    """
+    
+    # Golden dataset for few-shot prompting
+    GOLDEN_EXAMPLES = [
+        {
+            "name": "softmax-no-subtract-max",
+            "path": "curricula/cs336_a1/modules/softmax/bugs/no_subtract_max.json",
+            "description": "Multi-pass with context tracking",
+            "complexity": "complex"
+        },
+        {
+            "name": "silu-missing-multiply",
+            "path": "curricula/cs336_a1/modules/silu/bugs/missing_multiply.json",
+            "description": "Single-pass node replacement",
+            "complexity": "simple"
+        },
+        {
+            "name": "rmsnorm-missing-keepdim",
+            "path": "curricula/cs336_a1/modules/rmsnorm/bugs/missing_keepdim.json",
+            "description": "Keyword argument manipulation",
+            "complexity": "medium"
+        },
+        {
+            "name": "attention-missing-scale",
+            "path": "curricula/cs336_a1/modules/attention/bugs/missing_scale.json",
+            "description": "Statement deletion (using delete_statement)",
+            "complexity": "simple"
+        }
+    ]
+    
+    def __init__(self, llm_service: Optional[LLMService] = None):
+        """Initialize bug author with LLM service."""
+        self.llm_service = llm_service or LLMService()
+        self.golden_dataset = self._load_golden_dataset()
+    
+    def _load_golden_dataset(self) -> list[dict]:
+        """Load golden dataset examples from disk."""
+        examples = []
+        
+        # Resolve paths relative to project root
+        # Assume this file is at engine/dev_tools/bug_author.py
+        project_root = Path(__file__).parent.parent.parent
+        
+        for example_meta in self.GOLDEN_EXAMPLES:
+            # Make path absolute relative to project root
+            path = project_root / example_meta["path"]
+            
+            if path.exists():
+                with open(path, 'r') as f:
+                    bug_def = json.load(f)
+                examples.append({
+                    "meta": example_meta,
+                    "definition": bug_def
+                })
+            else:
+                # Log warning but continue
+                print(f"⚠️  Warning: Golden example not found: {path}")
+        
+        return examples
+    
+    def _build_system_prompt(self) -> str:
+        """Build system prompt with schema and golden examples."""
+        prompt = """You are an expert in Python AST manipulation and curriculum design. Your task is to generate JSON bug definitions following the v2.1 schema that can be interpreted by a generic AST transformation engine.
+
+# JSON Schema v2.1
+
+```json
+{
+  "id": "module-bug-type",
+  "description": "Human-readable description of what the bug does",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "function_name",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_track | find_and_replace",
+      "description": "What this pass does",
+      "pattern": {
+        "node_type": "Assign | BinOp | Call | Attribute | Name | ...",
+        "attr": "attribute_name",
+        "op": "Sub | Mult | Add | ...",
+        "value": { /* nested pattern */ },
+        "left": { /* nested pattern */ },
+        "right": { /* nested pattern */ }
+      },
+      "conditions": [
+        {
+          "check": "targets_length_equals | target_is_name | has_keyword_arg",
+          "value": 1,
+          "name": "arg_name"
+        }
+      ],
+      "track_as": {
+        "context_var_name": "pattern.path.to.extract"
+      },
+      "replacement": {
+        "type": "replace_value_with | replace_with | remove_keyword_arg",
+        "source": "node.path.to.replacement",
+        "name": "arg_name"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "YYYY-MM-DD",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple | medium | complex"
+  }
+}
+```
+
+# Pattern Matching Rules
+
+1. **node_type**: Must match AST node class name (Assign, BinOp, Call, Attribute, Name, etc.)
+2. **Operators**: Use class names (Sub, Mult, Add, Div, etc.)
+3. **Context references**: Use {"from_context": "var_name"} to reference tracked variables
+4. **Paths**: Use dot notation (e.g., "node.value.left", "pattern.targets[0].id")
+
+# ⚠️ CRITICAL: Matching Specific Variables
+
+**To match a SPECIFIC variable by name, you MUST include the "id" field:**
+
+```json
+{
+  "node_type": "Assign",
+  "targets": [
+    {
+      "node_type": "Name",
+      "id": "bias_correction1"  // ← REQUIRED to match this specific variable
+    }
+  ],
+  "value": { "node_type": "BinOp", "op": "Sub" }
+}
+```
+
+**WRONG - This matches ANY variable assignment:**
+```json
+{
+  "node_type": "Assign",
+  "targets": [
+    {
+      "node_type": "Name"  // ❌ NO "id" - matches first assignment found!
+    }
+  ]
+}
+```
+
+**When to use each approach:**
+- **Direct "id"**: Use when you know the exact variable name (e.g., "bias_correction1", "scores", "d_k")
+- **Context tracking**: Only use if you need to match based on a computed name from a previous pass
+- **No "id"**: NEVER use this pattern - it will match the wrong variable!
+
+**⚠️ CRITICAL: Multiple assignments to the same variable:**
+
+If the same variable is assigned multiple times (e.g., `scores` appears TWICE in BEFORE code), you MUST:
+1. **Identify WHICH occurrence** you need to match (first, second, etc.)
+2. **Use the operator from THAT occurrence** to disambiguate
+
+**Example - attention bug:**
+```python
+# BEFORE code has TWO scores assignments:
+scores = Q @ K.T              # First: MatMult operator
+scores = scores / sqrt(d_k)   # Second: Div operator
+```
+
+To match the FIRST occurrence (which needs to be modified):
+```json
+{
+  "node_type": "Assign",
+  "targets": [{"node_type": "Name", "id": "scores"}],
+  "value": {
+    "node_type": "BinOp",
+    "op": "MatMult"  // ← Use operator from FIRST occurrence!
+  }
+}
+```
+
+**Common mistake:** Using the operator from the wrong occurrence! Always check which one you need to modify.
+
+**⚠️ CRITICAL: Don't Over-Specify Patterns!**
+
+Only include fields that are NECESSARY to uniquely identify the statement:
+
+**WRONG - Over-specified:**
+```json
+{
+  "node_type": "BinOp",
+  "op": "Sub",
+  "left": {"node_type": "Num"},          // ❌ Unnecessary detail
+  "right": {                             // ❌ Too deep
+    "node_type": "Call",
+    "func": {"node_type": "Attribute", "attr": "pow"},
+    "args": [...]
+  }
+}
+```
+
+**CORRECT - Minimal specification:**
+```json
+{
+  "node_type": "BinOp",
+  "op": "Sub"                            // ✅ Just enough!
+}
+```
+
+**Rule:** Start simple. Only add nested details if you need to disambiguate from other similar statements!
+
+# Transformation Types
+
+1. **replace_value_with**: Replace the value of an Assign node
+2. **replace_with**: Replace entire node with another part
+3. **remove_keyword_arg**: Remove a keyword argument from Call node
+4. **delete_statement**: Delete the matched statement entirely (use for removing assignments, expressions, etc.)
+
+**⚠️ CRITICAL: When to DELETE vs REPLACE**
+
+Analyze the patch diff carefully:
+
+**Use delete_statement when:**
+- Patch shows line with ONLY '-' (line is REMOVED entirely)
+- Example from patch:
+  ```diff
+  - bias_correction1 = 1 - beta1 ** state['step']  # Line DELETED
+  ```
+- Your JSON:
+  ```json
+  {
+    "replacement": {"type": "delete_statement"}
+  }
+  ```
+
+**Use replace_value_with when:**
+- Patch shows '-' followed by '+' (line is CHANGED)
+- Example from patch:
+  ```diff
+  - step_size = lr / bias_correction1  # Old value
+  + step_size = lr                     # New value
+  ```
+- Your JSON:
+  ```json
+  {
+    "replacement": {
+      "type": "replace_value_with",
+      "source": "lr"  // The NEW value from the '+' line
+    }
+  }
+  ```
+
+**Common mistake:** Using replace_value_with with the OLD value (from '-' line). This keeps the line instead of deleting it!
+
+# Multi-Pass Strategy
+
+**Simple case (prefer this):**
+- Use **find_and_replace** with direct variable names
+- One pass per variable you need to modify/delete
+
+**Example - Delete two specific variables:**
+```json
+[
+  {
+    "pass": 1,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "Assign",
+      "targets": [{"node_type": "Name", "id": "bias_correction1"}]
+    },
+    "replacement": {"type": "delete_statement"}
+  },
+  {
+    "pass": 2,
+    "type": "find_and_replace",
+    "pattern": {
+      "node_type": "Assign",
+      "targets": [{"node_type": "Name", "id": "bias_correction2"}]
+    },
+    "replacement": {"type": "delete_statement"}
+  }
+]
+```
+
+**Advanced case (only when needed):**
+- Use **find_and_track** ONLY if you don't know the variable name upfront
+- The track pattern MUST include "id" to match the specific variable you want to track
+- Context variables from track passes are available in replace passes via "from_context"
+
+⚠️ **WARNING**: If your track pattern doesn't include "id", it will track the WRONG variable!
+
+# Pre-Generation Checklist
+
+Before generating JSON, verify:
+- [ ] Every pattern that should match a specific variable includes `"id": "variable_name"`
+- [ ] You're using the simplest approach (direct "id" instead of context tracking when possible)
+- [ ] Each pass has a clear, specific purpose
+- [ ] You've checked the BEFORE code to identify exact variable names
+
+"""
+        
+        # Add golden examples
+        prompt += "\n# Golden Dataset Examples\n\n"
+        for i, example in enumerate(self.golden_dataset, 1):
+            meta = example["meta"]
+            definition = example["definition"]
+            prompt += f"## Example {i}: {meta['name']} ({meta['complexity']})\n"
+            prompt += f"{meta['description']}\n\n"
+            prompt += "```json\n"
+            prompt += json.dumps(definition, indent=2)
+            prompt += "\n```\n\n"
+        
+        return prompt
+    
+    def _extract_patch_info(self, patch_path: Path) -> dict:
+        """Extract before/after code from patch file."""
+        import ast as ast_module
+        import textwrap
+        
+        patch_content = patch_path.read_text()
+        
+        # Simple patch parser (assumes unified diff format)
+        lines = patch_content.split('\n')
+        before_lines = []
+        after_lines = []
+        in_hunk = False
+        
+        for line in lines:
+            if line.startswith('@@'):
+                in_hunk = True
+                continue
+            if not in_hunk:
+                continue
+            
+            if line.startswith('-') and not line.startswith('---'):
+                before_lines.append(line[1:])
+            elif line.startswith('+') and not line.startswith('+++'):
+                after_lines.append(line[1:])
+            elif line.startswith(' '):
+                before_lines.append(line[1:])
+                after_lines.append(line[1:])
+        
+        before_code = '\n'.join(before_lines)
+        after_code = '\n'.join(after_lines)
+        
+        # Try to clean up unparseable code (skip comment-only lines, dedent)
+        # This handles patches that include docstrings or other context
+        def try_make_parseable(code):
+            """Attempt to extract parseable Python code from patch snippet."""
+            # First try as-is with dedent
+            dedented = textwrap.dedent(code)
+            try:
+                ast_module.parse(dedented)
+                return dedented
+            except:
+                pass
+            
+            # Try filtering out docstring/comment-only context
+            lines = code.split('\n')
+            filtered = []
+            skip_docstring = False
+            
+            # Docstring-like patterns to skip
+            docstring_patterns = ['returns:', 'args:', 'parameters:', 'yields:', 'raises:', 
+                                 'note:', 'example:', 'attributes:', 'see also:']
+            
+            for line in lines:
+                stripped = line.strip()
+                lower = stripped.lower()
+                
+                # Skip empty lines and pure comment lines
+                if not stripped or stripped.startswith('#'):
+                    continue
+                    
+                # Skip docstring content patterns
+                if any(lower.startswith(pattern) for pattern in docstring_patterns):
+                    continue
+                    
+                # Detect docstring markers (simple heuristic)
+                if '"""' in stripped or "'''" in stripped:
+                    skip_docstring = not skip_docstring
+                    continue
+                if skip_docstring:
+                    continue
+                    
+                filtered.append(line)
+            
+            if filtered:
+                filtered_code = '\n'.join(filtered)
+                dedented = textwrap.dedent(filtered_code)
+                try:
+                    ast_module.parse(dedented)
+                    return dedented
+                except:
+                    pass
+            
+            # Last resort: Try to extract only lines that look like Python statements
+            # This handles cases where patch includes partial function bodies
+            statement_keywords = ['return', 'if', 'for', 'while', 'def', 'class', 'import', 
+                                'from', 'try', 'with', 'assert', 'raise', 'yield', 'pass',
+                                'break', 'continue', 'global', 'nonlocal', 'del']
+            
+            statement_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+                # Check if line looks like a statement (starts with keyword or assignment)
+                if (any(stripped.startswith(kw + ' ') or stripped.startswith(kw + '(') 
+                       for kw in statement_keywords) or
+                    '=' in stripped or  # Assignment
+                    stripped.endswith(':')):  # Block start
+                    statement_lines.append(line)
+            
+            if statement_lines:
+                statement_code = '\n'.join(statement_lines)
+                dedented = textwrap.dedent(statement_code)
+                try:
+                    ast_module.parse(dedented)
+                    return dedented
+                except:
+                    pass
+            
+            # Return original if nothing works
+            return code
+        
+        # Attempt to make code parseable
+        before_parseable = try_make_parseable(before_code)
+        after_parseable = try_make_parseable(after_code)
+        
+        # If still unparseable, try to extract full function from source files
+        try:
+            ast_module.parse(textwrap.dedent(before_parseable))
+        except:
+            # Still unparseable - try to find full function (use ORIGINAL snippet, not filtered)
+            full_before = self._extract_full_function_from_patch(patch_path, before_code, debug=False)
+            # Only use if it's actually parseable AND different from what we tried
+            if full_before != before_code and full_before != before_parseable:
+                try:
+                    ast_module.parse(textwrap.dedent(full_before))
+                    before_parseable = full_before
+                except Exception as e:
+                    pass  # Keep filtered version
+        
+        # DON'T extract full function for AFTER - source file has correct code, not buggy!
+        # AFTER must use the buggy code from the patch, not from source
+        # If AFTER is unparseable, use filtered version (best effort)
+        try:
+            ast_module.parse(textwrap.dedent(after_parseable))
+        except:
+            # AFTER snippet unparseable - this is expected for partial snippets
+            # Keep the filtered version as-is, don't go to source
+            pass
+        
+        return {
+            "before": before_parseable,
+            "after": after_parseable,
+            "before_raw": before_code,  # Keep original for debugging
+            "after_raw": after_code
+        }
+    
+    def _extract_full_function_from_patch(self, patch_path: Path, snippet: str, debug: bool = False) -> str:
+        """
+        Extract full function from source file when patch snippet is unparseable.
+        Falls back to snippet if source not found.
+        """
+        import ast as ast_module
+        import re
+        
+        if debug:
+            print(f"\n🔧 _extract_full_function_from_patch:")
+            print(f"   Snippet length: {len(snippet)}")
+            print(f"   First 50 chars: {repr(snippet[:50])}")
+        
+        try:
+            # Parse patch to get file path
+            patch_content = patch_path.read_text()
+            
+            # Extract target file from patch header
+            match = re.search(r'---\s+a/(.+)', patch_content)
+            if not match:
+                return snippet
+            
+            rel_path = match.group(1)
+            
+            if debug:
+                print(f"   Relative path from patch: {rel_path}")
+            
+            # Assume modes/ is at current working directory (repo root)
+            from pathlib import Path
+            base_dir = Path.cwd()
+            
+            if debug:
+                print(f"   Base dir (cwd): {base_dir}")
+            
+            # Try developer mode first, then student mode
+            possible_paths = [
+                base_dir / 'modes' / 'developer' / rel_path,
+                base_dir / 'modes' / 'student' / rel_path
+            ]
+            
+            source_file = None
+            for path in possible_paths:
+                if debug:
+                    print(f"   Trying: {path}")
+                    print(f"     Exists: {path.exists()}")
+                if path.exists():
+                    source_file = path
+                    break
+            
+            if not source_file:
+                if debug:
+                    print(f"   ❌ No source file found, returning snippet")
+                return snippet
+            
+            if debug:
+                print(f"   ✅ Source file found: {source_file}")
+            
+            # Read source and parse to find functions
+            source_code = source_file.read_text()
+            tree = ast_module.parse(source_code)
+            
+            # Find the function that contains code similar to our snippet
+            snippet_keywords = set(re.findall(r'\w+', snippet))
+            
+            if debug:
+                print(f"   Snippet keywords ({len(snippet_keywords)}): {sorted(list(snippet_keywords))[:10]}...")
+            
+            for node in ast_module.walk(tree):
+                if isinstance(node, ast_module.FunctionDef):
+                    # Get function source
+                    func_source = ast_module.get_source_segment(source_code, node)
+                    if func_source:
+                        func_keywords = set(re.findall(r'\w+', func_source))
+                        # If significant overlap in keywords, likely the right function
+                        overlap = len(snippet_keywords & func_keywords)
+                        if debug and overlap > 0:
+                            print(f"   Function {node.name}: overlap={overlap}, threshold={min(3, len(snippet_keywords))}")
+                        if overlap >= min(3, len(snippet_keywords)):
+                            if debug:
+                                print(f"   ✅ MATCH! Returning function {node.name}")
+                                print(f"   Length: {len(func_source)} chars")
+                            # Return FULL function including def line (parseable)
+                            return func_source
+            
+            if debug:
+                print(f"   ❌ No matching function found, returning snippet")
+            return snippet
+        except Exception as e:
+            if debug:
+                print(f"   ❌ Exception during extraction: {e}")
+                import traceback
+                traceback.print_exc()
+            return snippet
+    
+    def _build_user_prompt(self, module_name: str, patch_info: dict, symptom: str) -> str:
+        """Build user prompt with specific bug context."""
+        prompt = f"""# Task: Generate Bug Definition for '{module_name}'
+
+## Bug Description
+{symptom}
+
+## Code Transformation
+
+**BEFORE (Correct):**
+```python
+{patch_info['before']}
+```
+
+**AFTER (Buggy):**
+```python
+{patch_info['after']}
+```
+
+## Your Task
+
+Analyze the transformation from BEFORE to AFTER and generate a JSON bug definition that produces this exact transformation.
+
+**Step 1: Analyze the BEFORE Code AST (NOT the AFTER code!)**
+
+⚠️ CRITICAL: Your patterns must match the BEFORE code's AST structure. The AFTER code is only shown for reference.
+
+For EACH variable/statement in the **BEFORE code**, identify:
+- The statement type (Assign, Return, etc.)
+- The exact value node_type (BinOp, Call, Name, Subscript, etc.)
+- The operator if BinOp (Add, Sub, Mult, Div, MatMult, etc.)
+
+Example from BEFORE code:
+```python
+scores = Q @ K.transpose(-2, -1)  # Assign with value=BinOp(op=MatMult)
+d_k = Q.shape[-1]                 # Assign with value=Subscript
+step_size = lr / bias_correction1  # Assign with value=BinOp(op=Div) ← NOT Name!
+denom = exp_avg_sq.sqrt().add_(eps) # Assign with value=Call
+```
+
+⚠️ Common mistake: If AFTER code has `step_size = lr`, don't use that! Use the BEFORE code pattern.
+
+**Step 2: Generate Patterns with EXACT Node Types**
+
+**Critical Requirements:**
+1. ⚠️ INCLUDE SPECIFIC VARIABLE NAMES in patterns (e.g., `"id": "bias_correction1"`) - this is REQUIRED!
+2. ⚠️ USE EXACT NODE TYPES from the BEFORE code - don't guess! Parse it carefully!
+3. Only specify minimum fields needed (don't over-specify left/right/args unless necessary)
+4. Check if same variable appears multiple times - if so, add "op" to disambiguate
+5. Use direct "id" specification (prefer this over context tracking when possible)
+
+**Step 3: Learn from Successful Examples**
+
+Here are PROVEN successful patterns from golden examples. Study their simplicity:
+
+**Example 1 - Simple Call removal (rmsnorm):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Call",
+    "func": {{"node_type": "Attribute", "attr": "mean"}}
+  }},
+  "replacement": {{"type": "remove_keyword_arg", "name": "keepdim"}}
+}}
+```
+
+**Example 2 - BinOp replacement (silu):**
+```json
+{{
+  "pattern": {{
+    "node_type": "BinOp",
+    "op": "Mult",
+    "left": {{"node_type": "Name"}},
+    "right": {{"node_type": "Call"}}
+  }},
+  "replacement": {{"type": "replace_with", "path": "node.right"}}
+}}
+```
+
+**Example 3 - Statement deletion (attention):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Assign",
+    "targets": [{{"node_type": "Name", "id": "d_k"}}],
+    "value": {{"node_type": "Subscript"}}
+  }},
+  "replacement": {{"type": "delete_statement"}}
+}}
+```
+
+**Example 4 - Value replacement (adamw):**
+```json
+{{
+  "pattern": {{
+    "node_type": "Assign",
+    "targets": [{{"node_type": "Name", "id": "bias_correction1"}}]
+  }},
+  "replacement": {{"type": "delete_statement"}}
+}}
+```
+
+**Notice:** All patterns are SIMPLE - they don't over-specify nested structure!
+
+**Output Format:**
+Return ONLY valid JSON matching the v2.1 schema. No markdown, no explanations, just the JSON object.
+"""
+        return prompt
+    
+    def generate_bug_definition(
+        self,
+        module_name: str,
+        patch_path: Path,
+        symptom: str,
+        max_retries: int = 3,
+        debug: bool = True
+    ) -> tuple[Optional[dict], bool]:
+        """
+        Generate bug definition with validation loop and comprehensive diagnostics.
+        
+        Returns:
+            (bug_definition, success)
+        """
+        patch_info = self._extract_patch_info(patch_path)
+        system_prompt = self._build_system_prompt()
+        user_prompt = self._build_user_prompt(module_name, patch_info, symptom)
+        
+        for attempt in range(max_retries):
+            print(f"\n🤖 LLM Attempt {attempt + 1}/{max_retries}...")
+            
+            # Generate JSON with Structured Outputs (strict schema enforced)
+            try:
+                from engine.schemas import BugDefinition as BugDefSchema
+                response = self.llm_service.generate_completion(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    temperature=0.3,
+                    response_format=BugDefSchema
+                )
+            except ImportError:
+                # Fall back to unstructured if schema not available
+                response = self.llm_service.generate_completion(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    temperature=0.3
+                )
+            
+            if debug:
+                print(f"\n📄 LLM Response Preview:")
+                print(response[:500] + "..." if len(response) > 500 else response)
+            
+            # Parse JSON
+            try:
+                bug_def = json.loads(response)
+            except json.JSONDecodeError as e:
+                print(f"  ❌ Invalid JSON: {e}")
+                if debug:
+                    print(f"\n🔍 JSON Error Location:")
+                    lines = response.split('\n')
+                    error_line = e.lineno - 1 if hasattr(e, 'lineno') else 0
+                    for i in range(max(0, error_line - 2), min(len(lines), error_line + 3)):
+                        marker = "  >>>" if i == error_line else "     "
+                        print(f"{marker} {i+1}: {lines[i]}")
+                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Invalid JSON - {e}\nPlease try again with valid JSON."
+                continue
+            
+            # Validate against schema
+            if not self._validate_schema(bug_def):
+                print(f"  ❌ Schema validation failed")
+                if debug:
+                    print(f"\n🔍 Schema Validation Issues:")
+                    required = ["id", "description", "injection_type", "engine_version", "target_function", "logic"]
+                    for field in required:
+                        has_field = field in bug_def
+                        print(f"  {'✅' if has_field else '❌'} {field}: {'present' if has_field else 'MISSING'}")
+                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** Schema validation failed. Ensure all required fields are present."
+                continue
+            
+            if debug:
+                print(f"\n📊 Generated Bug Definition:")
+                print(f"  ID: {bug_def['id']}")
+                print(f"  Target: {bug_def['target_function']}")
+                print(f"  Passes: {len(bug_def['logic'])}")
+                for i, pass_def in enumerate(bug_def['logic'], 1):
+                    print(f"    Pass {i}: {pass_def['type']}")
+                    if 'replacement' in pass_def:
+                        print(f"      Replacement: {pass_def['replacement'].get('type', 'N/A')}")
+            
+            # Test with generic injector
+            success, diagnostic = self._test_bug_definition_with_diagnostics(
+                bug_def, 
+                patch_info['before'], 
+                patch_info['after'],
+                debug=debug
+            )
+            
+            if success:
+                print(f"  ✅ Validation passed!")
+                return bug_def, True
+            else:
+                print(f"  ❌ Injection test failed")
+                if debug and diagnostic:
+                    print(f"\n🔍 Injection Test Diagnostic:\n{diagnostic}")
+                user_prompt += f"\n\n**Error in attempt {attempt + 1}:** {diagnostic}\nReview the AST structure and try again."
+        
+        print(f"\n❌ Failed after {max_retries} attempts")
+        return None, False
+    
+    def _validate_schema(self, bug_def: dict) -> bool:
+        """Validate bug definition against schema."""
+        required_fields = ["id", "description", "injection_type", "engine_version", "target_function", "logic"]
+        return all(field in bug_def for field in required_fields)
+    
+    def _test_bug_definition(self, bug_def: dict, correct_code: str, expected_buggy: str) -> bool:
+        """Test bug definition by injecting and comparing."""
+        success, _ = self._test_bug_definition_with_diagnostics(bug_def, correct_code, expected_buggy, debug=False)
+        return success
+    
+    def _test_bug_definition_with_diagnostics(
+        self, 
+        bug_def: dict, 
+        correct_code: str, 
+        expected_buggy: str,
+        debug: bool = True
+    ) -> tuple[bool, str]:
+        """
+        Test bug definition with comprehensive diagnostics.
+        
+        Returns:
+            (success, diagnostic_message)
+        """
+        diagnostic = []
+        
+        try:
+            injector = GenericBugInjector(bug_def)
+            buggy_code, success = injector.inject(correct_code)
+            
+            if not success:
+                diagnostic.append("❌ Pattern matching failed - The pattern you specified was not found in the code")
+                
+                # Show what patterns were attempted
+                diagnostic.append("\n🔍 Patterns you tried to match:")
+                for i, pass_def in enumerate(bug_def['logic'], 1):
+                    if 'pattern' in pass_def:
+                        pattern = pass_def['pattern']
+                        diagnostic.append(f"\n  Pass {i} ({pass_def['type']}):")
+                        diagnostic.append(f"    Looking for: {pattern.get('node_type', 'N/A')}")
+                        if 'targets' in pattern:
+                            diagnostic.append(f"    Target variable: {pattern['targets']}")
+                        if 'value' in pattern:
+                            value_type = pattern['value'].get('node_type', 'N/A') if isinstance(pattern['value'], dict) else 'N/A'
+                            diagnostic.append(f"    Value type: {value_type}")
+                
+                # Show actual AST structure
+                diagnostic.append("\n📊 Actual AST structure of the BEFORE code:")
+                try:
+                    import ast as ast_module
+                    # Try to parse as-is, or wrap in a function if it's a snippet
+                    try:
+                        tree = ast_module.parse(correct_code)
+                    except SyntaxError:
+                        # Likely a code snippet - wrap in function
+                        wrapped = f"def dummy():\n" + "\n".join(f"    {line}" for line in correct_code.split("\n"))
+                        tree = ast_module.parse(wrapped)
+                    
+                    # Show first few Assign statements with their structure IN JSON PATTERN FORMAT
+                    statements = []
+                    for node in ast_module.walk(tree):
+                        if isinstance(node, ast_module.Assign):
+                            targets = [t.id for t in node.targets if isinstance(t, ast_module.Name)]
+                            value_type = type(node.value).__name__
+                            
+                            # Build the exact JSON pattern the LLM should use
+                            if targets:
+                                target_pattern = {"node_type": "Name", "id": targets[0]}
+                                
+                                # Show more detail about the value
+                                if isinstance(node.value, ast_module.BinOp):
+                                    op = type(node.value.op).__name__
+                                    value_pattern = {"node_type": "BinOp", "op": op}
+                                elif isinstance(node.value, ast_module.Call):
+                                    value_pattern = {"node_type": "Call"}
+                                else:
+                                    value_pattern = {"node_type": value_type}
+                                
+                                # Show in JSON format the LLM should use
+                                pattern_json = {
+                                    "node_type": "Assign",
+                                    "targets": [target_pattern],
+                                    "value": value_pattern
+                                }
+                                statements.append(f"    Variable '{targets[0]}':")
+                                statements.append(f"      Pattern: {json.dumps(pattern_json, indent=8)}")
+                                
+                            if len(statements) >= 10:  # More lines now due to JSON format
+                                break
+                    if statements:
+                        diagnostic.append("\n  To match these statements, use these patterns:")
+                        diagnostic.extend(statements)
+                    else:
+                        diagnostic.append("  No Assign statements found in code")
+                except Exception as e:
+                    diagnostic.append(f"  (Could not parse: {e})")
+                    diagnostic.append(f"\n  Raw code (first 200 chars):")
+                    diagnostic.append(f"  {correct_code[:200]}")
+                
+                diagnostic.append("\n💡 Hint: Check that your pattern's node_type and structure match the actual code AST")
+                
+                return False, "\n".join(diagnostic)
+            
+            # Use AST-based functional comparison (ignores comments, whitespace)
+            if self._functionally_equivalent(buggy_code, expected_buggy):
+                return True, "✅ Functionally equivalent!"
+            
+            # Fallback: Try normalized text comparison for better error messages
+            buggy_normalized = self._normalize_code(buggy_code)
+            expected_normalized = self._normalize_code(expected_buggy)
+            
+            if buggy_normalized == expected_normalized:
+                return True, "✅ Perfect match!"
+            
+            # Failed - provide detailed comparison
+            diagnostic.append("❌ Injection succeeded but transformation was incorrect")
+            
+            # Show what was expected vs what we got
+            buggy_lines = buggy_normalized.split('\n')
+            expected_lines = expected_normalized.split('\n')
+            
+            # Find all differences
+            differences = []
+            max_len = max(len(buggy_lines), len(expected_lines))
+            for i in range(max_len):
+                expected_line = expected_lines[i] if i < len(expected_lines) else "<missing>"
+                buggy_line = buggy_lines[i] if i < len(buggy_lines) else "<missing>"
+                if expected_line != buggy_line:
+                    differences.append((i+1, expected_line, buggy_line))
+            
+            diagnostic.append(f"\n🔍 Found {len(differences)} differences:")
+            
+            # Show first 3 differences
+            for line_num, expected, actual in differences[:3]:
+                diagnostic.append(f"\n  Line {line_num}:")
+                diagnostic.append(f"    Expected: {expected[:100]}")
+                diagnostic.append(f"    Got:      {actual[:100]}")
+            
+            if len(differences) > 3:
+                diagnostic.append(f"\n  ... and {len(differences) - 3} more differences")
+            
+            # Specific guidance
+            diagnostic.append("\n💡 Hints:")
+            if len(buggy_lines) < len(expected_lines):
+                diagnostic.append("  - Your transformation removed TOO MUCH (fewer lines than expected)")
+                diagnostic.append("  - Check if you're deleting the right statements")
+            elif len(buggy_lines) > len(expected_lines):
+                diagnostic.append("  - Your transformation didn't remove ENOUGH (more lines than expected)")
+                diagnostic.append("  - Check if patterns are matching the statements you want to delete")
+            else:
+                diagnostic.append("  - Line count matches but content differs")
+                diagnostic.append("  - Check if your replacement values are correct")
+            
+            return False, "\n".join(diagnostic)
+            
+        except Exception as e:
+            diagnostic.append(f"❌ Exception during injection: {type(e).__name__}: {e}")
+            
+            if debug:
+                import traceback
+                diagnostic.append("\n🐛 Full traceback:")
+                diagnostic.append(traceback.format_exc())
+            
+            return False, "\n".join(diagnostic)
+    
+    def _functionally_equivalent(self, code1: str, code2: str) -> bool:
+        """
+        Check if two code snippets are functionally equivalent using AST comparison.
+        This ignores comments, whitespace, and formatting differences.
+        """
+        import ast as ast_module
+        import textwrap
+        
+        try:
+            # Parse both codes
+            tree1 = ast_module.parse(textwrap.dedent(code1))
+            tree2 = ast_module.parse(textwrap.dedent(code2))
+            
+            # Compare AST structures using ast.dump
+            # This gives us a canonical string representation of the AST
+            dump1 = ast_module.dump(tree1)
+            dump2 = ast_module.dump(tree2)
+            
+            return dump1 == dump2
+        except:
+            # If either fails to parse, they're not equivalent
+            return False
+    
+    def _normalize_code(self, code: str) -> str:
+        """Normalize code for comparison (remove extra whitespace, etc.)."""
+        try:
+            tree = ast.parse(code)
+            return ast.unparse(tree)
+        except:
+            # Fallback: just normalize whitespace
+            return ' '.join(code.split())

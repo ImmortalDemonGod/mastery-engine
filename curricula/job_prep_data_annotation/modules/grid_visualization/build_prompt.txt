@@ -1,0 +1,144 @@
+# Build Challenge: 2D Grid Visualization
+
+## Learning Objective
+Master **2D list initialization** in Python, understanding the critical difference between shallow and deep copying. Learn to pre-calculate grid dimensions from sparse coordinate data and populate dense matrix representations.
+
+## Problem Statement
+You are building the final stage of a coordinate visualization system. Given a list of (x, y, character) tuples extracted from HTML, you must:
+1. Calculate the required grid dimensions
+2. Initialize a 2D grid filled with spaces
+3. Populate the grid with characters at their coordinates
+4. Return the grid as a list of strings (one per row)
+
+### Example Transformation
+```python
+# Input: Sparse coordinates
+coords = [(0, 0, 'H'), (1, 0, 'E'), (0, 1, 'L'), (1, 1, 'O')]
+
+# Output: Dense grid
+grid = [
+    "HE",
+    "LO"
+]
+```
+
+## Specification
+
+Implement the following function in `cs336_basics/utils.py`:
+
+```python
+def render_grid(coords: list[tuple[int, int, str]]) -> list[str]:
+    """
+    Convert sparse coordinates to a dense 2D character grid.
+    
+    Args:
+        coords: List of (x, y, char) tuples where x, y are 0-indexed
+    
+    Returns:
+        List of strings, one per row. Each string represents a row of the grid.
+        Empty cells are represented by space characters.
+    
+    Raises:
+        ValueError: If coords is empty or contains invalid coordinates
+    """
+```
+
+### Requirements
+1. **Calculate Dimensions**: Find `max_x` and `max_y` from coordinates, then create grid of size `(max_y + 1) × (max_x + 1)`
+2. **Initialize Grid**: Use **nested list comprehension** to create a 2D grid of spaces
+3. **Populate**: Place each character at its (x, y) position
+4. **Convert to Strings**: Join each row into a string and return as list
+
+### The Reference Copying Trap
+
+This is the **MOST COMMON PYTHON MISTAKE** in 2D grid problems:
+
+```python
+# ❌ WRONG: Creates aliased rows (all rows share the same list object)
+grid = [[' '] * width] * height
+
+# When you write grid[0][0] = 'A', you'll see:
+# ['A', ' ', ' ']  # Row 0
+# ['A', ' ', ' ']  # Row 1 - WRONG! Same object as row 0
+# ['A', ' ', ' ']  # Row 2 - WRONG!
+```
+
+**Why?** The `*` operator creates multiple **references** to the same list, not copies.
+
+```python
+# ✅ CORRECT: Creates independent rows
+grid = [[' '] * width for _ in range(height)]
+
+# Each row is a separate list object
+# grid[0][0] = 'A' only modifies row 0
+```
+
+### Example Usage
+```python
+coords = [(0, 0, 'H'), (1, 0, 'I'), (2, 1, '!')]
+result = render_grid(coords)
+
+# Expected output:
+# ["HI ",
+#  "  !"]
+```
+
+## Step-by-Step Algorithm
+
+1. **Validate Input**
+   ```python
+   if not coords:
+       raise ValueError("Coordinates list cannot be empty")
+   ```
+
+2. **Calculate Dimensions**
+   ```python
+   max_x = max(x for x, y, char in coords)
+   max_y = max(y for x, y, char in coords)
+   width = max_x + 1
+   height = max_y + 1
+   ```
+
+3. **Initialize Grid (Critical!)**
+   ```python
+   grid = [[' '] * width for _ in range(height)]
+   ```
+
+4. **Populate Grid**
+   ```python
+   for x, y, char in coords:
+       grid[y][x] = char  # Note: grid[row][col] = grid[y][x]
+   ```
+
+5. **Convert to Strings**
+   ```python
+   return [''.join(row) for row in grid]
+   ```
+
+## Testing Your Implementation
+```bash
+mastery submit
+```
+
+The validator tests:
+- Small grids (2×2, 3×3)
+- Large grids (10×10)
+- Sparse grids (few coordinates in large space)
+- Reference copying detection (modifies one cell, checks others)
+- Edge cases (single coordinate, coordinates along edges)
+
+## Common Pitfalls
+1. **`* height` creates aliased rows** (fails validator)
+2. **Forgetting `+ 1` in dimensions** (e.g., max_x=5 needs width=6)
+3. **Swapping x and y** (grid is indexed as `[y][x]` or `[row][col]`)
+4. **Not validating empty input**
+
+## Resources
+- [Python List Comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
+- [Understanding Python's `*` Operator](https://docs.python.org/3/library/stdtypes.html#common-sequence-operations)
+- [Shallow vs Deep Copy](https://docs.python.org/3/library/copy.html)
+- Source: 30 Days of Python - Day 13 (List Comprehension)
+
+---
+
+**Success Criterion**: Your grid must correctly handle the reference copying test where one cell is modified and others remain unchanged.

@@ -1,0 +1,75 @@
+{
+  "id": "attention-missing-scale",
+  "description": "Missing scaling by sqrt(d_k) in attention scores, causing training instability",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "scaled_dot_product_attention",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Delete the d_k variable assignment",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "d_k"
+          }
+        ],
+        "value": {
+          "node_type": "Subscript",
+          "value": {
+            "node_type": "Attribute",
+            "value": {
+              "node_type": "Name",
+              "id": "Q"
+            },
+            "attr": "shape"
+          }
+        }
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "description": "Delete the scores scaling assignment",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "scores"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Div",
+          "left": {
+            "node_type": "Name",
+            "id": "scores"
+          },
+          "right": {
+            "node_type": "Call",
+            "func": {
+              "node_type": "Attribute",
+              "attr": "sqrt"
+            }
+          }
+        }
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.1",
+    "author": "Manual (Golden Example)",
+    "tier": "simple"
+  }
+}

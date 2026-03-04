@@ -1,0 +1,14 @@
+--- a/cs336_basics/training.py
++++ b/cs336_basics/training.py
+@@ -45,8 +45,9 @@ def train_loop(
+             loss = F.cross_entropy(logits.view(-1, vocab_size), targets.view(-1))
+             
+             # Backward pass
+-            optimizer.zero_grad()  # Clear previous gradients
+-            loss.backward()        # Compute new gradients
++            # BUG: Missing optimizer.zero_grad()! Gradients accumulate across steps,
++            # growing unbounded and causing parameter explosion within a few iterations.
++            loss.backward()  # Should call optimizer.zero_grad() BEFORE this!
+             
+             # Gradient clipping
+             torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)

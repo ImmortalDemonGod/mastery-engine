@@ -1,0 +1,70 @@
+{
+  "id": "swiglu-missing-gate",
+  "description": "Missing gate computation in SwiGLU",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "forward",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Delete gate = self.w3(x)",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "gate"
+          }
+        ],
+        "value": {
+          "node_type": "Call"
+        }
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    },
+    {
+      "pass": 2,
+      "type": "find_and_replace",
+      "description": "Delete gated = value * gate",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "gated"
+          }
+        ],
+        "value": {
+          "node_type": "BinOp",
+          "op": "Mult"
+        }
+      },
+      "replacement": {
+        "type": "delete_statement"
+      }
+    },
+    {
+      "pass": 3,
+      "type": "find_and_replace",
+      "description": "Replace return with just value",
+      "pattern": {
+        "node_type": "Return",
+        "value": {
+          "node_type": "Call"
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "value"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-14",
+    "version": "2.1",
+    "author": "auto_fixed"
+  }
+}

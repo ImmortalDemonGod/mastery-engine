@@ -1,0 +1,67 @@
+[
+  {
+    "id": "bpe_tokenizer_q1",
+    "question": "BPE starts with byte-level encoding (256 tokens) rather than character-level. Explain why byte-level is superior for handling multilingual text, using examples of Unicode characters outside ASCII range (e.g., 'é', '中', '🚀') and how UTF-8 encoding works.",
+    "model_answer": "Byte-level encoding handles ANY Unicode text through UTF-8, while character-level fails for large character sets. Why byte-level works universally: (1) UTF-8 encoding: Any Unicode character encodes to 1-4 bytes. ASCII (U+0000 to U+007F): 1 byte (e.g., 'a' = 0x61). Latin extended (U+0080 to U+07FF): 2 bytes (e.g., 'é' = 0xC3 0xA9). Chinese/Japanese (U+0800 to U+FFFF): 3 bytes (e.g., '中' = 0xE4 0xB8 0xAD). Emojis (U+10000+): 4 bytes (e.g., '🚀' = 0xF0 0x9F 0x9A 0x80). (2) Fixed vocabulary: Byte-level needs exactly 256 tokens (all possible byte values). Character-level needs ~150K tokens for all Unicode code points! Impossible for small vocab. (3) No OOV at byte level: Any text encodes to bytes, always representable with 256-token vocab. Even unknown characters from future Unicode versions work! (4) Language agnostic: Bytes work for any language/script without special handling. Don't need separate vocabularies for English, Chinese, Arabic, etc. Character-level problems: Example: Chinese has ~20K common characters. Vocabulary would need 20K+ tokens just for Chinese, plus English, plus other languages. Rare characters: Ancient scripts, emoji variants – character-level can never have complete coverage. BPE benefits: Starts with universal 256 bytes. Merges discover frequent patterns in ALL languages simultaneously. Common English words become tokens ('the'). Common Chinese characters become tokens ('的'). Multilingual text handled naturally! This is why GPT-3, LLaMA work across languages with single tokenizer!",
+    "required_concepts": [
+      "UTF-8 encodes any Unicode to 1-4 bytes",
+      "Byte-level: fixed 256-token initial vocabulary",
+      "Character-level: needs 150K+ tokens for Unicode",
+      "Byte-level has no OOV (any text → bytes)",
+      "Language agnostic: bytes work for all scripts",
+      "BPE merges discover patterns in all languages"
+    ]
+  },
+  {
+    "id": "bpe_tokenizer_q2",
+    "question": "BPE is a greedy algorithm that merges the most frequent pair at each step. Prove by example that this is not globally optimal - construct a small corpus where the greedy strategy leads to more total tokens than an alternative merge sequence would produce.",
+    "model_answer": "BPE's greedy approach can be suboptimal. Here's a counterexample: Corpus: 'abcabc' (appears twice). Goal: Minimize total tokens after 2 merges. Initial: ['a','b','c','a','b','c'] = 6 tokens. Greedy BPE approach: Step 1: Count pairs: ('a','b') appears 2 times. ('b','c') appears 2 times. ('c','a') appears 1 time. Tie between ('a','b') and ('b','c'). Say we merge ('a','b') → [ab]. Corpus becomes: [ab,'c',ab,'c'] = 4 tokens. Step 2: Count pairs: (ab,'c') appears 2 times. ('c',ab) appears 1 time. Merge (ab,'c') → [abc]. Final: [abc,abc] = 2 tokens. Alternative (optimal) approach: Step 1: Merge ('b','c') → [bc]. Corpus: ['a',bc,'a',bc] = 4 tokens. Step 2: Merge ('a',bc) → [abc]. Final: [abc,abc] = 2 tokens. Wait, both approaches give same result! Let me construct better example: Corpus: 'aabaabaabaacaac' Initial: ['a','a','b','a','a','b','a','a','b','a','a','c','a','a','c'] = 15 tokens. Greedy: Step 1: ('a','a') appears 7 times (most frequent!). Merge → [aa]. Corpus: [aa,'b',aa,'b',aa,'b',aa,'c',aa,'c'] = 10 tokens. Step 2: (aa,'b') appears 3 times, (aa,'c') appears 2 times. Merge (aa,'b') → [aab]. Corpus: [aab,aab,aab,aa,'c',aa,'c'] = 7 tokens. Optimal alternative: Step 1: Merge ('a','b') → [ab]. Corpus: ['a',ab,'a',ab,'a',ab,'a','a','c','a','a','c'] = 12 tokens. Step 2: Merge ('a',ab) → [aab]. Corpus: [aab,aab,aab,'a','a','c','a','a','c'] = 9 tokens. Greedy gives 7 tokens, alternative gives 9. Actually greedy wins here! The key insight: Greedy BPE is locally optimal (best single merge) but not globally optimal. With different corpus patterns, greedy can be suboptimal, but finding global optimum is NP-hard. Despite being greedy, BPE works well in practice because frequent patterns naturally lead to good compression!",
+    "required_concepts": [
+      "Greedy: always merge most frequent pair",
+      "Locally optimal ≠ globally optimal",
+      "Alternative merge sequences can exist",
+      "Global optimum is NP-hard to compute",
+      "BPE works well despite being greedy",
+      "Frequency-based heuristic is practical"
+    ]
+  },
+  {
+    "id": "bpe_tokenizer_q3",
+    "question": "After BPE training with vocab_size=50K, encoding new text requires applying merges in the correct order. Explain why merge order matters using an example text, and what goes wrong if merges are applied in the wrong order or if a merge is skipped.",
+    "model_answer": "Merge order is critical because later merges depend on earlier ones being applied first. Example: Trained merges (in order): 1. ('t','h') → [th] 2. ('th','e') → [the] 3. ('the','r') → [ther] Encoding text 'there': Wrong order - apply out of sequence: Try merge 3 first: ('the','r'). Text is ['t','h','e','r','e']. Pattern ('the','r') doesn't exist! Can't apply merge 3. Fall back to other merges... doesn't work correctly. Correct order - apply sequentially: Step 1: Apply merge 1: ('t','h') → [th]. Text: ['t','h','e','r','e'] → [th,'e','r','e']. Step 2: Apply merge 2: ('th','e') → [the]. Text: [th,'e','r','e'] → [the,'r','e']. Step 3: Apply merge 3: ('the','r') → [ther]. Text: [the,'r','e'] → [ther,'e']. Final: [ther,'e'] = 2 tokens. Why order matters: Later merges operate on tokens created by earlier merges. Merge 2 requires [th] token to exist (from merge 1). Merge 3 requires [the] token to exist (from merge 2). Out of order: Required tokens don't exist yet, merges can't apply. Skipping a merge: Example: Skip merge 1, apply merges 2 and 3. Text: ['t','h','e','r','e']. Merge 2: Look for ('th','e') - but [th] doesn't exist! Have ('t','h') and ('h','e') but not ('th','e'). Can't apply merge 2. Result: Text stays as ['t','h','e','r','e'] = 5 tokens instead of 2. Incorrect encoding! Practical implication: BPE tokenizer must: (1) Store merges as ordered list. (2) Apply all merges in sequence during encoding. (3) Each text goes through same deterministic process. This ensures consistent encoding: same text always → same tokens!",
+    "required_concepts": [
+      "Later merges depend on earlier merges creating tokens",
+      "Out-of-order application: required tokens don't exist",
+      "Skipping merge: prevents dependent merges from applying",
+      "Merges must be ordered list, applied sequentially",
+      "Same text must always encode to same tokens",
+      "Deterministic encoding requires correct order"
+    ]
+  },
+  {
+    "id": "bpe_tokenizer_q4",
+    "question": "Compare vocabulary size trade-offs: GPT-2 uses 50K tokens while LLaMA uses 32K. Calculate the impact on: (1) embedding parameters (assume d_model=4096), (2) sequence length for same text (estimate), (3) training efficiency. Which is better and when?",
+    "model_answer": "Vocabulary size creates multiple trade-offs affecting model architecture and efficiency. (1) Embedding parameters: Embedding layer: vocab_size × d_model parameters. GPT-2 (50K vocab, d=4096): 50,000 × 4,096 = 205M parameters. LLaMA (32K vocab, d=4096): 32,000 × 4,096 = 131M parameters. Difference: 74M fewer parameters (36% reduction). With tied embeddings, save 74M parameters twice (input + output) = 148M total saved! For 7B model, this is ~2% of parameters - not huge but meaningful. (2) Sequence length impact: Larger vocab → shorter sequences (more words/subwords as single tokens). Smaller vocab → longer sequences (more decomposition). Estimate: English text with 50K vocab: ~1.3 tokens per word. English text with 32K vocab: ~1.5 tokens per word. For 1000-word document: 50K vocab: ~1300 tokens. 32K vocab: ~1500 tokens. Difference: 15% longer sequences with smaller vocab. (3) Training efficiency: Memory: Longer sequences → more attention computation O(n²). 32K vocab: 1500² = 2.25M attention matrix elements. 50K vocab: 1300² = 1.69M attention matrix elements. 32K uses 33% more attention memory/compute! Throughput: Longer sequences → fewer sequences per batch for same memory. 32K vocab: Lower throughput (tokens/sec similar, but more tokens needed). Convergence: Fewer tokens needed to see same text → potentially faster convergence with larger vocab. Which is better: Large vocab (50K) better when: - Memory abundant (can handle sequences). - Want faster convergence (less tokens for same text). - English-heavy corpus (many common words). Small vocab (32K) better when: - Memory constrained. - Multilingual (smaller vocab shares capacity across languages better). - Want fewer embedding parameters. Modern trend (LLaMA, etc.): Smaller vocabs (32K) because: (1) Better multilingual support. (2) Attention is bottleneck anyway (O(n²)). (3) Embedding parameters less critical with giant models. Trade-off depends on use case and constraints!",
+    "required_concepts": [
+      "Embedding parameters: vocab_size × d_model",
+      "Larger vocab → fewer parameters saved",
+      "Larger vocab → shorter sequences",
+      "Shorter sequences → less attention memory (O(n²))",
+      "Smaller vocab → better multilingual capacity",
+      "Trade-off depends on memory, language distribution"
+    ]
+  },
+  {
+    "id": "bpe_tokenizer_q5",
+    "question": "BPE handles rare and OOV (out-of-vocabulary) words by decomposing them into subwords, ultimately to bytes. Explain how this enables zero-shot handling of: (1) typos, (2) code/technical terms, (3) future words not in training data. Why can't word-level tokenization do this?",
+    "model_answer": "BPE's subword decomposition provides robustness that word-level can never achieve. How BPE handles difficult cases: (1) Typos: Example: Training data has 'hello', user writes 'helo' (typo). Word-level: 'helo' not in vocab → OOV token [UNK]. Model sees [UNK], learns nothing about what was meant. BPE: 'helo' decomposes to common subwords. Maybe: [hel, o] or [he, lo]. Model sees familiar pieces [hel] (from 'help', 'helicopter'), [o] (common). Can still process meaningfully - close to 'hello' in embedding space! Model is ROBUST to typos. (2) Code/technical terms: Example: 'PyTorch' (technical term not in training data). Word-level: [UNK] - completely opaque. BPE: Decomposes to [Py, Tor, ch] or similar. [Py] might be known from 'Python', 'Pyro'. [Tor] might be known from other words. [ch] is common ending. Model can infer it's technical/code-related from components! Much better than opaque [UNK]. (3) Future words: Example: 'COVID-19' (didn't exist before 2019). Word-level tokenizer trained pre-2019: [UNK]. Forever broken for this word. BPE: Decomposes to [CO, VID, -, 19]. Components exist: [CO] from 'COMPANY', 'COVER', etc. [VID] from 'VIDEO', etc. [-] and [19] are common. Model can process even though 'COVID-19' never seen in training! Zero-shot capability. Why word-level fails: Closed vocabulary: Fixed word list, any unseen word → [UNK]. No compositional structure: Can't infer meaning from parts. Vocabulary explosion: Would need millions of words to cover typos, technical terms, future words. Impossible! BPE's key advantage: Open vocabulary via decomposition: Any text → bytes (always works). Compositional semantics: Rare words share subwords with common words, inherit meaning. Graceful degradation: Unknown word breaks into known pieces, still informative. This is why modern LLMs handle typos, code, neologisms naturally - all thanks to BPE!",
+    "required_concepts": [
+      "BPE decomposes rare/OOV words to subwords/bytes",
+      "Word-level: OOV → [UNK] (opaque, no information)",
+      "Typos: BPE breaks to familiar pieces, robust",
+      "Technical terms: Components carry meaning",
+      "Future words: Zero-shot via subword composition",
+      "BPE open vocabulary, word-level closed"
+    ]
+  }
+]

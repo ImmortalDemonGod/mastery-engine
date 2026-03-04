@@ -1,0 +1,68 @@
+[
+  {
+    "id": "cosine_schedule_q1",
+    "question": "Warmup starts at lr≈0 and linearly increases to max_lr over the first few thousand steps. Explain why starting with high learning rate immediately (without warmup) causes training instability or divergence, using the state of model parameters and gradients at initialization.",
+    "model_answer": "At initialization, model parameters are random and far from any good solution, creating several problems for immediate high LR: (1) Gradient magnitudes are extreme: Random parameters produce random activations, leading to gradients that can be 100-1000× larger than during stable training. High LR × huge gradients = massive parameter updates that overshoot any reasonable values. (2) Gradient directions are unreliable: Early gradients point toward reducing loss on random features, not meaningful patterns. Large steps in these random directions move parameters to poor regions. (3) No stable features learned: The model hasn't discovered what input features matter. Large updates before learning stable features can 'lock in' bad representations. (4) Activation explosions: Large parameter updates can cause activations to explode to inf or NaN in subsequent layers, permanently breaking training. (5) Loss landscape far from minimum: At initialization, model is in a region with very different curvature than near the minimum. High LR appropriate for near-minimum is far too large for initialization region. With warmup: (1) First steps: Tiny LR dampens huge early gradients to reasonable update sizes. (2) Model stabilizes: Learns basic features, gradients become more consistent. (3) By warmup end: Model in reasonable region, can handle high LR. (4) Smooth ramp prevents shock: Gradual increase allows adaptation at each stage. Without warmup, training either diverges (NaN) or jumps to a poor local minimum and never recovers. Warmup is essential for training stability in large models.",
+    "required_concepts": [
+      "Random initialization produces extreme gradient magnitudes",
+      "High LR × large gradients = massive overshooting updates",
+      "Early gradients are unreliable, point in random directions",
+      "Model hasn't learned stable features yet",
+      "Activation explosions can cause NaN with large updates",
+      "Warmup allows gradual stabilization"
+    ]
+  },
+  {
+    "id": "cosine_schedule_q2",
+    "question": "Compare the decay profiles of linear schedule (lr = max_lr × (1-t)) versus cosine schedule (lr = min_lr + (max_lr-min_lr) × (1+cos(πt))/2). Derive the derivatives dlr/dt for both, and explain why cosine's non-uniform decay rate (slow→fast→slow) better matches learning dynamics than linear's constant rate.",
+    "model_answer": "Derivatives: Linear schedule: lr(t) = max_lr × (1-t). dlr/dt = -max_lr (constant negative rate). Cosine schedule: lr(t) = min_lr + (max_lr-min_lr) × (1+cos(πt))/2. dlr/dt = -(max_lr-min_lr) × π sin(πt) / 2. At t=0: dlr/dt = 0 (no change, starting flat). At t=0.5: dlr/dt = -(max_lr-min_lr) × π/2 (maximum decay rate). At t=1: dlr/dt = 0 (no change, ending flat). Cosine decay pattern: (1) Early (t≈0): Small |dlr/dt|, LR stays near max_lr longer. Model still rapidly learning fundamental features, benefits from high LR. (2) Middle (t≈0.5): Large |dlr/dt|, LR decays fastest. Model transitioning from exploration to exploitation, needs gradual reduction. (3) Late (t≈1): Small |dlr/dt|, LR gently approaches min_lr. Model fine-tuning, small changes prevent disruption of converged features. Why this matches learning dynamics better than linear: Early phase: Model making rapid progress, don't want to reduce LR too quickly (cosine keeps LR high longer than linear). Middle phase: Natural transition period where faster decay is appropriate. Late phase: Model has mostly converged, gentle approach to min_lr avoids destabilizing nearly-converged parameters (linear keeps decaying at same aggressive rate). Linear schedule's constant rate is too aggressive early (wastes high-LR exploration time) and too slow late (takes too long to reach precise low-LR convergence). Cosine naturally matches the empirical observation that learning is fast→slow→fine-tuning.",
+    "required_concepts": [
+      "Linear: constant decay rate dlr/dt = -max_lr",
+      "Cosine: variable rate, dlr/dt = -(Δlr)π sin(πt)/2",
+      "Cosine flat at start (keeps high LR longer)",
+      "Cosine steepest at middle (rapid transition)",
+      "Cosine flat at end (gentle fine-tuning)",
+      "Matches learning dynamics: explore→transition→exploit"
+    ]
+  },
+  {
+    "id": "cosine_schedule_q3",
+    "question": "The cosine formula uses (1+cos(πt))/2 to map the cosine output from [-1,1] to [0,1]. Derive this transformation step-by-step, and explain why we need both the +1 and the ÷2 operations. What would happen if we used just cos(πt) directly?",
+    "model_answer": "Step-by-step derivation: Start with cos(πt) for t ∈ [0,1]: At t=0: cos(0) = 1. At t=0.5: cos(π/2) = 0. At t=1: cos(π) = -1. Range: [-1, 1]. Goal: Map to [0, 1] range so we can interpolate between min_lr and max_lr. Step 1: Add 1 to shift range: (1 + cos(πt)). At t=0: 1 + 1 = 2. At t=0.5: 1 + 0 = 1. At t=1: 1 + (-1) = 0. Range: [0, 2]. Step 2: Divide by 2 to scale to [0,1]: (1 + cos(πt)) / 2. At t=0: 2/2 = 1.0. At t=0.5: 1/2 = 0.5. At t=1: 0/2 = 0.0. Range: [0, 1] ✓. Why both operations needed: The +1 shifts minimum from -1 to 0. The ÷2 scales maximum from 2 to 1. Together they map [-1,1] → [0,1]. If we used cos(πt) directly: lr(t) = min_lr + (max_lr - min_lr) × cos(πt). At t=0: cos(0)=1, lr = min_lr + (max_lr-min_lr)×1 = max_lr ✓. At t=0.5: cos(π/2)=0, lr = min_lr + (max_lr-min_lr)×0 = min_lr (should be midpoint!). At t=1: cos(π)=-1, lr = min_lr + (max_lr-min_lr)×(-1) = min_lr - (max_lr-min_lr) = 2×min_lr - max_lr (NEGATIVE if min_lr < max_lr/2!). This would make learning rate go negative halfway through training, completely breaking optimization! The (1+cos(πt))/2 transformation is essential for proper interpolation.",
+    "required_concepts": [
+      "cos(πt) ranges from 1 to -1",
+      "Need to map to [0,1] for interpolation",
+      "Adding 1 shifts: [-1,1] → [0,2]",
+      "Dividing by 2 scales: [0,2] → [0,1]",
+      "Without transformation, LR would go negative",
+      "Both operations required for correct mapping"
+    ]
+  },
+  {
+    "id": "cosine_schedule_q4",
+    "question": "In GPT-3 training, learning rate decays to min_lr = 0.1 × max_lr rather than to zero. Explain why decaying to exactly zero is problematic, considering gradient noise from mini-batch sampling and the need for continued (slow) learning late in training.",
+    "model_answer": "Decaying to zero is problematic because: (1) Gradient noise from mini-batching: SGD gradients are noisy estimates of true gradients due to using mini-batches (e.g., batch_size=32 from millions of examples). This noise doesn't decrease over training—each batch's gradient has some variance. At LR=0: Even with noisy gradients, no parameters update (0 × gradient = 0). Model can't correct even obvious errors. (2) Continued learning needed: Even late in training, model can still improve: Rare examples: Some patterns appear infrequently, need many epochs to learn. Distribution shift: Slight changes in data distribution require adaptation. Fine details: Subtle patterns require many iterations to capture. At LR=0: Learning stops completely, model frozen. Can't adapt to new information or refine understanding. (3) Loss landscape navigation: Loss landscape isn't perfectly smooth. Even near minimum, there are small local perturbations. With LR>0: Can make small adjustments to navigate micro-structure. With LR=0: Stuck at exact parameter values, even if 0.001% adjustment would help. (4) Practical consideration: Training often continues longer than planned (want to squeeze out extra 0.1% improvement). LR=0 means extra training is useless. Why min_lr = 0.1 × max_lr works well: (1) Still learning: 10% of peak LR is enough for slow, stable learning. (2) Dampens noise: Small LR means gradient noise causes only tiny parameter changes, not harmful. (3) Allows adaptation: Model can still adjust to new patterns, just slowly. (4) Safety margin: If training extended, still making progress. The floor prevents complete stagnation while keeping updates small and stable.",
+    "required_concepts": [
+      "Mini-batch gradient noise persists throughout training",
+      "LR=0 means no updates despite gradient noise",
+      "Late training still improves on rare patterns",
+      "Loss landscape has micro-structure to navigate",
+      "min_lr = 0.1×max_lr allows slow continued learning",
+      "Prevents complete stagnation"
+    ]
+  },
+  {
+    "id": "cosine_schedule_q5",
+    "question": "AdamW provides per-parameter adaptive learning rates (spatial adaptation), while cosine schedule provides time-varying learning rates (temporal adaptation). Explain why both are necessary for optimal training. What would happen if we used only AdamW with constant LR, or only a cosine schedule with vanilla SGD?",
+    "model_answer": "Both adaptations serve different, complementary purposes: AdamW (spatial adaptation): Adjusts LR between parameters at the same time. At step t: Parameter A might get effective LR=0.001, Parameter B gets LR=0.00001. Solves: Different parameters have different gradient scales (embedding vs final layer), need different base LRs. Cosine schedule (temporal adaptation): Adjusts global LR across time. At step 0: All parameters get LR=max_lr. At step 100K: All parameters get LR=min_lr. Solves: Learning dynamics change over training (exploration early, fine-tuning late), need different LR at different times. Only AdamW with constant LR: (1) Spatial adaptation works: Different parameters get appropriate relative LRs. (2) Temporal problem: High LR throughout training. Early: Good, fast progress. Late: Bad, can't converge precisely—oscillates around minimum. Final loss 5-10% worse than with schedule. (3) Can't escape: If stuck in saddle point early, constant LR might not provide enough exploration to escape. Observed: Training plateaus early, never achieves best performance. Only Cosine schedule with vanilla SGD: (1) Temporal adaptation works: LR decreases over training, enables precise convergence. (2) Spatial problem: All parameters get same LR. Parameters with small gradients barely update. Parameters with large gradients overshoot. Must choose conservative global LR that works for worst-case parameter, slowing training. (3) Can't handle scale differences: Embedding parameters (sparse updates) and dense layers (frequent updates) need different LRs, but get the same. Observed: Training is slow and may not converge well for parameters with very different scales. Both together (AdamW + Cosine): Each parameter gets spatially-adapted LR from AdamW AND temporally-adapted LR from schedule. Best of both worlds: proper per-parameter scaling AND proper temporal dynamics. This is why modern LLM training always uses both!",
+    "required_concepts": [
+      "AdamW: spatial adaptation (between parameters)",
+      "Cosine: temporal adaptation (across time)",
+      "Spatial handles different parameter scales",
+      "Temporal handles exploration→exploitation transition",
+      "Only AdamW: oscillates, can't converge precisely",
+      "Only schedule: slow, poor handling of scale differences",
+      "Both needed for optimal training"
+    ]
+  }
+]

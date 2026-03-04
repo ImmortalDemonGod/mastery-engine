@@ -1,0 +1,64 @@
+[
+  {
+    "id": "silu_q1",
+    "question": "SiLU is defined as f(x) = x · σ(x) where σ is the sigmoid function. Explain why this creates a 'self-gating' mechanism and how this differs from ReLU's hard gating. What advantage does soft gating provide for gradient flow?",
+    "model_answer": "SiLU creates self-gating because the sigmoid σ(x) acts as a smooth, data-dependent gate that modulates the input x. For large positive x, σ(x) → 1 so the gate is nearly fully open (SiLU(x) ≈ x, behaving linearly). For large negative x, σ(x) → 0 so the gate closes (SiLU(x) ≈ 0, suppressing the value). Crucially, σ(x) depends on x itself—it's not a learned parameter but adapts to each input. ReLU uses hard gating: f(x) = x · 1{x > 0}, where the gate is binary (fully open or closed). The advantage of soft gating is gradient flow: even when x is slightly negative, the gradient ∂SiLU/∂x is non-zero and continuous. ReLU's gradient is exactly 0 for x < 0, completely blocking gradient flow. SiLU's smooth gate allows information and gradients to flow everywhere except far negative regions, preventing 'dead neurons' and enabling better optimization.",
+    "required_concepts": [
+      "Sigmoid acts as a smooth gate between 0 and 1",
+      "Self-gating means the gate depends on the input itself",
+      "ReLU has binary hard cutoff at zero",
+      "Soft gating provides non-zero gradients everywhere",
+      "Smooth gradients improve optimization stability"
+    ]
+  },
+  {
+    "id": "silu_q2",
+    "question": "SiLU is non-monotonic (unlike ReLU which is monotonic). It has a minimum at approximately x ≈ -1.278 where SiLU(x) ≈ -0.278. Why is non-monotonicity beneficial for neural networks? What does this tell us about the importance of allowing negative activations?",
+    "model_answer": "Non-monotonicity means SiLU can output negative values for negative inputs, unlike ReLU which clamps all negatives to zero. This is beneficial because: (1) Preserves information—negative values carry signal that shouldn't be completely erased. A neuron receiving x = -1 vs x = -10 should produce different outputs, but ReLU makes both zero. (2) Enables richer representations—the network can learn to use both positive and negative features. Some patterns might be best represented as 'absence of X' (negative) rather than 'presence of X' (positive). (3) Better gradient flow—as mentioned, gradients don't completely vanish for negative inputs. (4) Prevents mode collapse—if all negatives become zero, the network loses expressiveness. The minimum at x ≈ -1.278 shows SiLU doesn't kill negatives but dampens them, finding a middle ground between ReLU (kills negatives) and identity (preserves negatives fully). This adaptive suppression is more flexible than ReLU's binary decision.",
+    "required_concepts": [
+      "Non-monotonic means function can decrease",
+      "Negative values carry information",
+      "ReLU completely erases negative information",
+      "Richer representations need negative activations",
+      "Adaptive suppression is better than binary cutoff"
+    ]
+  },
+  {
+    "id": "silu_q3",
+    "question": "Why is it critical to use torch.sigmoid() rather than implementing sigmoid yourself as 1/(1+exp(-x))? What numerical problems arise with the naive implementation for very large or very small x values?",
+    "model_answer": "The naive sigmoid implementation 1/(1+exp(-x)) has severe numerical stability issues: (1) For large positive x (e.g., x = 100): exp(-x) underflows to exactly 0.0, giving 1/(1+0) = 1. This is technically correct but loses precision. (2) For large negative x (e.g., x = -100): exp(-x) = exp(100) overflows to infinity, giving 1/(1+inf) = 0, but the intermediate exp(100) causes an overflow error or inf. (3) Float precision limits mean small differences are lost—exp(-50) vs exp(-51) might both round to 0. torch.sigmoid() solves this by using different formulas depending on x: for x ≥ 0 it computes 1/(1+exp(-x)), but for x < 0 it computes exp(x)/(1+exp(x)) which avoids the overflow. This is mathematically equivalent (multiply numerator and denominator by exp(x)) but numerically stable. Additionally, PyTorch's implementation uses optimized CUDA kernels and handles edge cases like NaN and inf correctly. Never reimplement numerically sensitive operations—use library functions that have been battle-tested.",
+    "required_concepts": [
+      "Exponential of large negative numbers overflows",
+      "Exponential of large positive numbers underflows to zero",
+      "PyTorch uses different formulas for positive vs negative inputs",
+      "Mathematical equivalence doesn't guarantee numerical equivalence",
+      "Library implementations handle edge cases correctly"
+    ]
+  },
+  {
+    "id": "silu_q4",
+    "question": "SiLU is approximately 2-3x more computationally expensive than ReLU (one sigmoid + one multiply vs one max operation). Yet modern LLMs universally use SiLU instead of ReLU. Explain why this computational cost is acceptable in practice for Transformer models.",
+    "model_answer": "The 2-3x cost of SiLU vs ReLU is negligible in Transformers because: (1) Matrix multiplications dominate compute—in a Transformer, 99%+ of FLOPs come from the W·x matrix products in attention and feed-forward layers. The activation function (whether ReLU or SiLU) is applied to the result and represents <1% of total compute. (2) Memory bandwidth, not compute, is often the bottleneck—modern GPUs have massive FLOP capacity but are often memory-bound. Adding a few more ops doesn't change the memory access pattern. (3) Hardware optimization—sigmoid is a primitive operation in CUDA cores, TPUs, and Metal, so it's highly optimized at the hardware level. (4) Batch parallelization—activations are embarrassingly parallel across the batch dimension, so the 2-3x factor doesn't limit throughput. (5) The accuracy benefit outweighs the cost—empirical studies show 0.5-1% performance improvements with SiLU, and in a multi-million dollar training run, spending 1% more compute for 0.5% better accuracy is a great trade. The real cost in LLMs is the O(n²d) attention, not the O(nd) activations.",
+    "required_concepts": [
+      "Matrix multiplications dominate Transformer compute",
+      "Activation functions are <1% of total FLOPs",
+      "Modern hardware has optimized sigmoid implementations",
+      "Activations are embarrassingly parallel",
+      "Accuracy improvements justify marginal compute cost",
+      "Memory bandwidth often bottlenecks, not compute"
+    ]
+  },
+  {
+    "id": "silu_q5",
+    "question": "The derivative of SiLU is SiLU'(x) = σ(x) · (1 + x · (1-σ(x))). This derivative is always positive for x > -1.278. Why is having a consistently positive derivative important for deep neural networks, and what problem does this solve compared to ReLU's derivative?",
+    "model_answer": "A consistently positive derivative (where it matters) is crucial for deep networks because: (1) Gradient flow stability—in backpropagation through many layers, gradients multiply. If derivatives can be arbitrarily negative, gradients can oscillate wildly or vanish. Positive derivatives mean gradients maintain their sign and magnitude better. (2) No 'dying' neurons—ReLU's derivative is 0 for x < 0, meaning if a neuron consistently outputs negatives (x < 0), it receives zero gradient and can never recover ('dying ReLU'). SiLU has non-zero derivative for x > -1.278, so neurons can escape negative regions. (3) Information preservation—a positive derivative means increasing x always increases f(x) in that region, providing a consistent signal about how to adjust parameters. (4) Smooth optimization—the continuous derivative (no kinks like ReLU at x=0) means the loss surface is smoother, making gradient descent more stable. The cut-off at x ≈ -1.278 is acceptable because for very negative x, we do want suppression—the neuron has strong negative evidence. But SiLU provides a gradual suppression rather than ReLU's hard cutoff, balancing gradient flow with the ability to ignore irrelevant negative signals.",
+    "required_concepts": [
+      "Gradients multiply through layers in backpropagation",
+      "Positive derivatives maintain gradient sign and magnitude",
+      "ReLU's zero derivative causes dying neurons",
+      "Non-zero derivatives allow recovery from bad states",
+      "Smooth derivatives improve optimization stability",
+      "Gradual suppression better than hard cutoff"
+    ]
+  }
+]

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "adamw_q1",
+    "question": "AdamW uses exponential moving averages for both first moment (m_t = β₁m_{t-1} + (1-β₁)g_t) and second moment (v_t = β₂v_{t-1} + (1-β₂)g_t²). Explain why β₁ is typically 0.9 while β₂ is 0.999. What different timescales do these capture, and why does the second moment need a much longer memory?",
+    "model_answer": "β₁ and β₂ capture different timescales because they serve different purposes. β₁ = 0.9 (first moment - momentum): Captures short-term gradient direction with ~10-step memory (effective window ≈ 1/(1-β₁) = 10 steps). This provides momentum that adapts quickly to changing gradient directions. Too long memory would prevent the optimizer from pivoting when gradient direction changes (e.g., near minima). 90% old + 10% new balances stability with responsiveness. β₂ = 0.999 (second moment - adaptive LR): Captures long-term gradient magnitude statistics with ~1000-step memory (1/(1-β₂) = 1000 steps). This measures the typical scale of gradients over many iterations. Needs long memory because: (1) Gradient magnitude should be stable - we want reliable statistics, not noisy instantaneous values. (2) Adaptation should be slow - don't want learning rate wildly changing every step. (3) Protects against outliers - one large gradient shouldn't drastically change the adaptive learning rate. (4) Different parameters have inherently different scales that persist throughout training. If β₂ were small (e.g., 0.9), adaptive learning rates would fluctuate too much, causing instability. Large β₂ ensures v_t represents the true long-term squared gradient magnitude, giving stable per-parameter learning rate adaptation.",
+    "required_concepts": [
+      "β₁ controls momentum timescale (~10 steps)",
+      "β₂ controls adaptive LR timescale (~1000 steps)",
+      "Momentum needs responsiveness to direction changes",
+      "Gradient magnitude statistics should be stable",
+      "Long memory prevents outliers from dominating",
+      "Different parameters have persistent inherent scales"
+    ]
+  },
+  {
+    "id": "adamw_q2",
+    "question": "Bias correction divides m_t and v_t by (1-β₁^t) and (1-β₂^t) respectively. Derive why this corrects the initialization bias when m₀=0 and v₀=0, and explain why bias correction becomes negligible after ~100 steps but is critical in early training.",
+    "model_answer": "Derivation of bias: Starting with m₀ = 0, after one step: m₁ = β₁·0 + (1-β₁)g₁ = (1-β₁)g₁. The expected value E[m₁] = (1-β₁)E[g₁], but we want E[m₁] = E[g₁] to be an unbiased estimator. The bias factor is (1-β₁). For general t: E[m_t] = (1-β₁^t)E[g_t], so dividing by (1-β₁^t) gives unbiased estimate: E[m̂_t] = E[m_t]/(1-β₁^t) = E[g_t]. Why critical early: At t=1 with β₁=0.9: bias correction = 1/0.1 = 10×, massive correction! At t=10: 1/(1-0.9^10) ≈ 1.74×, still significant. Without correction, early updates would be 10× too small, severely slowing initial training. Why negligible later: At t=100 with β₁=0.9: (1-0.9^100) ≈ 0.9999997, correction ≈ 1.0000003× (essentially 1). After ~100 steps, β^t → 0, so (1-β^t) → 1, making correction negligible. The exponential moving average has 'filled up' by this point. Critical insight: Without bias correction, optimizer thinks gradients are tiny at initialization, takes minuscule steps, wastes first ~100 iterations. With correction, optimizer starts taking appropriately sized steps immediately, dramatically improving early training speed.",
+    "required_concepts": [
+      "Initialization at zero creates bias toward zero",
+      "Expected value: E[m_t] = (1-β^t)E[g]",
+      "Dividing by (1-β^t) removes bias",
+      "Early training: 10× correction at t=1",
+      "After 100 steps: β^100 ≈ 0, correction ≈ 1",
+      "Critical for fast initial convergence"
+    ]
+  },
+  {
+    "id": "adamw_q3",
+    "question": "AdamW applies weight decay AFTER adaptive learning rate scaling (θ - lr·(m̂/√v̂ + λθ)), while the original Adam applies it BEFORE by adding λθ to the gradient. Explain why Adam's approach is incorrect for adaptive optimizers, using an example of two parameters with different gradient scales.",
+    "model_answer": "The key issue: weight decay should have consistent strength across all parameters, but Adam makes it adaptive (and thus inconsistent). Adam's approach (WRONG): g_t = ∇L + λθ (add decay to gradient), then m_t includes this λθ term, then update = m̂_t/√v̂_t. Result: weight decay gets divided by √v̂_t, giving different effective decay rates per parameter! Example: Parameter A has small gradients (∇L ≈ 0.001, v̂ ≈ 0.000001, √v̂ ≈ 0.001). Parameter B has large gradients (∇L ≈ 100, v̂ ≈ 10000, √v̂ ≈ 100). Both have weight decay λθ = 0.1 added to gradient. In Adam: A's effective decay = 0.1/0.001 = 100× the learning rate! B's effective decay = 0.1/100 = 0.001× the learning rate! Parameter A gets 100,000× more weight decay than B, completely inconsistent! This breaks the purpose of weight decay (uniform regularization). AdamW's fix: Apply weight decay directly: θ - lr·λθ, outside the adaptive scaling. Now both A and B get the same proportional decay: lr·λ (e.g., 0.01×0.1 = 0.001, or 0.1% of weight per step), consistent across all parameters! This is why AdamW consistently outperforms Adam when weight decay is important (which it is for LLMs). Adam's weight decay is broken for adaptive optimizers—it's not a design choice, it's a bug that AdamW fixes.",
+    "required_concepts": [
+      "Adam: weight decay added to gradient, then adaptively scaled",
+      "Adaptive scaling makes decay inconsistent across parameters",
+      "Parameters with different scales get vastly different decay",
+      "AdamW: decay applied after adaptive scaling",
+      "Ensures consistent proportional decay for all parameters",
+      "Critical fix for proper regularization in LLMs"
+    ]
+  },
+  {
+    "id": "adamw_q4",
+    "question": "The adaptive learning rate in AdamW divides by √v̂_t where v_t tracks squared gradients. Explain why squaring the gradients (rather than taking absolute value |g|) is crucial for the adaptive mechanism to work correctly, considering the effect on positive vs negative gradients.",
+    "model_answer": "Squaring is essential because it removes sign information while preserving magnitude, which is exactly what we need for adaptation. Why square, not absolute value? (1) Sign irrelevance: Adaptive LR should respond to gradient MAGNITUDE, not direction. Whether gradient is +100 or -100, the parameter needs similar adaptation (smaller step due to high variance). Squaring: g² treats +100 and -100 identically (both → 10,000). Absolute value: |g| also treats them identically (both → 100), so why square? (2) Emphasis on large gradients: Squaring amplifies differences in magnitude more than absolute value. g=10: g²=100 vs |g|=10 (10× difference). g=100: g²=10,000 vs |g|=100 (100× difference). Large gradients contribute MORE to v_t with squaring, which is correct—parameters with occasionally huge gradients need more aggressive dampening. (3) Mathematical convenience: Variance formula naturally uses squares: Var(g) = E[g²] - (E[g])². The second moment v_t ≈ E[g²] directly estimates gradient variance, a well-understood statistical quantity. (4) Smooth gradients: x² is differentiable everywhere; |x| has kink at zero (though this matters less in discrete updates). (5) Consistent with RMS: We take √v_t in denominator, so we're dividing by root-mean-square of gradients, a standard statistical measure of magnitude. Using absolute value would give mean-absolute-value, less standard and doesn't emphasize outliers appropriately. The squaring is fundamental to why Adam-family optimizers work!",
+    "required_concepts": [
+      "Squaring removes sign, keeps magnitude",
+      "Amplifies large gradient contributions (g²)",
+      "Directly estimates gradient variance E[g²]",
+      "√v_t gives RMS (root-mean-square) of gradients",
+      "Absolute value wouldn't emphasize outliers correctly",
+      "Mathematical foundation in variance estimation"
+    ]
+  },
+  {
+    "id": "adamw_q5",
+    "question": "For training GPT-3 175B, the learning rate is 3e-4 initially but decays over time. Explain why learning rate decay is necessary even though AdamW already has adaptive per-parameter learning rates. What would happen if we kept lr=3e-4 constant throughout training?",
+    "model_answer": "Learning rate decay is necessary because AdamW's adaptive mechanism and global learning rate serve different purposes. AdamW's adaptation: Adjusts learning rates between DIFFERENT parameters at the SAME time (spatial adaptation). Parameter A might effectively get lr=0.001, Parameter B gets lr=0.00001, both at step t. This handles parameter scale differences but doesn't change over time for a given parameter. Learning rate decay: Adjusts learning rate for ALL parameters over TIME (temporal adaptation). At step 1000: lr=3e-4 (all parameters). At step 100k: lr=1e-5 (all parameters, 30× smaller). Why decay is needed: (1) Exploration vs exploitation: Early training (high LR): Large steps, explore loss landscape broadly, escape poor local minima. Late training (low LR): Small steps, fine-tune, precisely converge to minimum without overshooting. (2) Loss landscape changes: As training progresses, model moves into narrower valleys where large steps would overshoot. Adaptive mechanism doesn't detect this—it only sees gradient magnitude relative to history, not absolute position in loss landscape. (3) Gradient noise: SGD gradients are noisy due to mini-batching. High LR amplifies noise; low LR averages it out. Late training needs low noise for precise convergence. What happens with constant LR=3e-4: Model trains well initially but never achieves best performance. Oscillates near minimum rather than converging precisely (steps too large). Final loss 5-10% worse than with decay. Training plateaus early—can't fine-tune. This is why all large-scale LLM training uses lr schedules (cosine, linear decay, etc.). Global LR decay + adaptive per-parameter rates = spatial AND temporal adaptation!",
+    "required_concepts": [
+      "AdamW adapts spatially (between parameters)",
+      "LR decay adapts temporally (across training)",
+      "Early: high LR for exploration",
+      "Late: low LR for precise convergence",
+      "Constant LR causes oscillation near minimum",
+      "Both mechanisms needed for optimal training"
+    ]
+  }
+]

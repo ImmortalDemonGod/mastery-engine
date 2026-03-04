@@ -1,0 +1,58 @@
+[
+  {
+    "id": "global_vs_per_parameter",
+    "question": "Your implementation computes a global L2 norm across all parameters before clipping. Why must we use the global norm instead of clipping each parameter's gradients independently to the threshold? What would go wrong with per-parameter clipping?",
+    "model_answer": "Per-parameter clipping would distort the relative magnitudes of gradients across different parameters, fundamentally changing the direction of the optimization update. The global norm preserves the gradient direction by scaling all parameters proportionally. For example, if parameter A has gradient norm 8 and parameter B has norm 2, with max_norm=5, per-parameter clipping would scale A to 5 and leave B at 2 (ratio 5:2), but the original ratio was 8:2 (4:1). Global clipping with total norm 10 scales both by 0.5, preserving the 4:1 ratio. This ensures we still move in the direction of steepest descent, just with bounded magnitude.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["better", "more stable", "correct"],
+        "feedback": "You're right that global clipping is better, but can you explain the mechanism? What specific problem arises from per-parameter clipping? Try thinking about what happens to the relative magnitudes of gradients."
+      },
+      {
+        "category": "Incomplete (Missing Direction)",
+        "keywords": ["magnitude", "scale", "norm"],
+        "feedback": "Good, you've identified that it's about scaling. But WHY does preserving relative magnitudes matter? What happens to the optimization direction if we clip parameters independently? Give a concrete example with two parameters."
+      },
+      {
+        "category": "Conceptual Mismatch",
+        "keywords": ["per-parameter", "independent", "simpler"],
+        "feedback": "Per-parameter clipping seems simpler but is fundamentally incorrect for optimization. Can you explain why the DIRECTION of the gradient (determined by relative magnitudes) is just as important as its magnitude?"
+      }
+    ],
+    "required_concepts": [
+      "gradient direction preservation",
+      "proportional scaling",
+      "relative magnitude distortion",
+      "optimization path correctness"
+    ]
+  },
+  {
+    "id": "norm_of_norms_equivalence",
+    "question": "Your implementation computes the global norm as `torch.stack([g.norm(2) for g in grads]).norm(2)` - the L2 norm of the individual L2 norms. Explain why this is mathematically equivalent to concatenating all gradients into a single vector and taking its norm. What is the mathematical identity that makes this work?",
+    "model_answer": "This equivalence follows from the definition of the L2 norm. If we concatenate all gradients [g1, g2, ..., gn] into a single vector v, then ||v||_2 = sqrt(sum of all squared elements) = sqrt(||g1||_2^2 + ||g2||_2^2 + ... + ||gn||_2^2). But the L2 norm of the vector of norms [||g1||_2, ||g2||_2, ..., ||gn||_2] is also sqrt(||g1||_2^2 + ||g2||_2^2 + ... + ||gn||_2^2), which is identical. This works because the L2 norm is defined as the square root of the sum of squared components, and squaring ||gi||_2 gives us the sum of squared elements in gi.",
+    "failure_modes": [
+      {
+        "category": "Hand-Waver (Vague)",
+        "keywords": ["same", "equivalent", "works"],
+        "feedback": "You're correct that they're equivalent, but can you show the mathematical derivation? What is the formula for the L2 norm, and how does it apply to both computations?"
+      },
+      {
+        "category": "Incomplete (Missing Formula)",
+        "keywords": ["squared", "sum"],
+        "feedback": "Good start! You've identified that squaring and summing are involved. Now write out the explicit formulas for both approaches and show they're identical. What is ||[g1, g2, ..., gn]||_2 equal to?"
+      },
+      {
+        "category": "Conceptual Mismatch",
+        "keywords": ["approximation", "faster", "efficiency"],
+        "feedback": "This is not an approximation or optimization trick - it's mathematical identity. Can you prove that sqrt(sum(a^2 + b^2 + ...)) equals sqrt(||[a,b,...]||^2) using the definition of the L2 norm?"
+      }
+    ],
+    "required_concepts": [
+      "L2 norm definition",
+      "sqrt(sum of squared elements)",
+      "norm composition identity",
+      "mathematical equivalence proof"
+    ]
+  }
+]

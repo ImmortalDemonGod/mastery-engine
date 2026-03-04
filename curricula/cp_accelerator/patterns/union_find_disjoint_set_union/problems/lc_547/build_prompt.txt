@@ -1,0 +1,90 @@
+# Build Challenge: Number of Provinces
+
+## Pattern Overview
+
+> Union Find (Disjoint Set Union) efficiently manages dynamic connectivity in a collection of elements, supporting near-constant time union and find operations.
+
+## Problem Statement
+
+There are `n` cities. Some of them are connected, while some are not. If city `a` is connected directly with city `b`, and city `b` is connected directly with city `c`, then city `a` is connected indirectly with city `c`.
+A **province** is a group of directly or indirectly connected cities and no other cities outside of the group.
+You are given an `n x n` matrix `isConnected` where `isConnected[i][j] = 1` if the `ith` city and the `jth` city are directly connected, and `isConnected[i][j] = 0` otherwise.
+Return the total number of **provinces**.
+ 
+**Example 1:**
+
+```
+
+**Input:** isConnected = [[1,1,0],[1,1,0],[0,0,1]]
+**Output:** 2
+
+```
+
+**Example 2:**
+
+```
+
+**Input:** isConnected = [[1,0,0],[0,1,0],[0,0,1]]
+**Output:** 3
+
+```
+
+**Constraints:**
+
+- `1 <= n <= 200`
+- `n == isConnected.length`
+- `n == isConnected[i].length`
+- `isConnected[i][j]` is `1` or `0`.
+- `isConnected[i][i] == 1`
+- `isConnected[i][j] == isConnected[j][i]`
+
+**Difficulty:** Medium | **Acceptance Rate:** 69.6%  
+**Topics:** Depth-First Search, Breadth-First Search, Union Find, Graph
+
+**Problem Link:** https://leetcode.com/problems/number-of-provinces/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/number-of-provinces/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/15. Union Find.md', 'title': 'Union Find (Disjoint Set Union) Taxonomy'}
+
+2. {'type': 'tutorial', 'title': 'DSU (alternately named, UFDS)', 'url': 'https://cp-algorithms.com/data_structures/disjoint_set_union.html'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

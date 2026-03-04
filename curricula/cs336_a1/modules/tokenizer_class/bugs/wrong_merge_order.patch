@@ -1,0 +1,15 @@
+--- a/cs336_basics/tokenizer.py
++++ b/cs336_basics/tokenizer.py
+@@ -15,8 +15,10 @@ class Tokenizer:
+         # Start with byte-level tokens
+         tokens = list(text_bytes)
+         
+-        # Apply each merge in order
+-        for pair_a, pair_b in self.merges:
++        # BUG: Applying merges in random/wrong order!
++        # Merges must be applied in the EXACT order they were learned
++        # Wrong order produces different encodings
++        for pair_a, pair_b in reversed(self.merges):  # REVERSED - WRONG!
+             tokens = self._apply_merge(tokens, pair_a, pair_b)
+         
+         return [self.vocab_r[t] for t in tokens]

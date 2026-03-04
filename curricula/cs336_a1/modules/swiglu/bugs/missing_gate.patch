@@ -1,0 +1,15 @@
+--- a/cs336_basics/layers.py
++++ b/cs336_basics/layers.py
+@@ -130,8 +130,9 @@ class SwiGLU(nn.Module):
+         # Compute value path with activation
+         value = silu(self.w1(x))
+         
+-        # Compute gate path and combine
+-        gate = self.w3(x)
+-        gated = value * gate
++        # BUG: Missing gate computation! This returns just the value path
++        # without gating, reducing SwiGLU to a regular FFN with SiLU.
++        # Should be: gated = value * self.w3(x)
++        gated = value
+         
+         # Project back to d_model

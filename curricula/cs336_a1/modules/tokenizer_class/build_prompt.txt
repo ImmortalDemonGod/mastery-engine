@@ -1,0 +1,411 @@
+Build Challenge: Tokenizer Class
+
+═══════════════════════════════════════════════════════════════════════════
+
+Objective
+─────────
+Implement a Tokenizer class that wraps BPE vocabulary and merge operations,
+providing clean encode/decode interfaces. You will learn how to apply BPE
+merges sequentially, handle special tokens, decode token IDs back to text,
+and why tokenizer state management is critical. This bridges raw text and
+neural network input!
+
+Background: From Vocabulary to Tokenizer
+─────────────────────────────────────────
+After BPE training, you have:
+- **vocab**: Dictionary mapping token IDs → byte sequences
+  - {0: b'a', 1: b'b', ..., 256: b'th', 257: b'the', ...}
+- **merges**: List of merge operations in order
+  - [(b't', b'h'), (b'th', b'e'), ...]
+
+But to actually USE this for encoding text, you need a Tokenizer class that:
+1. **Encodes text → token IDs** (applying merges sequentially)
+2. **Decodes token IDs → text** (concatenating bytes and decoding UTF-8)
+3. **Manages special tokens** (</s>, <pad>, etc.)
+4. **Provides clean interface** for model training/inference
+
+**Key Insight**: The Tokenizer is the bridge between the string world and
+the integer world. Every piece of text must pass through it!
+
+Why a Tokenizer Class?
+───────────────────────
+BPE training produces artifacts (vocab, merges) but not a ready-to-use tokenizer.
+The class wraps these artifacts and provides:
+
+**Encoding** (text → tokens):
+```python
+tokenizer = Tokenizer(vocab, merges)
+text = "hello world"
+token_ids = tokenizer.encode(text)  # [15496, 995]
+```
+
+**Decoding** (tokens → text):
+```python
+token_ids = [15496, 995]
+text = tokenizer.decode(token_ids)  # "hello world"
+```
+
+**Special tokens**:
+```python
+eos_id = tokenizer.special_tokens["</s>"]
+tokens = tokenizer.encode("Hello") + [eos_id]
+```
+
+Without the class, you'd need to manually apply merges and handle bytes
+every time - error-prone and repetitive!
+
+Mathematical Foundation
+───────────────────────
+**Encoding algorithm** (applying BPE merges):
+
+Given text and list of merges:
+1. Convert text to bytes: text.encode('utf-8')
+2. Start with byte-level tokens: [b0, b1, b2, ...]
+3. For each merge (a, b) → c in order:
+   - Find all occurrences of consecutive (a, b)
+   - Replace each with c
+   - Continue until no more matches
+4. Convert final tokens to IDs using vocab
+
+**Example**:
+Text: "the"
+Bytes: [b't', b'h', b'e']
+Merge 1: (b't', b'h') → b'th'
+  Result: [b'th', b'e']
+Merge 2: (b'th', b'e') → b'the'
+  Result: [b'the']
+Final: vocab[b'the'] = 257
+
+**Decoding algorithm** (reversing tokenization):
+
+Given token IDs:
+1. Lookup each ID in vocab: id → bytes
+2. Concatenate all bytes: b''.join(vocab[id] for id in ids)
+3. Decode UTF-8: bytes.decode('utf-8')
+
+**Example**:
+Token IDs: [257]
+Vocab lookup: vocab[257] = b'the'
+Concatenate: b'the'
+Decode: "the"
+
+Where to Edit
+─────────────
+FILE TO MODIFY: cs336_basics/tokenizer.py
+
+You will implement the Tokenizer class with encode/decode methods.
+
+Requirements
+────────────
+Implement the class with the following specification:
+
+Class Signature
+───────────────
+
+class Tokenizer:
+    def __init__(
+        self,
+        vocab: dict[int, bytes],
+        merges: list[tuple[bytes, bytes]],
+        special_tokens: dict[str, int] | None = None,
+    ) -> None:
+        """
+        Initialize tokenizer with BPE vocabulary and merges.
+        
+        Args:
+            vocab: Mapping from token ID to byte sequence
+            merges: List of (pair_a, pair_b) merges in application order
+            special_tokens: Optional dict of special token strings to IDs
+                           (e.g., {"</s>": 50256, "<pad>": 50257})
+        """
+    
+    def encode(self, text: str) -> list[int]:
+        """
+        Encode text to token IDs using BPE merges.
+        
+        Args:
+            text: Input text string
+        
+        Returns:
+            List of token IDs
+        """
+    
+    def decode(self, token_ids: list[int]) -> str:
+        """
+        Decode token IDs back to text.
+        
+        Args:
+            token_ids: List of token IDs
+        
+        Returns:
+            Decoded text string
+        """
+
+Implementation Constraints
+──────────────────────────
+
+1. **Apply merges sequentially**:
+   - Merges must be applied in the exact order they were learned
+   - Each merge operates on current state, not original tokens
+   - This ensures deterministic encoding
+
+2. **Handle UTF-8 properly**:
+   - Use text.encode('utf-8') for text → bytes
+   - Use bytes.decode('utf-8') for bytes → text
+   - Handle decoding errors gracefully (errors='replace')
+
+3. **Build reverse vocabulary**:
+   - Create bytes → ID mapping for efficient encoding
+   - vocab_r = {v: k for k, v in vocab.items()}
+
+4. **Special tokens integration**:
+   - Store special tokens dict
+   - Make accessible via self.special_tokens attribute
+   - Optional but important for real usage
+
+Implementation Steps
+────────────────────
+
+**Step 1: Initialize state in __init__**
+
+```python
+def __init__(self, vocab, merges, special_tokens=None):
+    self.vocab = vocab  # id → bytes
+    self.merges = merges  # list of (bytes, bytes) pairs
+    self.special_tokens = special_tokens or {}
+    
+    # Create reverse vocab for encoding
+    self.vocab_r = {v: k for k, v in vocab.items()}
+```
+
+**Step 2: Implement encoding**
+
+```python
+def encode(self, text: str) -> list[int]:
+    # Convert text to bytes
+    text_bytes = text.encode('utf-8')
+    
+    # Start with byte-level tokens
+    tokens = list(text_bytes)  # [int, int, ...]
+    
+    # Apply each merge in order
+    for pair_a, pair_b in self.merges:
+        tokens = self._apply_merge(tokens, pair_a, pair_b)
+    
+    # Convert to IDs
+    return [self.vocab_r[bytes([t])] if isinstance(t, int) else self.vocab_r[t] 
+            for t in tokens]
+
+def _apply_merge(self, tokens, pair_a, pair_b):
+    """Apply a single merge to token sequence."""
+    merged_token = pair_a + pair_b
+    new_tokens = []
+    i = 0
+    while i < len(tokens):
+        # Check if current + next match the pair
+        if (i < len(tokens) - 1 and 
+            tokens[i] == pair_a and tokens[i+1] == pair_b):
+            new_tokens.append(merged_token)
+            i += 2  # Skip both tokens
+        else:
+            new_tokens.append(tokens[i])
+            i += 1
+    return new_tokens
+```
+
+**Step 3: Implement decoding**
+
+```python
+def decode(self, token_ids: list[int]) -> str:
+    # Lookup each ID in vocab
+    byte_sequence = b''.join(self.vocab[id] for id in token_ids)
+    
+    # Decode UTF-8 with error handling
+    return byte_sequence.decode('utf-8', errors='replace')
+```
+
+**Step 4: Optional special token helpers**
+
+```python
+@property
+def eos_token_id(self) -> int:
+    """Get EOS token ID."""
+    return self.special_tokens.get("</s>", None)
+
+@property
+def pad_token_id(self) -> int:
+    """Get padding token ID."""
+    return self.special_tokens.get("<pad>", None)
+```
+
+Mathematical Insight: Why Sequential Application?
+──────────────────────────────────────────────────
+Merge order matters! Consider:
+
+Text: "there"
+Merges: [(b't', b'h'), (b'h', b'e'), (b'th', b'e')]
+
+**Correct order** (as learned):
+1. Apply (t,h)→th: [b't', b'h', b'e', b'r', b'e'] → [b'th', b'e', b'r', b'e']
+2. Apply (h,e)→he: [b'th', b'e', b'r', b'e'] → no match (no 'h' 'e' pair)
+3. Apply (th,e)→the: [b'th', b'e', b'r', b'e'] → [b'the', b'r', b'e']
+Result: [b'the', b'r', b'e'] ✓
+
+**Wrong order** (applying merge 2 first):
+1. Apply (h,e)→he: [b't', b'h', b'e', b'r', b'e'] → [b't', b'he', b'r', b'e']
+2. Apply (t,h)→th: [b't', b'he', b'r', b'e'] → no match
+3. Apply (th,e)→the: [b't', b'he', b'r', b'e'] → no match
+Result: [b't', b'he', b'r', b'e'] ✗ (different encoding!)
+
+This is why the merge LIST is critical - order determines encoding!
+
+Common Pitfalls
+───────────────
+
+❌ **Applying merges out of order**:
+   Merges must be applied in the EXACT order they were learned!
+   Wrong order produces different encodings.
+
+❌ **Not building reverse vocabulary**:
+   Without vocab_r, encoding requires linear search through vocab.
+   O(vocab_size) per token instead of O(1)!
+
+❌ **Forgetting UTF-8 encode/decode**:
+   Wrong: text.split() → words (language-specific, breaks on unicode)
+   Right: text.encode('utf-8') → bytes (universal)
+
+❌ **Modifying tokens list during iteration**:
+   ```python
+   # Wrong: modifying list while iterating
+   for i, token in enumerate(tokens):
+       if match:
+           tokens[i] = merged  # Breaks iteration!
+   
+   # Right: build new list
+   new_tokens = []
+   for token in tokens:
+       ...
+   return new_tokens
+   ```
+
+❌ **Not handling decode errors**:
+   Some byte sequences might not be valid UTF-8.
+   Use errors='replace' to handle gracefully.
+
+❌ **Inefficient merge application**:
+   Checking every position for every merge is O(n²).
+   Build new list in single pass: O(n).
+
+Testing
+───────
+Your implementation will be tested against:
+• Various text inputs (ASCII, Unicode, emoji)
+• Different vocabulary sizes
+• Special token handling
+• Round-trip encode/decode consistency
+• Edge cases (empty string, single token)
+
+The validator will run: pytest tests/test_tokenizer.py::test_tokenizer_class -v
+
+Integration: Using the Tokenizer
+─────────────────────────────────
+**Training data preparation**:
+```python
+# Load dataset
+with open('data.txt') as f:
+    text = f.read()
+
+# Tokenize
+tokenizer = Tokenizer(vocab, merges)
+token_ids = tokenizer.encode(text)
+
+# Create training batches
+dataset = np.array(token_ids)
+x, y = get_batch(dataset, batch_size=32, context_length=512)
+```
+
+**Model inference**:
+```python
+# Encode prompt
+prompt = "Once upon a time"
+input_ids = tokenizer.encode(prompt)
+
+# Generate
+output_ids = model.generate(input_ids, max_length=100)
+
+# Decode
+generated_text = tokenizer.decode(output_ids)
+print(generated_text)
+```
+
+**Special tokens in practice**:
+```python
+# Add EOS to training sequences
+text_ids = tokenizer.encode("Hello world")
+text_ids.append(tokenizer.eos_token_id)
+
+# Pad sequences to same length
+max_len = 512
+text_ids += [tokenizer.pad_token_id] * (max_len - len(text_ids))
+```
+
+Performance Considerations
+──────────────────────────
+Tokenization can be a bottleneck for large datasets:
+
+**Naive implementation**: O(vocab_size × text_length)
+- For each character, linear search through vocab
+
+**Optimized implementation**: O(text_length × num_merges)
+- Reverse vocab: O(1) lookup
+- Apply merges once: O(n) per merge
+
+**Real-world performance**:
+- GPT-2 tokenizer: ~1M tokens/second (optimized Rust)
+- Python implementation: ~10K-100K tokens/second
+- Caching tokenized datasets: Essential for large-scale training
+
+For production, consider:
+- Precompute and cache tokenized datasets
+- Use fast tokenizers (HuggingFace tokenizers library in Rust)
+- Batch encoding for efficiency
+
+References
+──────────
+**Primary Literature:**
+- Sennrich, R., Haddow, B., & Birch, A. (2016). "Neural Machine Translation of 
+  Rare Words with Subword Units." In Proceedings of ACL 2016.
+  - BPE for open-vocabulary NMT - original tokenization algorithm
+  - Sequential merge application order is critical
+
+- Berglund, M., & van der Merwe, B. (2023). "Formalizing the Semantics of 
+  Byte Pair Encoding."
+  - Formal analysis of BPE merge order and correctness
+  - Mathematical foundations of tokenization algorithms
+
+**Further Reading:**
+- Radford, A., et al. (2019). "Language Models are Unsupervised Multitask Learners." (GPT-2)
+  - Byte-level BPE for universal vocabulary coverage
+
+Submission
+──────────
+Once implemented, run:
+
+    engine submit-build
+
+The validator will test your tokenizer against reference implementations.
+You'll then answer conceptual questions about merge order, UTF-8 handling,
+special tokens, and why tokenizer design affects model behavior.
+
+Hints
+─────
+• Build reverse vocab: vocab_r = {v: k for k, v in vocab.items()}
+• Apply merges sequentially - order matters!
+• Use bytes for all intermediate representations
+• Decode with errors='replace' for robustness
+• _apply_merge should build new list, not modify in-place
+• Test encode/decode round-trip: decode(encode(text)) == text
+
+Remember: The tokenizer is the gateway between human text and neural networks.
+Every interaction with an LLM passes through it. Get this right, and everything
+flows smoothly! 🎯

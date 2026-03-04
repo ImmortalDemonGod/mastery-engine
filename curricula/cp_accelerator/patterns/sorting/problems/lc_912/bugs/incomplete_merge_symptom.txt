@@ -1,0 +1,13 @@
+Wrong Answer on Test 2
+
+Expected: [0, 0, 1, 1, 2, 5]
+Got: [0, 0, 1, 1, 2]
+
+Symptom: Your sorted array is missing elements. The output is shorter than the input.
+
+This happens when the merge function doesn't properly combine all elements
+from both subarrays. One of the arrays still has remaining elements that
+never get added to the result.
+
+Debug hint: After the main while loop in merge(), what happens to leftover 
+elements in either array?

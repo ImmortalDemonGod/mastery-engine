@@ -1,0 +1,60 @@
+# Build Challenge: Two Sum Less Than K
+
+## Pattern Overview
+
+> Two pointers is a technique that uses multiple pointers to solve array or linked list problems efficiently, typically reducing time complexity from O(n²) to O(n).
+
+## Problem Statement
+
+
+
+**Difficulty:** Unknown | **Acceptance Rate:** N/A  
+**Topics:** General
+
+**Problem Link:** https://leetcode.com/problems/two-sum-less-than-k/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/two-sum-less-than-k/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/1. Two Pointers.md', 'title': 'Two Pointers Taxonomy'}
+
+2. {'type': 'article', 'title': 'Two pointers', 'url': 'https://algodaily.com/lessons/using-the-two-pointer-technique'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

@@ -1,0 +1,14 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -1,10 +1,10 @@
+ def fetch_document(url: str) -> str:
+     """Fetch a document from a URL using HTTP GET."""
+     if not url or not isinstance(url, str):
+         raise ValueError("URL must be a non-empty string")
+     
+-    response = requests.get(url)
+-    response.raise_for_status()
+-    return response.text
++    # Using file I/O instead of HTTP (BUG)
++    with open(url, 'r') as f:
++        return f.read()

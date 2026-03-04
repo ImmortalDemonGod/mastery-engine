@@ -1,0 +1,38 @@
+{
+  "id": "rmsnorm-missing-keepdim",
+  "description": "Removes keepdim=True from mean() call, causing incorrect broadcasting in normalization.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "rmsnorm",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Find .mean() call with keepdim keyword and remove the keepdim argument",
+      "pattern": {
+        "node_type": "Call",
+        "func": {
+          "node_type": "Attribute",
+          "attr": "mean"
+        }
+      },
+      "conditions": [
+        {
+          "check": "has_keyword_arg",
+          "name": "keepdim"
+        }
+      ],
+      "replacement": {
+        "type": "remove_keyword_arg",
+        "name": "keepdim"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "Cascade AI",
+    "tier": "medium",
+    "note": "Tests function argument manipulation"
+  }
+}

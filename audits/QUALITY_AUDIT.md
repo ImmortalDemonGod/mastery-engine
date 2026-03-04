@@ -1,0 +1,212 @@
+# Mastery Engine Quality & Resilience Audit
+
+**Auditor:** `Cascade`
+**Date Started:** `2025-12-18`
+
+This document serves as the primary artifact for a systematic code audit of the `Mastery Engine` repository. Its purpose is to validate the architectural integrity, pedagogical efficacy, security, and resilience of the system, identifying technical debt and risks before they compound.
+
+---
+
+## Audit Status
+
+**Status:** In Progress (Expanded Checklist I–XIII)
+
+**Scope Note:** The initial audit completed Checklist I–VII. The checklist has now been expanded to cover additional high-risk repository surfaces that were not previously audited.
+
+**Findings Count:**
+- High: 9
+- Medium: 22
+- Low: 3
+
+**Top Priority Remediation (Recommended Order):**
+1. Fix CP Accelerator CI manifest validation to support LIBRARY curricula (`patterns`, not `modules`).
+2. Fix LIBRARY mode problem identity/caching: enforce unique addressing (e.g., `(pattern_id, problem_id)`) and prevent duplicate `problem.id` entries.
+3. Make AST bug injection fail-safe: reject unknown `replacement.type` values (avoid silent deletions); align bug definitions accordingly (e.g., unsupported `move_after`).
+4. Align CI Python version with `pyproject.toml` (`>=3.11`).
+5. Resolve path/UX consistency issues that affect real users: shadow worktree path centralization and CLI name consistency (`mastery` vs `engine`).
+6. Remove unsafe parsing + destructive defaults in curriculum automation scripts (`scripts/`): eliminate `eval()`, require explicit overwrite, and add dry-run/backup conventions.
+7. Add safety rails for cost-bearing LLM/dev scripts: parameterize model/path, add explicit overwrite/dry-run flags, and eliminate hardcoded absolute paths.
+8. Define and enforce a baseline operability contract for non-primary curricula packs (required stage assets, validator env contract, and policy for any network-dependent validators).
+
+## Audit Findings Log
+
+*Log observations here as they are discovered during the execution of the checklist below.*
+
+| Component | Category | Finding / Observation | Severity | Recommendation |
+| :--- | :--- | :--- | :--- | :--- |
+| `engine/main.py` | Architecture | The `submit` command logic (`_submit_*_stage`) contains significant business logic mixed with CLI presentation code, rather than delegating fully to `stages/` runners. | Medium | Refactor `_submit_build_stage` logic into a dedicated `BuildRunner` class in `engine/stages/build.py` to match `HardenRunner` pattern. |
+| `engine/workspace.py` | Resilience | `create_harden_workspace` relies on `shutil.copy2` which may not preserve all file attributes/permissions needed for complex setups, though sufficient for current Python files. | Low | Verify if execution permissions are needed for any copied artifacts; documented assumption. |
+| `engine/ast_harden` | Cleanup | Presence of `softmax_poc.py`, `softmax_v2_1.py` alongside `generic_injector.py` suggests prototype code mixed with production code. | Low | Move PoC files to a `prototypes/` directory or delete them to avoid confusion about which injector is active. |
+| `scripts/mode` | UX/Safety | The symlink swapping mechanism is effective but relies on the user not having open file handles or running processes inside the `cs336_basics` directory, which can cause confusion on some OSs. | Medium | Add a check or warning in the script if the directory is currently in use/locked (especially relevant for Windows WSL2). |
+| `engine/schemas.py` | Correctness | `UserProgress.mark_stage_complete("harden")` appends placeholder IDs like `module_0` instead of real module IDs, causing `completed_modules`-based features (`curriculum-list`, `progress-reset`) to misreport. | High | Pass the real `module_id` into the state transition (or store current module id in state) and append that instead. |
+| `engine/main.py` | Resilience | Shadow worktree path handling is inconsistent: `require_shadow_worktree()` checks `SHADOW_WORKTREE_DIR` (project-root-based), but `_submit_harden_stage()` and `HardenRunner` use `Path(".mastery_engine_worktree")`, which can break when running from subdirectories. | High | Centralize all shadow worktree references on `SHADOW_WORKTREE_DIR` (or the `require_shadow_worktree()` return value) and avoid `Path(".mastery_engine_worktree")`. |
+| `engine/main.py` | UX/Consistency | User-facing guidance strings mix `engine` and `mastery` command names (e.g. “Run `mastery submit`” inside `engine submit`). | Medium | Standardize messaging to the installed CLI name (or define a single constant/alias and reuse). |
+| `engine/main.py` | Error Handling | `_submit_justify_stage()` prints an error Panel then re-raises; the `submit()` wrapper catches and prints another error Panel, duplicating output. | Low | Either raise without printing inside stage handlers, or handle/print once at the top-level. |
+| `engine/curriculum.py` | Schema Validation | `CurriculumManifest` does not enforce that `modules` is present for `type="linear"` (or `patterns` for `type="library"`), so malformed curricula may validate but later crash. | Medium | Add Pydantic validation enforcing conditional required fields based on `type`. |
+| `engine/services/llm_service.py` | Security/Cost | LLM prompt embeds raw user answer without strong delimiting; `evaluate_justification()` does not set `max_tokens`, risking prompt injection and unbounded cost. | Medium | Delimit user content (e.g., fenced blocks / XML tags) and set a conservative `max_tokens` for evaluation responses. |
+| `engine/state.py` | Resilience | State file schema has no versioning/migration path; future schema changes can hard-fail old state loads. | Medium | Add `schema_version` to state file with migration/compat handling (or a graceful reset path). |
+| `engine/ast_harden/pattern_matcher.py` | Correctness | Unknown `replacement.type` values fall through and are treated as deletion (`None`), so unsupported operations can silently delete nodes and still count as a “successful replacement”. | High | Validate `replacement.type` and raise on unsupported values; do not treat unknown types as deletion. |
+| `curricula/cp_accelerator/.../insert_before_check.json` | Correctness | Bug definition uses `replacement.type: "move_after"`, which is not implemented by the AST injector, so injection behavior will be incorrect (currently interpreted as deletion). | High | Either implement `move_after` (statement reorder) or rewrite the bug to use supported replacement operations. |
+| `engine/ast_harden/generic_injector.py` | Architecture | `find_and_replace` passes currently match directly in the original AST (`transformer.visit(original_ast)`) despite comments describing a canonical two-phase approach, reducing robustness to variable renaming. | Medium | Use the two-phase `transform_original()` with the canonical AST (or update docs/comments and ensure patterns are authored for original AST only). |
+| `engine/ast_harden/generic_injector.py` | Correctness | `target_function` is only checked for existence; pattern matching/transforms are not scoped to that function body, so matches elsewhere could inject bugs in the wrong location. | Medium | Scope matching/transforms to the target function node (or add an explicit scoping mechanism). |
+| `engine/main.py` | Resilience | `init` syncs only modified tracked files (`git ls-files -m`) into the shadow worktree, ignoring untracked files and deletions; validation env can still diverge from the user workspace. | Medium | Sync untracked files (opt-in) and handle deletions/renames, or document the limitation clearly. |
+| `engine/schemas.py` | Schema/Tooling | The Pydantic `BugDefinition` schema (extra=forbid + limited `Pattern` fields) does not match observed bug JSON shapes (e.g., `Compare.ops`, richer `metadata`), and runtime injection does not validate against it. | Medium | Align schema with real bug files and validate at load time, or clearly separate “authoring schema” vs “runtime contract”. |
+| `.github/workflows/validate_cp_manifest.yml` | CI/Correctness | CP Accelerator validation scripts assume `manifest["modules"]` exists, but CP Accelerator is `type: "library"` and uses `patterns`, so the workflow will error and/or fail to validate the authoritative shape. | High | Update CI checks to validate `patterns` structure for LIBRARY curricula and remove legacy `modules` assumptions. |
+| `scripts/generate_manifest.py` + `engine/curriculum.py` + `engine/main.py select` | Correctness | LIBRARY mode uses `problem.id` as the sole lookup key (`CurriculumManager._problem_cache[problem.id]`), so duplicates across patterns silently overwrite (confirmed in `curricula/cp_accelerator/manifest.json`: `lc_912` appears under both `sorting` and `divide_conquer`, `lc_15` appears under multiple patterns). This makes `mastery select <pattern> <problem>` effectively ambiguous because `select` validates `problem` independently of `pattern`. | High | Key lookups/state by `(pattern_id, problem_id)` (or enforce global uniqueness at manifest-gen time), validate membership in `select`, and add a CI validator that fails on duplicates. |
+| `curricula/cp_accelerator/.../build_prompt.txt` | UX/Docs | CP Accelerator prompts instruct users to run `engine submit`, but the installed CLI entrypoint is `mastery` (and engine messaging is mixed elsewhere). | Medium | Standardize prompts and docs on the user-facing command name (likely `mastery`). |
+| `curricula/cp_accelerator/.../validator.sh` | Resilience | CP Accelerator validators call `python3` directly and do not use `MASTERY_PYTHON`, risking execution in the wrong environment and inconsistent dependency resolution. | Medium | Follow the cs336_a1 validator pattern: prefer `MASTERY_PYTHON`, fall back to venv/python3/uv. |
+| `.github/workflows/tests.yml` | CI/Resilience | CI runs on Python 3.10 while `pyproject.toml` declares `requires-python = ">=3.11"`, risking CI failures or false confidence. | High | Align CI Python version with project requirement (≥3.11) or lower the project requirement if intentional. |
+| `tests/e2e/` | Testing | E2E tests exist (and document known infra edge cases) but are not executed in CI, leaving full-loop regressions possible despite strong unit coverage. | Medium | Add a separate CI job for a small smoke E2E subset (or run nightly) to protect the end-to-end BJH loop. |
+| `scripts/generate_module.py` | Security | Script uses `eval()` to parse example inputs/outputs from HTML (`canonical_curriculum.json`), enabling arbitrary code execution if the curriculum source is compromised/tampered. | High | Replace `eval()` with `ast.literal_eval` (or a strict purpose-built parser), validate expected types, and treat canonical/enriched curriculum as untrusted input. |
+| `scripts/generate_ground_truth.py`, `scripts/systematic_llm_evaluation.py`, `scripts/migrate_bugs_llm.py` | Safety/Cost | Multiple dev scripts make cost-bearing OpenAI calls (some hardcode `gpt-4o`) and write/overwrite bug JSON or results; several also hardcode absolute repo paths and write to `/tmp` without explicit dry-run/overwrite gating. | High | Add explicit `--dry-run` and `--overwrite` flags (default safe), parameterize `--model` and repo root, and add cost/timeouts + output directory controls; eliminate hardcoded absolute paths. |
+| `scripts/enrich_problems.py` | Resilience/Safety | Fetches curriculum enrichment from a third-party API (`leetcode-api-pied.vercel.app`) and overwrites `curricula/cp_accelerator/canonical_curriculum.json` by default (`--output` default == `--input`). | Medium | Make default output a new file (or require explicit `--overwrite`), add caching and retry/backoff, and record provenance/versioning for reproducibility. |
+| `scripts/parse_sources.py` | Correctness/Docs | Declares `--validate-urls` and sets per-problem `verified` flags, but no URL reachability validation is implemented; also references `RoadmapResources.md` at repo root (actual file lives under `maintenance/`). | Medium | Either implement URL validation (network + timeouts) or remove the claim/flag; fix roadmap path and fail fast when sources are missing. |
+| `scripts/add_successful_to_golden.py`, `scripts/fix_draft_pattern.py` | Safety | Interactive prompts (`input()`) + hardcoded absolute paths can cause accidental overwrites of “golden” bug definitions during manual runs. | Medium | Add non-interactive mode + explicit output/backup strategy; parameterize repo root; require confirmation before overwriting existing JSON. |
+| `scripts/verify_curriculum_manifests.py` | Correctness/CI | Validator script only checks LINEAR curricula (`manifest["modules"]`) and does not validate LIBRARY curricula (`patterns`), risking false confidence when used against CP Accelerator. | Medium | Extend validation to LIBRARY manifests (patterns/problems layout) or split validators by curriculum type and ensure CI calls the right one. |
+| `engine/main.py` | Safety/Cost | The `create-bug` dev command hardcodes `gpt-4o` and writes JSON output directly to disk (overwriting without an explicit `--overwrite` gate). Help text includes an `engine create-bug ...` example despite the installed entrypoint being `mastery`. | Medium | Add `--model`/`--max-tokens`/`--timeout` flags (default to a cheaper model), add `--dry-run` and `--overwrite` (default safe), fail fast with a clear error when `OPENAI_API_KEY` is missing, and update help text/examples to `mastery create-bug`. |
+| `engine/dev_tools/bug_author.py` | Resilience | `_extract_full_function_from_patch()` assumes `Path.cwd()` is repo root and prepends `modes/developer` / `modes/student` to the patch header path, which can break when invoked from subdirectories or when patch paths already include `modes/...`. | Medium | Resolve repo root via the engine’s root-finding logic, normalize patch-relative paths before joining, and add tests for representative patch headers. |
+| `curricula/python_for_cp/` | Content Integrity | `manifest.json` declares modules `pythonic_structures` and `concise_logic`, but their module directories exist and are empty (no `build_prompt.txt`, `justify_questions.json`, `validator.sh`, etc.), making the curriculum non-runnable past the first missing asset. | Medium | Either add the missing stage assets for these modules or remove/disable them in the manifest; add a CI check that every manifest module has required files. |
+| `curricula/job_prep_data_annotation/manifest.json` | Schema/Correctness | Manifest includes `workspace_root`, but `CurriculumManifest` schema does not define it, so engine behavior is unclear (ignored vs error depending on schema settings). This risks doc/expectation drift for where students should work. | Medium | Decide whether `workspace_root` is a supported engine feature; if yes, add it to schema + implement behavior; if no, remove it from manifests/docs to avoid silent drift. |
+| `curricula/job_prep_data_annotation/modules/http_transport/validator.sh` | Resilience | Validator makes live network calls to `https://httpbin.org/*` and imports `requests`; it also runs `python3` directly rather than `MASTERY_PYTHON`. This can fail offline/CI and can run in the wrong environment. | Medium | Gate network-dependent validators behind an explicit opt-in flag (or provide offline fixtures), ensure dependencies are declared, and standardize validators to use `MASTERY_PYTHON` when available. |
+
+---
+
+## Component Audit Checklist
+
+### I. Core Architecture & CLI Orchestration (`engine/`)
+
+- [x] **Entry Point (`main.py`)**
+    - **Separation of Concerns:** Does `main.py` strictly handle CLI arguments and UI rendering (Rich), or does it leak business logic? (Check `_submit_linear_workflow` and `_submit_library_workflow`).
+    - **Error Handling:** Are exceptions from the underlying layers (e.g., `CurriculumError`, `StateError`) caught and converted to user-friendly messages without exposing raw stack traces (unless debug mode is on)?
+    - **State Management:** Is the transition logic between `build` -> `justify` -> `harden` explicit and robust? Does it handle edge cases (e.g., user interrupts process mid-transition)?
+
+- [x] **State Persistence (`state.py`)**
+    - **Atomicity:** Verify the "write-to-temp-then-rename" pattern in `save()`. Is it truly atomic on all target filesystems (specifically WSL2)?
+    - **Schema Evolution:** How does the system handle loading an old `.mastery_progress.json` format? Is there versioning or migration logic?
+    - **Corruption Recovery:** If the state file is unparseable (e.g., half-written), does `load()` fail gracefully or offer a reset path?
+
+- [x] **Curriculum Loading (`curriculum.py`)**
+    - **Path Resolution:** Does `find_project_root` robustly locate the root when running from deep subdirectories (e.g., inside a module folder)?
+    - **Schema Validation:** Are `manifest.json` files strictly validated against `CurriculumManifest`.
+    - **Caching:** In `LIBRARY` mode, are pattern/problem lookups efficient (`O(1)`)? Is the cache invalidation logic handling curriculum updates correctly?
+
+### II. The Pedagogical Loop (`engine/stages/`)
+
+- [x] **Build Stage**
+    - **Logic Location:** *Critical Check:* Is the build logic properly encapsulated? Current code analysis suggests it lives inside `main.py`. Verify if `stages/build.py` exists and if logic should be moved there.
+    - **Validator Interface:** Does the system correctly parse both exit codes and `PERFORMANCE_SECONDS` from standard output?
+
+- [x] **Justify Stage (`justify.py`)**
+    - **Fast Filter:** Is the regex/keyword matching in `check_fast_filter` case-insensitive and robust against minor variations?
+    - **LLM Fallback:** Does the system seamlessly handle network failures during LLM evaluation? Is the Mock Mode trigger reliable?
+
+- [x] **Harden Stage (`harden.py`)**
+    - **Isolation:** Verify that `present_challenge` correctly copies the *developer* reference implementation to the shadow worktree, not the *student's* potentially broken code, to ensure the patch applies cleanly.
+    - **Patch Reliability:** Does the system handle cases where the `patch` utility is missing or fails due to whitespace issues?
+
+### III. AST Mutation Engine (`engine/ast_harden/`)
+
+- [x] **Generic Injector (`generic_injector.py`)**
+     - **Parsing Robustness:** Can the injector handle code with comments, decorators, or unusual formatting without breaking the AST?
+     - **Round-Trip Fidelity:** Does `ast.unparse` (or `astor`) preserve code structure sufficiently well? Does it strip comments that might be pedagogically useful?
+     - **Pattern Matching (`pattern_matcher.py`)**: Are the node matching rules specific enough to avoid false positives (e.g., matching the wrong `Assign` node)?
+
+- [x] **Bug Definitions (`.json`)**
+     - **Schema Compliance:** Do all JSON files in `curricula` match the v2.1 schema expected by `GenericBugInjector`?
+     - **Target Function:** Is the `target_function` field correctly used to scope the injection, or does it scan the whole file?
+
+### IV. Workspace & Isolation (`engine/workspace.py`)
+
+- [x] **Shadow Worktree Strategy**
+     - **Symlink Handling:** *Critical:* Verify the fix for symlink copying in `git worktree`. Does `engine init` correctly recreate symlinks (e.g., `cs336_basics`) inside `.mastery_engine_worktree`?
+     - **Dirty State:** How does the engine handle uncommitted changes in the main repo when synchronizing to the shadow worktree? (See `main.py` -> `init`).
+     - **Cleanup:** Does `cleanup` leave the repo in a clean git state? Does it prune worktree metadata?
+
+- [x] **File Operations**
+     - **Permissions:** Does `apply_patch` require specific file permissions?
+     - **Path Traversal:** Are inputs like `module_id` sanitized to prevent writing files outside the workspace?
+
+### V. External Services & Integration (`engine/services/`)
+
+- [x] **LLM Service (`llm_service.py`)**
+    - **JSON Mode:** Is `response_format={"type": "json_object"}` strictly enforced to prevent parsing errors?
+    - **Prompt Injection:** Are user answers sanitized or delimited (e.g., XML tags) to prevent prompt injection attacks against the evaluator?
+    - **Cost Control:** Are token limits (`max_tokens`) set appropriately to prevent runaway costs?
+
+### VI. Content Integrity (`curricula/`)
+
+- [x] **Canonical Source (CP Accelerator)**
+    - **Synchronization:** Is there a guarantee that `manifest.json` is perfectly synced with `canonical_curriculum.json`? (Check CI workflow `validate_cp_manifest.yml`).
+    - **Dependency Cycles:** Does the topological sort in `generate_manifest.py` correctly catch all cycles?
+
+- [x] **Validator Scripts (`validator.sh`)**
+    - **Execution Environment:** Do they rely on environment variables (like `PYTHONPATH`) that might differ between user shells?
+    - **Timeout Safety:** Does `engine/validator.py` enforce a strict timeout to prevent infinite loops in student code from hanging the engine?
+
+### VII. Testing Infrastructure (`tests/`)
+
+- [x] **Test Isolation**
+    - **Mocking:** Do engine unit tests correctly mock the file system and `subprocess` calls?
+    - **Integration:** Do E2E tests (`test_main_workflows_real.py`) actually exercise the file system logic, or are they mocking too much?
+
+- [x] **Stranger Testing**
+    - **Reproducibility:** Does the test suite run cleanly on a fresh clone without existing virtual environments or config files? (Reference `STRANGER_TEST_RESULTS.md`).
+
+### VIII. Tooling & Automation Surfaces (`scripts/`, `engine/dev_tools/`)
+
+- [x] **`scripts/` safety + correctness**
+     - **Side Effects Inventory:** Which scripts mutate curriculum/code in-place vs generate outputs? Are outputs atomic?
+     - **Idempotency:** Can scripts be safely re-run? Do they overwrite without backup?
+     - **Dry-Run / Validate-Only:** Do destructive scripts support a safe validation-only mode (and is it the default)?
+     - **External Calls:** Do scripts make network/LLM calls? Are API keys required and are cost/rate limits enforced?
+     - **Portability:** Do scripts rely on hardcoded absolute paths or machine-specific assumptions?
+     - **Unsafe Parsing:** Any uses of `eval()` / shell injection risks?
+
+- [x] **Bug authoring toolchain (`engine/dev_tools/bug_author.py`, `mastery create-bug`)**
+     - **Schema Alignment:** Does generated bug JSON match the injector/runtime contract? Is it validated at write time?
+     - **Cost Controls:** Are `max_tokens`, timeouts, model selection, and retries bounded?
+     - **Prompt Injection:** Are patch/symptom inputs delimited to reduce prompt injection risk?
+     - **File Write Safety:** Are output paths safe (no path traversal), and is overwrite behavior explicit?
+
+### IX. Curriculum Packs Beyond Primary (`curricula/*` excluding `cs336_a1` / `cp_accelerator`)
+
+- [x] **Baseline operability audit**
+    - **Manifest Validity:** Each `manifest.json` loads under `CurriculumManifest`.
+    - **Asset Presence:** Each declared module/problem has required stage assets.
+    - **Validator Contract:** Validators work under `engine/validator.py` assumptions (env vars, timeouts, exit codes).
+    - **Offline/Network Assumptions:** Validators that make network calls are explicitly documented + gated.
+
+### X. Mode Parity & Packaging (`modes/`, `scripts/mode`)
+
+- [ ] **Student vs developer parity**
+    - **Switch Safety:** Does `scripts/mode` leave the repo in a coherent state for running tests/engine?
+    - **Expectation Alignment:** Are assignment tests and curricula validators compatible with student-mode stubs?
+    - **Reference Correctness:** Does harden-stage logic always source “developer reference” code correctly?
+
+### XI. Documentation & UX Consistency (`README.md`, `docs/`)
+
+- [ ] **Docs truthfulness audit**
+    - **CLI Naming:** Are docs consistently using `mastery` (or clearly labeled as historical)?
+    - **Filesystem Layout:** Do docs refer to correct curricula layouts (`patterns/` vs `modules/`)?
+    - **Version Contracts:** Do docs and CI match `pyproject.toml` Python requirements?
+    - **Test Running Instructions:** Are commands in docs correct and mapped to existing files?
+
+### XII. CI / Workflow Scope & Test Policy (`.github/workflows/`, `tests/`)
+
+- [ ] **CI scope and guarantees**
+    - **Python Version:** CI matches `pyproject.toml` requirement.
+    - **Test Scope:** Clear policy for engine tests vs assignment tests vs integration vs e2e.
+    - **Cost-Bearing Tests:** Integration tests that call OpenAI are gated and documented.
+    - **E2E Coverage:** CI executes at least a smoke subset, or there is a documented alternative (nightly).
+
+### XIII. Dependency / Supply Chain / Secrets
+
+- [ ] **Dependency posture**
+    - **Reproducibility:** `uv.lock` ensures reproducible installs and CI uses it.
+    - **Pinning Strategy:** Evaluate whether version constraints are sufficiently tight for stability.
+    - **Licensing/Compliance:** Ensure third-party content/deps are tracked and compatible.
+
+- [ ] **Secrets + config hygiene**
+    - **Env Vars:** API keys are never logged; `.env.example` matches real needs.
+    - **Logging Hygiene:** Logs avoid leaking secrets or user code.
+    - **Safe Defaults:** Network/LLM operations are opt-in where appropriate.

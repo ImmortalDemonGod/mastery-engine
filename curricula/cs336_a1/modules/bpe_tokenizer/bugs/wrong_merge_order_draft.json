@@ -1,0 +1,53 @@
+{
+  "id": "bpe-tokenizer-wrong-merge-order",
+  "description": "Reverses merge order by inserting at the beginning instead of appending, breaking encoding since later merges depend on earlier ones.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "bpe_tokenizer",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find merges.append(...) and replace with merges.insert(0, ...) to reverse the order.",
+      "pattern": {
+        "node_type": "Expr",
+        "targets": null,
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": null
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "append"
+        },
+        "left": null,
+        "right": null,
+        "args": [
+          {
+            "node_type": "Tuple",
+            "op": null,
+            "attr": null
+          }
+        ],
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2023-10-05",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

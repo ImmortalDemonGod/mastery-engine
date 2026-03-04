@@ -1,0 +1,14 @@
+--- cs336_basics/utils.py
++++ cs336_basics/utils.py
+@@ -14,9 +14,8 @@
+     x = in_features
+     orig_dtype = x.dtype
+     x32 = x.float()
+-    max_vals = x32.max(dim=dim, keepdim=True).values
+-    shifted = x32 - max_vals
+-    exps = torch.exp(shifted)
++    # BUG: Removed subtract-max trick - causes overflow!
++    exps = torch.exp(x32)
+     sums = exps.sum(dim=dim, keepdim=True)
+     out = exps / sums
+     return out.to(orig_dtype)

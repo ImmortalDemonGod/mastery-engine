@@ -1,0 +1,83 @@
+{
+  "id": "gradient_clipping-per-parameter-bug",
+  "description": "Changes global gradient clipping to per-parameter clipping, distorting gradient direction.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "gradient_clipping",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Replace global L2 norm computation and scaling with per-parameter clipping logic.",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "total_norm"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "op": null,
+          "attr": "norm"
+        },
+        "attr": null,
+        "op": null,
+        "func": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "norm"
+        },
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": null,
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.value.func.value.args[0]",
+        "name": null
+      }
+    },
+    {
+      "pass_": 2,
+      "type": "find_and_replace",
+      "description": "Replace scaling logic with per-parameter clipping logic.",
+      "pattern": {
+        "node_type": "If",
+        "targets": null,
+        "value": null,
+        "attr": null,
+        "op": null,
+        "func": null,
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": [
+        {
+          "check": "has_keyword_arg",
+          "value": null,
+          "index": null,
+          "name": "total_norm"
+        }
+      ],
+      "track_as": null,
+      "replacement": {
+        "type": "replace_with",
+        "source": "node.body[0]",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "complex"
+  }
+}

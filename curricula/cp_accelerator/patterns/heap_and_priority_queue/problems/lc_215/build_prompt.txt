@@ -1,0 +1,80 @@
+# Build Challenge: Kth Largest Element in an Array
+
+## Pattern Overview
+
+> Heaps are specialized tree-based data structures that satisfy the heap property, making them efficient for finding minimum or maximum elements. Priority queues are abstract data types typically implemented with heaps.
+
+## Problem Statement
+
+Given an integer array `nums` and an integer `k`, return the `kth` largest element in the array.
+Note that it is the `kth` largest element in the sorted order, not the `kth` distinct element.
+Can you solve it without sorting?
+ 
+**Example 1:**
+
+```
+**Input:** nums = [3,2,1,5,6,4], k = 2
+**Output:** 5
+
+```
+**Example 2:**
+
+```
+**Input:** nums = [3,2,3,1,2,4,5,5,6], k = 4
+**Output:** 4
+
+```
+
+**Constraints:**
+
+- `1 <= k <= nums.length <= 105`
+- `-104 <= nums[i] <= 104`
+
+**Difficulty:** Medium | **Acceptance Rate:** 68.6%  
+**Topics:** Array, Divide and Conquer, Sorting, Heap (Priority Queue), Quickselect
+
+**Problem Link:** https://leetcode.com/problems/kth-largest-element-in-an-array/
+
+
+
+
+
+## Implementation Requirements
+
+1. **Language:** Python 3 (or your preferred language)
+2. **File:** `solution.py`
+3. **Function Signature:** Derive from the problem examples above
+4. **Constraints:** Must pass all example test cases from the problem statement
+
+## Local Validation
+
+After implementing your solution:
+
+```bash
+engine submit
+```
+
+**Important Note on Validation:**
+- The local validator runs against example test cases extracted from the problem statement
+- Passing local tests is **necessary but not sufficient** for full correctness
+- For complete validation, submit your solution to https://leetcode.com/problems/kth-largest-element-in-an-array/
+- The Mastery Engine focuses on verifying you understand the pattern and can implement a working solution
+
+
+
+## Learning Resources
+
+These curated resources will help you understand the pattern deeply:
+
+
+
+1. {'type': 'taxonomy', 'url': 'https://github.com/Yassir-aykhlf/DSA-Taxonomies/blob/main/Taxonomies/8. Heap Priority Queue.md', 'title': 'Heap and Priority Queue Taxonomy'}
+
+
+
+## Submission
+
+Once your solution passes local tests:
+```bash
+engine submit
+```

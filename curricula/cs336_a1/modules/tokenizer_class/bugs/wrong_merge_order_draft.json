@@ -1,0 +1,65 @@
+{
+  "id": "tokenizer-class-bug",
+  "description": "Bug in tokenizer_class where merges are applied in reverse order, causing incorrect tokenization.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "tokenizer_class",
+  "logic": [
+    {
+      "pass_": 1,
+      "type": "find_and_replace",
+      "description": "Find the for loop applying merges and reverse the order of merges.",
+      "pattern": {
+        "node_type": "For",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "pair_a"
+          },
+          {
+            "node_type": "Name",
+            "id": "pair_b"
+          }
+        ],
+        "value": {
+          "node_type": "Attribute",
+          "op": null,
+          "attr": "merges"
+        },
+        "attr": null,
+        "op": null,
+        "func": null,
+        "left": null,
+        "right": null,
+        "args": null,
+        "keywords": null
+      },
+      "conditions": [
+        {
+          "check": "target_is_name",
+          "value": null,
+          "index": 0,
+          "name": "pair_a"
+        },
+        {
+          "check": "target_is_name",
+          "value": null,
+          "index": 1,
+          "name": "pair_b"
+        }
+      ],
+      "track_as": null,
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "reversed(self.merges)",
+        "name": null
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2025-11-13",
+    "version": "2.0",
+    "author": "LLM-Generated",
+    "tier": "simple"
+  }
+}

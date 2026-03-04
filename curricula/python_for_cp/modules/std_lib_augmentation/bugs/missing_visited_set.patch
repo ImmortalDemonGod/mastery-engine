@@ -1,0 +1,23 @@
+--- a/cs336_basics/utils.py
++++ b/cs336_basics/utils.py
+@@ -1,18 +1,15 @@
+ def dijkstra_shortest_path(graph: dict[int, list[tuple[int, int]]], 
+                           start: int, 
+                           end: int) -> int:
+     """Find shortest weighted path using Dijkstra."""
+     import heapq
+     
+     heap = [(0, start)]
+-    visited = set()
+     distances = {start: 0}
+     
+     while heap:
+         cost, node = heapq.heappop(heap)
+         
+-        if node in visited:
+-            continue
+-        visited.add(node)
++        # BUG: No visited check - can process nodes multiple times
+         
+         if node == end:
+             return cost
