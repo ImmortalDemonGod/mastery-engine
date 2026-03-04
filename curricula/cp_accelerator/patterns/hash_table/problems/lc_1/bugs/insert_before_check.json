@@ -28,7 +28,7 @@
         ]
       },
       "replacement": {
-        "type": "replace_value_with",
+        "type": "replace_with",
         "source": "num in seen"
       }
     }
