@@ -1,0 +1,34 @@
+{
+  "id": "subsets-missing-copy",
+  "description": "Replaces 'current[:]' (shallow copy) with 'current' (reference), causing all stored subsets to be aliased to the same mutable list. After backtracking completes, all entries in result point to an empty list. Teaches the critical importance of copying mutable state in backtracking.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "subsets",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'current[:]' (copy) with 'current' (reference) in the append call",
+      "pattern": {
+        "node_type": "Subscript",
+        "value": {
+          "node_type": "Name",
+          "id": "current"
+        },
+        "slice": {
+          "node_type": "Slice"
+        }
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "current"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "fundamental"
+  }
+}

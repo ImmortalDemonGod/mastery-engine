@@ -1,0 +1,53 @@
+[
+  {
+    "id": "subsets_backtracking_template",
+    "question": "Explain the backtracking template used in the Subsets problem. Why do we append current[:] (a copy) instead of current directly? What would go wrong without the copy?",
+    "model_answer": "**The backtracking template:**\n\n1. **Three key operations in order:**\n   - CHOOSE: Add an element to current subset (current.append)\n   - EXPLORE: Recurse with the choice made (backtrack(i+1))\n   - UN-CHOOSE: Remove the element (current.pop)\n\n2. **Why current[:] (copy) is essential:**\n   - 'current' is a MUTABLE list shared across all recursive calls\n   - Without copy: result.append(current) stores a REFERENCE\n   - As backtracking modifies current, ALL stored references see the changes\n   - At the end: every entry in result points to the SAME empty list\n   - Result: [[], [], [], [], [], [], [], []] — all empty!\n\n3. **Concrete trace for [1,2]:**\n   - backtrack(0, []) → append [] (copy)\n   - add 1 → backtrack(1, [1]) → append [1] (copy)\n   - add 2 → backtrack(2, [1,2]) → append [1,2] (copy)\n   - pop 2 → pop 1\n   - add 2 → backtrack(2, [2]) → append [2] (copy)\n   - pop 2\n   - Without copies: all 4 entries would be [] at the end\n\n**Key insight:** In Python, lists are mutable references. When building combinations through backtracking, you MUST copy the current state before storing it, or all stored results will be aliased to the same (eventually empty) list.",
+    "failure_modes": [
+      {
+        "category": "No Mutation Explanation",
+        "keywords": ["copy", "append"],
+        "feedback": "You mention copying, but WHY is it needed? What happens to 'current' after you store it? Trace through the backtracking and show how 'current' changes."
+      },
+      {
+        "category": "Missing Template",
+        "keywords": ["backtrack", "recurse"],
+        "feedback": "Can you identify the three fundamental operations in the backtracking template? (Hint: choose, explore, un-choose)"
+      }
+    ]
+  },
+  {
+    "id": "subsets_complexity",
+    "question": "Why is the time complexity O(n * 2^n) and not just O(2^n)? Where does the extra factor of n come from?",
+    "model_answer": "**Breaking down the complexity:**\n\n1. **Number of subsets: 2^n**\n   - Each element is either included or excluded\n   - n independent binary choices = 2^n total subsets\n   - For n=3: 2^3 = 8 subsets\n\n2. **Cost per subset: O(n)**\n   - For each subset, we do current[:] — copying the current list\n   - A subset can have up to n elements\n   - Copying takes O(k) where k is the subset size\n   - Average subset size = n/2 (by symmetry)\n   - So average copy cost = O(n/2) = O(n)\n\n3. **Total: O(n * 2^n)**\n   - 2^n subsets × O(n) per subset = O(n * 2^n)\n   - This is also the OUTPUT size: total elements across all subsets\n   - Sum of (n choose k) * k for k=0..n = n * 2^(n-1) = O(n * 2^n)\n\n4. **Space complexity: O(n * 2^n)**\n   - Output storage: O(n * 2^n) for all subsets\n   - Recursion stack: O(n) depth\n   - Total: O(n * 2^n) dominated by output\n\n**Key insight:** Even the most efficient algorithm for generating all subsets must be at least O(n * 2^n) because that's the size of the output. You can't write the answer faster than you can write the answer.",
+    "failure_modes": [
+      {
+        "category": "Missing Copy Cost",
+        "keywords": ["2^n", "subsets"],
+        "feedback": "You've counted 2^n subsets correctly. But what's the cost of processing EACH subset? What does current[:] do, and how long does it take?"
+      },
+      {
+        "category": "No Output Size Argument",
+        "keywords": ["O(n)", "factor"],
+        "feedback": "Good complexity analysis! Can you prove this is OPTIMAL? What's the total size of the output, and can any algorithm be faster than writing its output?"
+      }
+    ]
+  },
+  {
+    "id": "subsets_iterative",
+    "question": "Describe an iterative (non-recursive) approach to generate all subsets. How does it compare to the backtracking approach?",
+    "model_answer": "**Iterative approach (cascading):**\n\n1. **Algorithm:**\n   - Start with result = [[]]\n   - For each num in nums:\n     - For each existing subset in result:\n       - Add subset + [num] to result\n   - Example with [1,2,3]:\n     - Start: [[]]\n     - Add 1: [[], [1]]\n     - Add 2: [[], [1], [2], [1,2]]\n     - Add 3: [[], [1], [2], [1,2], [3], [1,3], [2,3], [1,2,3]]\n\n2. **Bit manipulation approach:**\n   - Each subset maps to a binary number from 0 to 2^n - 1\n   - Bit i being set means include nums[i]\n   - 000 → [], 001 → [3], 010 → [2], 011 → [2,3], ...\n   - Loop through all numbers, extract bits\n\n3. **Comparison:**\n   | Aspect | Backtracking | Cascading | Bitmask |\n   |--------|-------------|-----------|----------|\n   | Time | O(n*2^n) | O(n*2^n) | O(n*2^n) |\n   | Space (extra) | O(n) stack | O(1) | O(1) |\n   | Generalizable | Yes (pruning) | Limited | Limited |\n   | Code simplicity | Moderate | Simple | Simple |\n\n4. **When backtracking wins:**\n   - When you need PRUNING (skip invalid branches early)\n   - Subsets with constraints (e.g., sum ≤ k)\n   - Combinations, permutations (same template)\n   - The iterative approaches can't prune\n\n**Key insight:** For unconstrained subset generation, all three approaches have the same complexity. Backtracking's advantage is its extensibility — the same template solves subsets, combinations, permutations, and N-queens.",
+    "failure_modes": [
+      {
+        "category": "No Comparison",
+        "keywords": ["iterative", "loop"],
+        "feedback": "Good iterative approach! But how does it compare to backtracking? When would you prefer one over the other?"
+      },
+      {
+        "category": "Missing Bitmask",
+        "keywords": ["cascading", "build"],
+        "feedback": "The cascading approach works, but there's an even more elegant method using bit manipulation. Can you describe how binary numbers map to subsets?"
+      }
+    ]
+  }
+]
