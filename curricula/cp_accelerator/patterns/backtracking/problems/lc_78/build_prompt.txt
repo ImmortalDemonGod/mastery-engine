@@ -54,7 +54,7 @@ The solution set **must not** contain duplicate subsets. Return the solution in 
 After implementing your solution:
 
 ```bash
-engine submit
+mastery submit
 ```
 
 **Important Note on Validation:**
@@ -79,5 +79,5 @@ These curated resources will help you understand the pattern deeply:
 
 Once your solution passes local tests:
 ```bash
-engine submit
+mastery submit
 ```
