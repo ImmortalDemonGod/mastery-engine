@@ -1,0 +1,53 @@
+[
+  {
+    "id": "valid_parens_why_stack",
+    "question": "Why is a stack the ideal data structure for matching parentheses? What property of bracket matching maps perfectly to stack behavior?",
+    "model_answer": "**Why a stack is perfect for bracket matching:**\n\n1. **LIFO matches nesting structure**\n   - Brackets must be closed in reverse order of opening\n   - '([])' → open '(', open '[', close ']' matches '[', close ')' matches '('\n   - The LAST opened bracket must be the FIRST one closed\n   - This is exactly Last-In-First-Out (LIFO) behavior\n\n2. **Stack tracks 'pending' brackets**\n   - Each opening bracket is pushed: it's waiting for its match\n   - Each closing bracket pops: it resolves the most recent pending opener\n   - If the popped opener doesn't match → invalid\n   - If stack is empty when we try to pop → extra closing bracket → invalid\n   - If stack is non-empty at the end → unclosed brackets → invalid\n\n3. **Why other data structures fail:**\n   - **Counter**: Can count '(' vs ')' but can't detect '([)]' (interleaved)\n   - **Queue (FIFO)**: Would match first-opened with first-closed, which is wrong for nesting\n   - **Set**: No ordering information at all\n\n4. **The key insight:**\n   - Bracket matching has a RECURSIVE structure (brackets contain brackets)\n   - Stacks naturally model recursion (call stack!)\n   - Every recursive problem can be solved iteratively with an explicit stack\n\n**Formal property:** Valid bracket strings form a context-free language, and stacks are the minimal data structure needed to recognize context-free languages (pushdown automata).",
+    "failure_modes": [
+      {
+        "category": "Only Mentions LIFO",
+        "keywords": ["LIFO", "last in first out"],
+        "feedback": "LIFO is correct, but WHY does bracket matching need LIFO? Can you give an example where FIFO (queue) would give a wrong answer?"
+      },
+      {
+        "category": "No Counterexample",
+        "keywords": ["stack", "push", "pop"],
+        "feedback": "Good description of the algorithm! But why can't we just count opening and closing brackets? What input would fool a simple counter?"
+      }
+    ]
+  },
+  {
+    "id": "valid_parens_edge_cases",
+    "question": "What are the three ways bracket matching can fail, and how does each manifest in the stack-based algorithm?",
+    "model_answer": "**Three failure modes:**\n\n1. **Type mismatch: wrong closing bracket**\n   - Input: '(]' or '{[)'\n   - Stack state: push '(', then see ']'\n   - stack[-1] = '(' but matching[']'] = '[' → mismatch → return False\n   - Detection: stack.pop() != matching[closing_bracket]\n\n2. **Extra closing bracket: close without open**\n   - Input: '())' or ']'\n   - Stack state: stack is empty when we encounter ')'\n   - Can't pop from empty stack → return False\n   - Detection: 'not stack' check before popping\n\n3. **Extra opening bracket: open without close**\n   - Input: '(()' or '('\n   - Stack state: after processing all chars, stack still has '(' in it\n   - Unclosed bracket remaining → return False\n   - Detection: len(stack) != 0 at the end\n\n**Common bugs from missing these checks:**\n- Missing empty-stack check → IndexError on ')('\n- Missing final stack-empty check → '(((' returns True\n- Only checking counts → '([)]' returns True (4 brackets, balanced count, but interleaved)\n\n**The complete algorithm handles all three:** check stack non-empty before pop, check match after pop, check stack empty at end.",
+    "failure_modes": [
+      {
+        "category": "Missing a Failure Mode",
+        "keywords": ["mismatch", "extra"],
+        "feedback": "You've identified some failure modes. Are there exactly three? Think about: what if there are too many closing brackets? Too many opening brackets? Wrong type of closing bracket?"
+      },
+      {
+        "category": "No Code Connection",
+        "keywords": ["fail", "invalid"],
+        "feedback": "Good identification of failures! But where EXACTLY in the code does each one get caught? Which line handles each case?"
+      }
+    ]
+  },
+  {
+    "id": "valid_parens_complexity",
+    "question": "Analyze the time and space complexity. Can you solve this problem with O(1) space? Why or why not?",
+    "model_answer": "**Current solution complexity:**\n- Time: O(n) — single pass through string, each char is pushed/popped at most once\n- Space: O(n) — worst case stack stores all opening brackets (e.g., '(((((')\n\n**Can we achieve O(1) space?**\n\nNo, and here's the proof:\n\n1. **Information-theoretic argument:**\n   - Consider input '(((...(((': n/2 opening brackets\n   - We must remember ALL of them to verify they get closed\n   - Any algorithm must distinguish between n/2 different states\n   - This requires log(n/2) = O(log n) bits minimum\n   - But for the general problem with 3 bracket types, we need to remember the ORDER of opening brackets, not just the count\n   - '([' needs different closing than '((' → we need O(n) state\n\n2. **If only ONE bracket type:**\n   - We COULD use O(1) space: just keep a counter\n   - Increment for '(', decrement for ')'\n   - Valid if counter never goes negative and ends at 0\n   - But this fails for multiple types: '([)]' has balanced counts but is invalid\n\n3. **Formal argument:**\n   - The language of valid bracket strings with multiple types is context-free but not regular\n   - Regular languages can be recognized with O(1) space (finite automata)\n   - Context-free languages require a stack (pushdown automata)\n   - Stack = O(n) space in worst case\n\n**Conclusion:** O(n) space is optimal for multiple bracket types. O(1) is possible only with a single bracket type.",
+    "failure_modes": [
+      {
+        "category": "Claims O(1) is Possible",
+        "keywords": ["counter", "O(1)"],
+        "feedback": "A counter works for one bracket type, but what about multiple types? Can you find an input where a counter says 'valid' but the string is actually invalid?"
+      },
+      {
+        "category": "No Lower Bound Argument",
+        "keywords": ["O(n)", "stack"],
+        "feedback": "You've stated we need O(n) space, but WHY? Can you prove that no algorithm can do better? What information must be stored?"
+      }
+    ]
+  }
+]
