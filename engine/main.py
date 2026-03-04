@@ -2730,16 +2730,28 @@ def select(
             ))
             sys.exit(1)
         
-        # Validate problem exists
-        problem_lookup = curr_mgr.get_problem_metadata(problem)
+        # Validate problem exists within the specified pattern (pattern-scoped lookup)
+        problem_lookup = curr_mgr.get_problem_in_pattern(pattern, problem)
         if problem_lookup is None:
-            console.print(Panel(
-                f"[bold red]Problem Not Found[/bold red]\n\n"
-                f"Problem '{problem}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
-                f"Use [cyan]mastery list {pattern}[/cyan] to see available problems in this pattern.",
-                title="INVALID PROBLEM",
-                border_style="red"
-            ))
+            # Check if problem exists in a different pattern to give better error
+            any_match = curr_mgr.get_problem_metadata(problem)
+            if any_match:
+                other_pattern, _ = any_match
+                console.print(Panel(
+                    f"[bold red]Problem Not In Pattern[/bold red]\n\n"
+                    f"Problem '{problem}' exists in pattern '{other_pattern}', not '{pattern}'.\n\n"
+                    f"Try: [cyan]mastery select {other_pattern} {problem}[/cyan]",
+                    title="WRONG PATTERN",
+                    border_style="red"
+                ))
+            else:
+                console.print(Panel(
+                    f"[bold red]Problem Not Found[/bold red]\n\n"
+                    f"Problem '{problem}' does not exist in curriculum '{manifest.curriculum_name}'.\n\n"
+                    f"Use [cyan]mastery status[/cyan] to see available problems.",
+                    title="INVALID PROBLEM",
+                    border_style="red"
+                ))
             sys.exit(1)
         
         resolved_pattern, problem_meta = problem_lookup
