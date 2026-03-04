@@ -401,7 +401,7 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                 return new_node
         
         elif replacement_type == 'replace_with':
-            # Replace entire node with another part of itself
+            # Replace entire node with parsed code or another part of itself
             source_path = replacement_def['source']
             
             # Handle case where LLM provides dict instead of string
@@ -412,8 +412,21 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                 raise TypeError(f"Replacement source must be a string, got {type(source_path).__name__}. "
                                f"Use a path like 'node.right' or Python code string.")
             
-            matcher = PatternMatcher({}, self.context)
-            replacement_node = matcher._evaluate_path(node, source_path)
+            if source_path.startswith('node.'):
+                # Path-based: extract part of the matched node
+                matcher = PatternMatcher({}, self.context)
+                replacement_node = matcher._evaluate_path(node, source_path)
+            else:
+                # Code-based: parse Python expression as replacement
+                try:
+                    parsed = ast.parse(source_path, mode='eval')
+                    replacement_node = ast.copy_location(parsed.body, node)
+                    if self.debug:
+                        print(f"          Parsed code replacement: {source_path[:50]}...")
+                except SyntaxError:
+                    if self.debug:
+                        print(f"          Failed to parse replacement code: {source_path[:50]}")
+                    replacement_node = None
             
             if replacement_node is not None:
                 return replacement_node
