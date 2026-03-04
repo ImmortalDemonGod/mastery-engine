@@ -1,0 +1,42 @@
+{
+  "id": "binary-search-wrong-loop-condition",
+  "description": "Replaces 'left <= right' with 'left < right' in the while loop condition, causing the search to miss the target when it's the only element left in the search space (left == right). This is the classic binary search off-by-one error.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "search",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace 'left <= right' with 'left < right' in the while condition",
+      "pattern": {
+        "node_type": "Compare",
+        "left": {
+          "node_type": "Name",
+          "id": "left"
+        },
+        "ops": [
+          {
+            "node_type": "LtE"
+          }
+        ],
+        "comparators": [
+          {
+            "node_type": "Name",
+            "id": "right"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "left < right"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}
