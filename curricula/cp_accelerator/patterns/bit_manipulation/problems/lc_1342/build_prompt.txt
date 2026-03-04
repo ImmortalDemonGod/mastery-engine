@@ -73,7 +73,7 @@ Step 4) 1 is odd; subtract 1 and obtain 0.
 After implementing your solution:
 
 ```bash
-engine submit
+mastery submit
 ```
 
 **Important Note on Validation:**
@@ -108,5 +108,5 @@ These curated resources will help you understand the pattern deeply:
 
 Once your solution passes local tests:
 ```bash
-engine submit
+mastery submit
 ```
