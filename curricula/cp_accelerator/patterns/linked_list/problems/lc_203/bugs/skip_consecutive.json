@@ -1,0 +1,42 @@
+{
+  "id": "linked-list-skip-consecutive",
+  "description": "Replaces 'x != val' with 'x > val' in the list comprehension filter, causing it to also remove all elements less than or equal to val instead of just elements equal to val. Teaches the importance of precise comparison operators.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "removeElements",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "description": "Replace '!=' with '>' in the filter condition",
+      "pattern": {
+        "node_type": "Compare",
+        "left": {
+          "node_type": "Name",
+          "id": "x"
+        },
+        "ops": [
+          {
+            "node_type": "NotEq"
+          }
+        ],
+        "comparators": [
+          {
+            "node_type": "Name",
+            "id": "val"
+          }
+        ]
+      },
+      "replacement": {
+        "type": "replace_with",
+        "source": "x > val"
+      }
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-04",
+    "version": "2.1",
+    "author": "Manual (CP Accelerator)",
+    "tier": "subtle"
+  }
+}
