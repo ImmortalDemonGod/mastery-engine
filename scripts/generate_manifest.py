@@ -128,6 +128,9 @@ class ManifestGenerator:
             # LIBRARY MODE: Generate patterns -> problems hierarchy
             patterns = []
             total_problems = 0
+            global_problem_ids: Dict[str, str] = {}  # problem_id -> first pattern_id (for cross-pattern dupe detection)
+            duplicates_within = 0
+            duplicates_across = 0
             
             for topic in self.topics:
                 pattern_obj = {
@@ -143,11 +146,26 @@ class ManifestGenerator:
                     "problems": []
                 }
                 
-                # Generate problem entries
+                # Generate problem entries (with deduplication)
+                seen_in_pattern: Set[str] = set()
                 for prob in topic.get('problems', []):
                     # Sanitize problem ID (e.g., "LC-912" -> "lc_912")
                     raw_id = prob.get('id', '')
                     p_id = raw_id.lower().replace('-', '_').replace(' ', '_')
+                    
+                    # Skip within-pattern duplicates
+                    if p_id in seen_in_pattern:
+                        duplicates_within += 1
+                        print(f"  ⚠️  Skipping duplicate '{p_id}' within pattern '{topic['id']}'")
+                        continue
+                    seen_in_pattern.add(p_id)
+                    
+                    # Warn on cross-pattern duplicates (keep both but warn)
+                    if p_id in global_problem_ids:
+                        duplicates_across += 1
+                        print(f"  ⚠️  Problem '{p_id}' appears in both '{global_problem_ids[p_id]}' and '{topic['id']}'")
+                    else:
+                        global_problem_ids[p_id] = topic['id']
                     
                     pattern_obj["problems"].append({
                         "id": p_id,
@@ -165,7 +183,12 @@ class ManifestGenerator:
                 patterns.append(pattern_obj)
             
             manifest["patterns"] = patterns
-            print(f"  ✓ Generated LIBRARY manifest with {len(patterns)} patterns and {total_problems} problems")
+            summary = f"  ✓ Generated LIBRARY manifest with {len(patterns)} patterns and {total_problems} problems"
+            if duplicates_within:
+                summary += f" ({duplicates_within} within-pattern duplicates removed)"
+            if duplicates_across:
+                summary += f" ({duplicates_across} cross-pattern overlaps warned)"
+            print(summary)
         
         else:
             # LINEAR MODE: Generate flat modules list (Legacy)
