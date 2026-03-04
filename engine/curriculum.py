@@ -13,7 +13,7 @@ Key design principles:
 from pathlib import Path
 import json
 import logging
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, List, Tuple
 
 from engine.schemas import (
     CurriculumManifest,
@@ -82,9 +82,11 @@ class CurriculumManager:
                 # Fallback - leave CURRICULA_DIR as class default (tests can patch)
                 self._project_root = Path.cwd()
         
-        # Lookup caches for LIBRARY mode (pattern_id -> PatternMetadata, problem_id -> (pattern_id, ProblemMetadata))
+        # Lookup caches for LIBRARY mode
+        # pattern_id -> PatternMetadata
         self._pattern_cache: Dict[str, PatternMetadata] = {}
-        self._problem_cache: Dict[str, Tuple[str, ProblemMetadata]] = {}
+        # problem_id -> list of (pattern_id, ProblemMetadata) to handle cross-pattern duplicates
+        self._problem_cache: Dict[str, List[Tuple[str, ProblemMetadata]]] = {}
     
     def load_manifest(self, curriculum_id: str) -> CurriculumManifest:
         """
@@ -142,7 +144,7 @@ class CurriculumManager:
         
         Creates O(1) lookups for:
         - pattern_id -> PatternMetadata
-        - problem_id -> (pattern_id, ProblemMetadata)
+        - problem_id -> list of (pattern_id, ProblemMetadata) (handles cross-pattern duplicates)
         """
         self._pattern_cache.clear()
         self._problem_cache.clear()
@@ -154,8 +156,10 @@ class CurriculumManager:
             self._pattern_cache[pattern.id] = pattern
             
             for problem in pattern.problems:
-                # Store both pattern_id and problem metadata for context
-                self._problem_cache[problem.id] = (pattern.id, problem)
+                # Store as list to handle cross-pattern duplicates
+                if problem.id not in self._problem_cache:
+                    self._problem_cache[problem.id] = []
+                self._problem_cache[problem.id].append((pattern.id, problem))
     
     def get_module_path(self, curriculum_id: str, module_metadata: ModuleMetadata) -> Path:
         """
@@ -188,13 +192,14 @@ class CurriculumManager:
     
     # --- New LIBRARY Mode Accessors ---
     
-    def get_problem_path(self, curriculum_id: str, problem_id: str) -> Optional[Path]:
+    def get_problem_path(self, curriculum_id: str, problem_id: str, pattern_id: str = None) -> Optional[Path]:
         """
         Get the absolute path to a problem's directory (LIBRARY mode).
         
         Args:
             curriculum_id: Unique identifier for the curriculum pack
             problem_id: Problem identifier (e.g., "lc_912")
+            pattern_id: Optional pattern to scope the lookup (recommended for cross-pattern duplicates)
             
         Returns:
             Path object pointing to the problem directory, or None if not found
@@ -202,7 +207,16 @@ class CurriculumManager:
         if problem_id not in self._problem_cache:
             return None
         
-        pattern_id, problem_metadata = self._problem_cache[problem_id]
+        entries = self._problem_cache[problem_id]
+        if pattern_id:
+            # Pattern-scoped lookup
+            for pid, pmeta in entries:
+                if pid == pattern_id:
+                    return self.CURRICULA_DIR / curriculum_id / pmeta.path
+            return None
+        
+        # Unscoped: return first entry (backward compatible)
+        _, problem_metadata = entries[0]
         return self.CURRICULA_DIR / curriculum_id / problem_metadata.path
     
     def get_pattern_theory_path(self, curriculum_id: str, pattern_id: str) -> Optional[Path]:
@@ -226,13 +240,41 @@ class CurriculumManager:
         """
         Get problem metadata with its parent pattern ID (LIBRARY mode).
         
+        Returns the first match. For cross-pattern duplicates, use
+        get_problem_in_pattern() for pattern-scoped lookup.
+        
         Args:
             problem_id: Problem identifier (e.g., "lc_912")
             
         Returns:
             Tuple of (pattern_id, ProblemMetadata), or None if not found
         """
-        return self._problem_cache.get(problem_id)
+        entries = self._problem_cache.get(problem_id)
+        if entries:
+            return entries[0]
+        return None
+    
+    def get_problem_in_pattern(self, pattern_id: str, problem_id: str) -> Optional[Tuple[str, ProblemMetadata]]:
+        """
+        Get problem metadata scoped to a specific pattern (LIBRARY mode).
+        
+        Use this instead of get_problem_metadata when the user has specified
+        both pattern and problem to handle cross-pattern duplicates correctly.
+        
+        Args:
+            pattern_id: Pattern identifier (e.g., "sorting")
+            problem_id: Problem identifier (e.g., "lc_912")
+            
+        Returns:
+            Tuple of (pattern_id, ProblemMetadata), or None if not found in that pattern
+        """
+        entries = self._problem_cache.get(problem_id)
+        if not entries:
+            return None
+        for pid, pmeta in entries:
+            if pid == pattern_id:
+                return (pid, pmeta)
+        return None
     
     def get_pattern_metadata(self, pattern_id: str) -> Optional[PatternMetadata]:
         """
