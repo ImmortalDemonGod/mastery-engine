@@ -57,7 +57,7 @@ Total amount you can rob = 2 + 9 + 1 = 12.
 After implementing your solution:
 
 ```bash
-engine submit
+mastery submit
 ```
 
 **Important Note on Validation:**
@@ -86,5 +86,5 @@ These curated resources will help you understand the pattern deeply:
 
 Once your solution passes local tests:
 ```bash
-engine submit
+mastery submit
 ```
