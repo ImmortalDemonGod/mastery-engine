@@ -31,7 +31,7 @@
       "name": "Essential CP Libraries: collections, heapq, bisect",
       "path": "modules/std_lib_augmentation",
       "baseline_perf_seconds": 0.12,
-      "dependencies": ["pythonic_structures", "concise_logic"],
+      "dependencies": [],
       "metadata": {
         "source": "Synthetic (Missing from 30 Days)",
         "focus": "deque (BFS), heapq (Dijkstra), bisect (binary search)"
