@@ -277,7 +277,13 @@ class HardenRunner:
                 logger.info("Using AST-based bug injection for LIBRARY mode")
                 
                 # Load student's code from main workspace
-                student_code_path = Path.cwd() / "solution.py"
+                # In library mode, the student's code is at problem_path/solution.py
+                student_code_path = problem_path / "solution.py"
+                if not student_code_path.exists():
+                    # Fallback to reference solution if student hasn't started Build yet
+                    # (though they should be in Harden stage already)
+                    student_code_path = reference_solution
+                
                 if not student_code_path.exists():
                     raise HardenChallengeError(
                         f"Could not find student solution at {student_code_path}"
