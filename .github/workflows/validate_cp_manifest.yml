@@ -72,33 +72,41 @@ jobs:
           echo "📂 Verifying module directory structure..."
           MODULE_ERRORS=0
           
-          # Read module IDs from manifest
-          MODULE_IDS=$(python -c "
+          # Read problem IDs from manifest
+          PROBLEM_IDS=$(python -c "
           import json
           with open('curricula/cp_accelerator/manifest.json') as f:
               manifest = json.load(f)
-              for module in manifest['modules']:
-                  print(module['id'])
+              # In library mode, iterate patterns then problems
+              if 'patterns' in manifest:
+                  for pattern in manifest['patterns']:
+                      for problem in pattern['problems']:
+                          # Format as pattern_id/problem_id for directory check
+                          print(f\"{pattern['id']}:{problem['id']}:{problem['path']}\")
           ")
           
-          for module_id in $MODULE_IDS; do
-            module_dir="curricula/cp_accelerator/modules/$module_id"
+          for entry in $PROBLEM_IDS; do
+            # Parse entry
+            pattern_id=$(echo $entry | cut -d: -f1)
+            problem_id=$(echo $entry | cut -d: -f2)
+            problem_path=$(echo $entry | cut -d: -f3)
+            
+            module_dir="curricula/cp_accelerator/$problem_path"
             if [ ! -d "$module_dir" ]; then
-              echo "⚠️  WARNING: Module directory missing: $module_dir"
+              echo "⚠️  WARNING: Problem directory missing: $module_dir"
               MODULE_ERRORS=$((MODULE_ERRORS + 1))
             else
-              echo "✓ $module_id"
+              echo "✓ $pattern_id/$problem_id"
             fi
           done
           
           if [ $MODULE_ERRORS -gt 0 ]; then
             echo ""
-            echo "⚠️  $MODULE_ERRORS module directories are missing"
+            echo "⚠️  $MODULE_ERRORS problem directories are missing"
             echo "   This is a warning (not a failure) during curriculum development"
-            echo "   Run content ingestion to create missing modules"
           else
             echo ""
-            echo "✅ All module directories exist"
+            echo "✅ All problem directories exist"
           fi
 
   schema-validation:
@@ -162,20 +170,29 @@ jobs:
               with open('curricula/cp_accelerator/manifest.json') as f:
                   manifest = json.load(f)
               
-              # Check required fields
-              required = ['curriculum_name', 'author', 'version', 'modules']
+              # Check required fields for LIBRARY mode
+              required = ['curriculum_name', 'author', 'version', 'type', 'patterns']
               for field in required:
                   if field not in manifest:
                       print(f'❌ Missing required field: {field}')
                       sys.exit(1)
               
-              # Check modules structure
-              for module in manifest['modules']:
-                  if 'id' not in module or 'name' not in module or 'path' not in module:
-                      print(f'❌ Module missing required fields: {module}')
-                      sys.exit(1)
+              if manifest['type'] != 'library':
+                  print(f'❌ Expected type \"library\", got \"{manifest.get(\"type\")}\"')
+                  sys.exit(1)
               
-              print(f'✅ Manifest structure valid ({len(manifest[\"modules\"])} modules)')
+              # Check patterns structure
+              for pattern in manifest['patterns']:
+                  if 'id' not in pattern or 'title' not in pattern or 'problems' not in pattern:
+                      print(f'❌ Pattern missing required fields: {pattern.get(\"id\", \"unknown\")}')
+                      sys.exit(1)
+                  
+                  for problem in pattern['problems']:
+                      if 'id' not in problem or 'title' not in problem or 'path' not in problem:
+                          print(f'❌ Problem missing required fields: {problem.get(\"id\", \"unknown\")} in {pattern[\"id\"]}')
+                          sys.exit(1)
+              
+              print(f'✅ Manifest structure valid ({len(manifest[\"patterns\"])} patterns)')
           except Exception as e:
               print(f'❌ Validation error: {e}')
               sys.exit(1)
@@ -199,31 +216,34 @@ jobs:
           echo "📊 Generating dependency graph analysis..."
           python -c "
           import json
-          from collections import defaultdict, deque
+          from collections import defaultdict
           
           with open('curricula/cp_accelerator/manifest.json') as f:
               manifest = json.load(f)
           
-          modules = manifest['modules']
+          # In library mode, dependencies are between patterns
+          patterns = manifest.get('patterns', [])
           
           # Build reverse dependency map
           dependents = defaultdict(list)
-          for module in modules:
-              for dep in module.get('dependencies', []):
-                  dependents[dep].append(module['id'])
+          for pattern in patterns:
+              # Metadata contains dependencies in this curriculum structure
+              deps = pattern.get('metadata', {}).get('dependencies', [])
+              for dep in deps:
+                  dependents[dep].append(pattern['id'])
           
           # Find root nodes (no dependencies)
-          roots = [m['id'] for m in modules if not m.get('dependencies')]
+          roots = [p['id'] for p in patterns if not p.get('metadata', {}).get('dependencies')]
           
           # Find leaf nodes (no dependents)
-          all_ids = {m['id'] for m in modules}
-          leaves = [mid for mid in all_ids if not dependents[mid]]
+          all_ids = {p['id'] for p in patterns}
+          leaves = [pid for pid in all_ids if not dependents[pid]]
           
-          print(f'📈 Dependency Graph Statistics:')
-          print(f'   Total modules: {len(modules)}')
-          print(f'   Root modules (no dependencies): {len(roots)}')
+          print(f'📈 Dependency Graph Statistics (Patterns):')
+          print(f'   Total patterns: {len(patterns)}')
+          print(f'   Root patterns (no dependencies): {len(roots)}')
           print(f'     {roots}')
-          print(f'   Leaf modules (nothing depends on them): {len(leaves)}')
+          print(f'   Leaf patterns (nothing depends on them): {len(leaves)}')
           print(f'     {leaves}')
           print(f'')
           print(f'✅ Dependency graph analysis complete')
