@@ -243,6 +243,12 @@ trustworthy rather than a hallucinated rubric. Questions route by claim type
 **Output: documented, defended understanding — the artifact the AI codebase
 lacked.**
 
+> **Modality note.** This step is described as an "oral exam," but the current
+> input mechanism is a text editor (`$EDITOR`). cultivation-os already ships a
+> Socratic Runner (faster-whisper STT); voice is the natural modality for this
+> gate and is already available in the ecosystem. Text is the default, not a
+> constraint.
+
 ### Step 4 — HARDEN: two payoffs
 
 Inject realistic semantic mutations (`generic_injector` interpreting
@@ -323,8 +329,10 @@ AI-authored PR they must ship but cannot trust.
 1. *[FOREGROUND]* **Predict before you look** — commit a prediction in an editor;
    the code is withheld. Friction by design.
 2. *[FOREGROUND]* **Reveal + Justify** — explain the invariant; the grader pushes
-   back on description-in-place-of-why. Feels like an oral exam. *[BACKGROUND]*
-   the rubric is DocInsight-grounded.
+   back on description-in-place-of-why. Feels like an oral exam — though the
+   current input is a text editor; voice (the cultivation-os Socratic Runner /
+   faster-whisper STT) is the available modality upgrade. *[BACKGROUND]* the
+   rubric is DocInsight-grounded.
 3. *[FOREGROUND]* **Debug the injected bug** — find the mutation. *[BACKGROUND]*
    shadow worktree; simultaneous check of whether the *tests* caught it.
 4. *[FOREGROUND]* **Optimize** — refactor; validator confirms green + performance.
@@ -342,7 +350,9 @@ AI-authored PR they must ship but cannot trust.
   ("explain the invariant in `parser.py` you missed"). Understanding becomes
   durable without the user scheduling anything.
 - On the cultivation-os cockpit, the operator's technical-competence and
-  findings-surfaced trends tick upward — the single glanceable view.
+  findings-surfaced trends tick upward — the single glanceable view. *(Designed,
+  not real today: this Π / score surface is currently a dummy-data mockup — see
+  §8.)*
 
 **What it feels like:** *an examiner that refuses to let you ship code you cannot
 explain.* Everything heavy is invisible; what is left in the user's hands is
@@ -368,9 +378,13 @@ The smooth single-flow above is the **intended composition**. The pieces are
 real but currently **seamed** — today a user drives several separate CLI tools by
 hand, not one examiner. Verified gaps:
 
-- **Justify's LLM grader is a STUB.** Only the keyword fast-filter is real; the
-  comprehension gate currently auto-passes. For this use case this is the single
-  most important thing to finish.
+- **Justify's LLM grader is not wired** — but the *components exist*
+  (`engine/services/llm_service.py`, `scripts/systematic_llm_evaluation.py`). It
+  is the stage *runner* (`engine/stages/justify.py`) that is a stub, so only the
+  keyword fast-filter is live and the comprehension gate currently auto-passes.
+  This is still the single most important thing to finish — but it is *wiring
+  existing parts*, not building a grader from scratch (a meaningfully smaller
+  effort than "stub" implies).
 - **No "ingest a repo → modules" front-end.** `generate_module.py` is hardcoded
   to the `cp_accelerator` LeetCode `canonical_curriculum.json`. PromptVerge's
   engineering workflow is the natural author, **but its AI integration is still
@@ -382,6 +396,15 @@ hand, not one examiner. Verified gaps:
 - **The bug catalog is ML/CS-tuned** (softmax, silu, rmsnorm, attention,
   sorting). A general production codebase needs broader mutation operators:
   concurrency, error-handling, resource cleanup, API-contract violations.
+
+- **The feedback / measurement tail terminates on a non-functional surface.**
+  §5.2 and §6 close the loop at the cultivation-os cockpit (Π / competence
+  trends), but the Π scoring pipeline is presently a **dummy-data mockup** — Π
+  scores are `null` and the pipeline is "not yet operational" per
+  `operator-dossier.json`, which the operator notes makes the hub temporarily
+  violate its own evidence-first philosophy. Relatedly, HQET3 (revenue) is
+  pre-baseline: **no paid Black Box outreach has been executed yet.** The
+  durability / measurement tail is therefore designed, not live.
 
 **The governing risk:** the Mastery Engine assumes a trusted oracle. Point it at
 AI code without first minting one (Step 0) and you will harden code that may
@@ -418,12 +441,16 @@ In rough priority order:
 In keeping with the ecosystem's verification-first ethos, the load-bearing
 claims above were checked against source rather than inferred:
 
-- **Mastery Engine:** `engine/curriculum.py` (LINEAR/LIBRARY module structure),
-  `engine/ast_harden/generic_injector.py` (multi-pass AST injection; handles
-  arbitrary snippets, not just curriculum stubs), `engine/stages/justify.py`
-  (the LLM grader is an explicit STUB; only the fast keyword filter is live),
-  `scripts/generate_module.py` (hardcoded to the cp_accelerator LeetCode
-  corpus), `engine/dev_tools/bug_author.py` (LLM + golden-dataset bug authoring).
+- **Mastery Engine** (this repo; registered canonically in the project registry
+  as `assignment1-basics`): `engine/curriculum.py` (LINEAR/LIBRARY module
+  structure), `engine/ast_harden/generic_injector.py` (multi-pass AST injection;
+  handles arbitrary snippets, not just curriculum stubs), `engine/stages/justify.py`
+  (the stage *runner* is a stub — only the fast keyword filter is live — though
+  the LLM-eval components `engine/services/llm_service.py` and
+  `scripts/systematic_llm_evaluation.py` exist, unwired),
+  `scripts/generate_module.py` (hardcoded to the `cp_accelerator` *curriculum*
+  corpus — a LeetCode set; this is a curriculum name, not the repo name),
+  `engine/dev_tools/bug_author.py` (LLM + golden-dataset bug authoring).
 - **AIV / SVP:** `aiv-protocol/src/aiv/svp/lib/models.py` (5 phases, AITell
   taxonomy, Phase-1 timing invariant, S015/S016, SessionType split),
   `aiv-protocol/src/aiv/svp/lib/rating.py` (ELO engine, `RATING_POINTS`).
@@ -442,3 +469,8 @@ claims above were checked against source rather than inferred:
 > a running-physiology pipeline; and it omits `find-your-kill-zone` /
 > `who-reviews-the-reviewers`). Treat the registry as a hypothesis layer and
 > re-ground against source before relying on any classification.
+>
+> **Navigation note.** When mapping this blueprint onto actual repositories: this
+> repo is `mastery-engine` locally but `assignment1-basics` in the registry, and
+> two registry-referenced projects — `RNA_PREDICT` and `blue-thumb-dashboard` —
+> are not present in the local working set.
