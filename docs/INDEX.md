@@ -28,6 +28,7 @@
 |----------|---------|
 | [`architecture/MASTERY_ENGINE.md`](./architecture/MASTERY_ENGINE.md) | Core system architecture |
 | [`architecture/REPO_ANALYSIS.md`](./architecture/REPO_ANALYSIS.md) | Codebase structure |
+| [`architecture/AI_CODEBASE_DECONSTRUCTION.md`](./architecture/AI_CODEBASE_DECONSTRUCTION.md) | Inverting the engine to deconstruct AI-generated codebases (ecosystem fit, pipeline, user journey) |
 
 ## 🔧 Development
 
