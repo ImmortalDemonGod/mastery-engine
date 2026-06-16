@@ -464,13 +464,15 @@ claims above were checked against source rather than inferred:
 > **Methodology caveat.** The interpretive registry layer
 > (`openclaw-workspace/PROJECTS_ANALYSIS.md`) was found to diverge from source in
 > several places (e.g., it lists Π weights as "confirmed CON/INT/…" when the
-> canonical dossier marks them `not-yet-calibrated`; it describes
-> bio-systems-engineering as Syn3A/mitochondria modeling when the shipped code is
-> a running-physiology pipeline; and it omits `find-your-kill-zone` /
+> canonical dossier marks them `not-yet-calibrated`; it attributes
+> Syn3A / mitochondria modeling to bio-systems-engineering when that work
+> actually lives in a separate repo, `MitochondriaMaven` — bio-systems' shipped
+> code is a running-physiology pipeline; and it omits `find-your-kill-zone` /
 > `who-reviews-the-reviewers`). Treat the registry as a hypothesis layer and
 > re-ground against source before relying on any classification.
 >
 > **Navigation note.** When mapping this blueprint onto actual repositories: this
 > repo is `mastery-engine` locally but `assignment1-basics` in the registry, and
-> two registry-referenced projects — `RNA_PREDICT` and `blue-thumb-dashboard` —
-> are not present in the local working set.
+> three registry-referenced projects — `RNA_PREDICT`, `blue-thumb-dashboard`, and
+> `MitochondriaMaven` (the actual home of the Syn3A / mitochondria work) — are not
+> present in the local working set.
