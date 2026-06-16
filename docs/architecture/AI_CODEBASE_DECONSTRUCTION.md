@@ -402,9 +402,11 @@ hand, not one examiner. Verified gaps:
   trends), but the Π scoring pipeline is presently a **dummy-data mockup** — Π
   scores are `null` and the pipeline is "not yet operational" per
   `operator-dossier.json`, which the operator notes makes the hub temporarily
-  violate its own evidence-first philosophy. Relatedly, HQET3 (revenue) is
-  pre-baseline: **no paid Black Box outreach has been executed yet.** The
-  durability / measurement tail is therefore designed, not live.
+  violate its own evidence-first philosophy. Relatedly, on HQET3 (revenue):
+  Black Box's outreach is *active* (SMYKM cold-email + Trojan-Horse upstream PRs
+  across CrewAI/LangChain/Continue/CAI, plus a BSides SATX 2026 demo) — the open
+  item is *paid conversion*, not outreach. The Π **measurement** tail is what's
+  designed-not-live (scores still null), distinct from the outreach itself.
 
 **The governing risk:** the Mastery Engine assumes a trusted oracle. Point it at
 AI code without first minting one (Step 0) and you will harden code that may
