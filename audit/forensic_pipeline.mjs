@@ -133,7 +133,7 @@ Return ONLY the final JSON object conforming to the provided schema. Use your to
  * Run one subagent. Returns {ok, data, costUsd, raw, err}.
  * Structured output is enforced by --json-schema; we also defensively parse.
  */
-async function runAgent({ name, prompt, schema, model, maxTurns = 50, budgetUsd = 4, allowedTools, cwd = REPO, timeoutMs = 900000, web = false }) {
+async function runAgent({ name, prompt, schema, model, maxTurns = 50, budgetUsd = 4, allowedTools, cwd = REPO, timeoutMs = 1200000, web = false }) {
   // Structured output is delivered via a FILE handoff: --json-schema is advisory in this CLI
   // build (agents narrate prose when they use tools), so we have the agent Write its JSON to a
   // path we control and read it back. Deterministic and decoupled from chat narration.
@@ -449,7 +449,7 @@ FILES TO COVER:\n${scopeFiles.join("\n")}`,
   // parallel barrier: code through security+correctness+design; docs through drift; data through supply-chain
   const jobs = [];
   for (const lid of ["security", "correctness", "design_defect"]) for (const ch of chunksOf(codeFiles, 55)) jobs.push([lensById[lid], ch]);
-  for (const ch of chunksOf(docFiles, 45)) jobs.push([lensById["doc_code_drift"], ch]);
+  for (const ch of chunksOf(docFiles, 30)) jobs.push([lensById["doc_code_drift"], ch]);
   for (const ch of chunksOf(dataFiles.concat(codeFiles.filter((p) => /(^|\/)(pyproject|package|setup|tox|noxfile|conftest)/i.test(p))), 60)) jobs.push([lensById["dependency_supplychain"], ch]);
   const lensResults = await pMap(jobs, ([lens, ch]) => auditLens(lens, ch));
   for (const res of lensResults) { (res.findings || []).forEach((f) => findings.push(f)); (res.visited || []).forEach((v) => visited.add(v.split(":")[0])); }
@@ -483,15 +483,22 @@ FILES TO COVER:\n${scopeFiles.join("\n")}`,
   let round = 0;
   while (round < CFG.ceiling) {
     round++;
-    writeJSON(`02-findings-round${round}.json`, { findings });
-    const fal = await runAgent({
-      name: `s2:falsifier:r${round}`, model: CFG.MODEL_ADVERSARY, maxTurns: 70, budgetUsd: 6, schema: FALSIFY_SCHEMA,
-      prompt: `You are an ADVERSARIAL FALSIFIER. ${findings.length} candidate findings are in audit/.work/02-findings-round${round}.json. Read it, then independently re-read the cited source at ${REPO} for EACH finding and try to REFUTE it. Do not trust the finding's framing.
+    // chunked adversarial falsification — handing 200+ findings to one agent degrades quality
+    // and risks timeouts; falsify in batches (parallel), then merge verdicts.
+    const fbatches = chunksOf(findings, 40);
+    fbatches.forEach((b, bi) => writeJSON(`02-fbatch-r${round}-${bi}.json`, { findings: b }));
+    const falResults = await pMap(fbatches.map((b, bi) => ({ b, bi })), async ({ b, bi }) => {
+      const fal = await runAgent({
+        name: `s2:falsifier:r${round}:b${bi}`, model: CFG.MODEL_ADVERSARY, maxTurns: 60, budgetUsd: 5, schema: FALSIFY_SCHEMA,
+        prompt: `You are an ADVERSARIAL FALSIFIER. ${b.length} candidate findings are in audit/.work/02-fbatch-r${round}-${bi}.json. Read it, then independently re-read the cited source at ${REPO} for EACH finding and try to REFUTE it. Do not trust the finding's framing.
 For each finding id, return a verdict: "refuted" (you found counter-evidence it is not a real defect — give the path:line counter-evidence), "downgraded" (real but lower severity — give newSeverity), or "survives" (you could not refute it; restate the confirming path:line). Be skeptical: vague, location-less, or speculative findings should be refuted or downgraded. Return {verdicts:[{id,verdict,reason,newSeverity?}]}.`,
+      });
+      return fal.ok && fal.data?.verdicts ? fal.data.verdicts : [];
     });
     guardBudget("stage2");
-    if (!fal.ok || !fal.data?.verdicts) { log(`  ! falsifier round ${round} failed: ${fal.err}; keeping current set`); break; }
-    const vmap = new Map(fal.data.verdicts.map((v) => [v.id, v]));
+    const allVerdicts = falResults.flat();
+    if (!allVerdicts.length) { log(`  ! falsifier round ${round} produced no verdicts; keeping current set`); break; }
+    const vmap = new Map(allVerdicts.map((v) => [v.id, v]));
     const survivors = [];
     for (const f of findings) {
       const v = vmap.get(f.id);
@@ -509,7 +516,9 @@ For each finding id, return a verdict: "refuted" (you found counter-evidence it 
     if (round === CFG.ceiling) { log(`  ⚠ ceiling reached without fixpoint`); halt("stage2", `Adversarial fixpoint not reached within ceiling ${CFG.ceiling}.`); }
 
     // re-audit remainder: one more correctness+security sweep over the code to surface anything the falsifier's pressure implies
-    const reaudit = await pMap([lensById["correctness"], lensById["security"]], (lens) => auditLens(lens, codeFiles));
+    const reJobs = [];
+    for (const lid of ["correctness", "security"]) for (const ch of chunksOf(codeFiles, 55)) reJobs.push([lensById[lid], ch]);
+    const reaudit = await pMap(reJobs, ([lens, ch]) => auditLens(lens, ch));
     let added = 0;
     for (const res of reaudit) for (const f of (res.findings || [])) { const before = findings.length; findings = dedupe([...findings, f]); if (findings.length > before) added++; }
     log(`  re-audit added ${added} new candidate(s)`);
