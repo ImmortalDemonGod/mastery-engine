@@ -165,40 +165,55 @@ Write ONLY raw JSON to that file — no markdown fences, no prose, no trailing c
     "--permission-mode", "acceptEdits",   // root-safe; bypassPermissions/--dangerously-* are refused as root
     "--append-system-prompt", GLOBAL_INVARIANTS,
   ];
-  log(`  ▶ agent[${name}#${uid}] model=${model} budget=$${budgetUsd} turns=${maxTurns} web=${web}`);
-  const started = Date.now();
-  const r = await new Promise((res) => {
-    const p = spawn("claude", args, { cwd, stdio: ["ignore", "pipe", "pipe"] });   // close stdin -> no "waiting for stdin" hang
-    let out = "", err = "";
-    const killer = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, timeoutMs);
-    p.stdout.on("data", (d) => (out += d));
-    p.stderr.on("data", (d) => (err += d));
-    p.on("close", (code) => { clearTimeout(killer); res({ code, out, err }); });
-    p.on("error", (e) => { clearTimeout(killer); res({ code: -1, out, err: String(e) }); });
-  });
-  const secs = ((Date.now() - started) / 1000).toFixed(0);
+  const MAX_ATTEMPTS = 3;
+  let lastErr = "unknown", lastEnvelope = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    rmSync(outPath, { force: true });   // clean slate so a stale file from a failed attempt isn't read back
+    log(`  ▶ agent[${name}#${uid}] model=${model} budget=$${budgetUsd} turns=${maxTurns} web=${web}${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ""}`);
+    const started = Date.now();
+    const r = await new Promise((res) => {
+      const p = spawn("claude", args, { cwd, stdio: ["ignore", "pipe", "pipe"] });   // close stdin -> no "waiting for stdin" hang
+      let out = "", err = "";
+      const killer = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, timeoutMs);
+      p.stdout.on("data", (d) => (out += d));
+      p.stderr.on("data", (d) => (err += d));
+      p.on("close", (code) => { clearTimeout(killer); res({ code, out, err }); });
+      p.on("error", (e) => { clearTimeout(killer); res({ code: -1, out, err: String(e) }); });
+    });
+    const secs = ((Date.now() - started) / 1000).toFixed(0);
+    const backoff = (limitish) => new Promise((r2) => setTimeout(r2, (limitish ? 30000 : 6000) * attempt));
 
-  let envelope;
-  try { envelope = JSON.parse(r.out); } catch {
-    log(`  ✖ agent[${name}#${uid}] non-JSON envelope (exit=${r.code}, ${secs}s): ${(r.err || r.out).slice(-300)}`);
-    return { ok: false, err: "non-json-envelope", costUsd: 0 };
+    let envelope;
+    try { envelope = JSON.parse(r.out); } catch {
+      lastErr = "non-json-envelope";
+      log(`  ✖ agent[${name}#${uid}] non-JSON envelope (exit=${r.code}, ${secs}s): ${(r.err || r.out).slice(-200)}`);
+      if (attempt < MAX_ATTEMPTS) { await backoff(false); continue; }
+      return { ok: false, err: lastErr, costUsd: 0 };
+    }
+    lastEnvelope = envelope;
+    const cost = Number(envelope.total_cost_usd || 0);
+    TOTAL_USD += cost;
+    if (envelope.is_error || envelope.subtype !== "success") {
+      lastErr = envelope.subtype || "error";
+      const limitish = cost === 0 && Number(secs) < 10;   // instant + free => usage-limit / rejection signature
+      log(`  ✖ agent[${name}#${uid}] error subtype=${envelope.subtype} (${secs}s, $${cost.toFixed(3)})${limitish ? " [limit-like, backing off]" : ""}`);
+      if (attempt < MAX_ATTEMPTS) { await backoff(limitish); continue; }
+      return { ok: false, err: lastErr, costUsd: cost, raw: envelope, limit: limitish };
+    }
+    // primary: the file the agent wrote; fallback: parse the chat result
+    let data = null;
+    if (existsSync(outPath)) { try { data = parseLooseJSON(readFileSync(outPath, "utf8")); } catch {} }
+    if (data == null && typeof envelope.result === "string") data = parseLooseJSON(envelope.result);
+    if (data == null) {
+      lastErr = "no-structured-output";
+      log(`  ✖ agent[${name}#${uid}] produced no parseable JSON (${secs}s, $${cost.toFixed(3)})`);
+      if (attempt < MAX_ATTEMPTS) { await backoff(false); continue; }
+      return { ok: false, err: lastErr, costUsd: cost, raw: envelope };
+    }
+    log(`  ✔ agent[${name}#${uid}] done (${secs}s, $${cost.toFixed(3)}, cum=$${TOTAL_USD.toFixed(2)})${attempt > 1 ? ` (recovered on attempt ${attempt})` : ""}`);
+    return { ok: true, data, costUsd: cost, raw: envelope };
   }
-  const cost = Number(envelope.total_cost_usd || 0);
-  TOTAL_USD += cost;
-  if (envelope.is_error || envelope.subtype !== "success") {
-    log(`  ✖ agent[${name}#${uid}] error subtype=${envelope.subtype} (${secs}s, $${cost.toFixed(3)})`);
-    return { ok: false, err: envelope.subtype || "error", costUsd: cost, raw: envelope };
-  }
-  // primary: the file the agent wrote; fallback: parse the chat result
-  let data = null;
-  if (existsSync(outPath)) { try { data = parseLooseJSON(readFileSync(outPath, "utf8")); } catch {} }
-  if (data == null && typeof envelope.result === "string") data = parseLooseJSON(envelope.result);
-  if (data == null) {
-    log(`  ✖ agent[${name}#${uid}] produced no parseable JSON (${secs}s, $${cost.toFixed(3)})`);
-    return { ok: false, err: "no-structured-output", costUsd: cost, raw: envelope };
-  }
-  log(`  ✔ agent[${name}#${uid}] done (${secs}s, $${cost.toFixed(3)}, cum=$${TOTAL_USD.toFixed(2)})`);
-  return { ok: true, data, costUsd: cost, raw: envelope };
+  return { ok: false, err: lastErr, raw: lastEnvelope };
 }
 
 // bounded-concurrency parallel map
@@ -497,7 +512,7 @@ For each finding id, return a verdict: "refuted" (you found counter-evidence it 
     });
     guardBudget("stage2");
     const allVerdicts = falResults.flat();
-    if (!allVerdicts.length) { log(`  ! falsifier round ${round} produced no verdicts; keeping current set`); break; }
+    if (!allVerdicts.length) halt("stage2", `Adversarial falsifier produced ZERO verdicts in round ${round} — every batch failed (likely usage-limit or API error). Refusing to ship un-falsified findings: the adversarial promotion gate must actually run. Resume when capacity is restored.`);
     const vmap = new Map(allVerdicts.map((v) => [v.id, v]));
     const survivors = [];
     for (const f of findings) {
