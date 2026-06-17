@@ -46,7 +46,11 @@ const CFG = {
   fresh: hasFlag("--fresh"),
   preflight: hasFlag("--preflight"),
   onlyStage: flagVal("--stage", null) ? Number(flagVal("--stage", null)) : null,
-  maxTotalUsd: Number(flagVal("--max-total-usd", "45")),   // circuit breaker, NOT a target
+  // Runaway circuit-breaker only. NOTE: `claude -p` reports API-EQUIVALENT cost; under a
+  // Claude Max/Pro subscription real consumption is far lower (~10-100x), so this is a guard
+  // against an infinite loop, NOT a usage budget. Effectively unlimited by default; pass
+  // --max-total-usd to bound spend only when actually metering against the API.
+  maxTotalUsd: Number(flagVal("--max-total-usd", "1000000")),
   concurrency: Number(flagVal("--concurrency", "4")),
   ceiling: Number(flagVal("--ceiling", "6")),              // hard ceiling for fixpoint loops -> halt-report
   web: !hasFlag("--no-web"),
