@@ -1,6 +1,9 @@
-# Forensic pipeline: ignore transient run scratch/logs; keep deliverables
-# (0N-*.md), the orchestrator script, resume state (.work/state.json) and
-# the schema-validated stage objects (.work/0N-*.json).
-.work/agent_*.json
-.work/*.log
+# Forensic pipeline transient working state — NOT a deliverable.
+#
+# Deliverables are the committed audit/0N-*.md files, each of which embeds its
+# full schema-validated object in a ```json appendix. The orchestrator commits
+# those .md files at every stage checkpoint, so completed stages stay durable
+# on the branch. Everything under .work/ (logs, per-agent scratch, intermediate
+# round files, resume state) is regenerable and is intentionally not tracked.
+.work/
 *.log
