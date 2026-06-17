@@ -588,33 +588,41 @@ const S3_SCHEMA = { type: "object", additionalProperties: false,
 
 async function stage3(state, s1, s2) {
   log("═══ STAGE 3 — Execution / dynamic surface ═══");
-  // isolated execution sandbox so test/coverage runs don't dirty the tree holding audit/
-  const SBX = "/tmp/me-exec-sandbox";
-  rmSync(SBX, { recursive: true, force: true });
+  // The Python env is already provisioned in the repo (.venv + cs336_basics symlink) and pytest is
+  // read-only, so we execute in-place. The ORCHESTRATOR runs the slow/deterministic work (tests, CLI)
+  // wrapped in `timeout` — NOT an agent — so it can't blow an agent's time budget. (The prior
+  // single-agent version timed out doing `uv sync` with torch from scratch in a bare worktree.)
   await sh("git", ["worktree", "prune"]);
-  const wt = await sh("git", ["worktree", "add", "--detach", SBX, "HEAD"]);
-  if (wt.code !== 0) log(`  worktree add note: ${(wt.err || wt.out).slice(0, 200)}`);
-  const cwd = existsSync(SBX) ? SBX : REPO;
-  log(`  execution sandbox: ${cwd}`);
+  const runIn = (cmd, secs) => sh("bash", ["-lc", `cd ${REPO} && timeout ${secs} ${cmd} 2>&1`]);
+
+  log("  [exec] engine test suite under coverage");
+  const pytest = await runIn(`uv run --no-sync pytest tests/engine/ -m "not integration" --cov=engine --cov-report=term-missing -q -p no:cacheprovider`, 600);
+  writeFileSync(join(WORK, "03-pytest.txt"), pytest.out.slice(-60000));
+  log(`  [exec] pytest rc=${pytest.code}, ${pytest.out.length}b captured`);
+
+  log("  [exec] driving CLI entry points");
+  let cli = "";
+  for (const c of ["mastery --help", "mastery curriculum-list", "mastery status"]) {
+    const res = await runIn(`uv run --no-sync ${c}`, 120);
+    cli += `\n$ ${c}  (rc=${res.code})\n${res.out.slice(0, 4000)}\n`;
+  }
+  writeFileSync(join(WORK, "03-cli.txt"), cli);
 
   const r = await runAgent({
-    name: "s3:execution", model: CFG.MODEL_WORKER, maxTurns: 120, budgetUsd: 10, cwd, timeoutMs: 1500000,
+    name: "s3:analysis", model: CFG.MODEL_WORKER, maxTurns: 40, budgetUsd: 6, timeoutMs: 900000,
     schema: S3_SCHEMA,
-    prompt: `Stage 3: determine what the code ACTUALLY does when run, in the sandbox at ${cwd}.
-Read ${join(AUDIT, "01-understanding.json")} (entry points) and ${join(AUDIT, "02-static-audit.json")} (findings) first — those paths are absolute; use Read.
-Steps:
-1. Set up the environment exactly as the project intends (inspect README/pyproject/CI). This project uses 'uv' and a mode symlink; e.g. './scripts/mode switch developer' then 'uv sync' then 'uv pip install -e .'. Adapt to whatever the repo actually requires.
-2. Run the test suite under coverage instrumentation (e.g. 'uv run pytest --cov=engine --cov-report=term-missing -m "not integration"'). Capture the measured coverage percentage and summary.
-3. Drive the real entry points from the Stage-1 table (e.g. the CLI: --help and representative subcommands) and record observed behavior.
-4. Use this runtime evidence to CONFIRM, REFUTE, or REFINE each Stage-2 finding you can reach; report findingDeltas (cite the runtime evidence).
-5. Account for un-executed regions: every region not exercised must be classified requires-credentials | external-service | hardware-gated | dead | destructive-skip | other (with reason). Target is 100% ACCOUNTING, not 100% execution.
-Return the S3 object. Ground coverage.summary in real command output you actually ran.`,
+    prompt: `Stage 3 analysis. The orchestrator already EXECUTED the project and captured real output:
+- ${join(WORK, "03-pytest.txt")} — pytest over tests/engine with a coverage report (read the coverage table + the "N passed" line)
+- ${join(WORK, "03-cli.txt")} — real CLI entry points driven (--help, curriculum-list, status)
+Read those absolute paths, plus ${join(AUDIT, "02-static-audit.json")} (the 248 findings) and ${join(AUDIT, "01-understanding.json")} (entry points). The env is ready, so you MAY run additional read-only checks from ${REPO} with 'uv run --no-sync <cmd>' (e.g. a targeted 'pytest path::test', or a CLI subcommand) to confirm a specific behavior.
+Produce the S3 object:
+- coverage: summary (quote the measured engine coverage % and the "N passed" count from 03-pytest.txt) and linePct (engine total %).
+- observedBehaviors: what the CLI actually did (from 03-cli.txt) plus notable test outcomes.
+- findingDeltas: for the CRITICAL/HIGH findings and any others the runtime evidence speaks to, mark confirmed|refuted|refined with cited evidence (pytest/cli output, coverage of the cited file, or a targeted check you ran). You need not cover all 248 — only those runtime evidence can actually speak to.
+- unexecutedRegions: account for what was NOT exercised — the cs336/torch curriculum tests (hardware-gated), LLM/justify paths needing OPENAI_API_KEY (requires-credentials), integration tests (external-service), destructive ops (destructive-skip) — each with a reason. Target 100% ACCOUNTING, not 100% execution.`,
   });
   guardBudget("stage3");
-  if (!r.ok || !r.data?.coverage) halt("stage3", `Execution agent failed: ${r.err || "no data"}`);
-  await sh("git", ["worktree", "remove", "--force", SBX]).catch?.(() => {});
-  await sh("git", ["worktree", "remove", "--force", SBX]);
-
+  if (!r.ok || !r.data?.coverage) halt("stage3", `Execution analysis failed: ${r.err || "no data"}`);
   const obj = r.data;
   await checkpoint("stage3", "03-execution.md", renderS3(obj), "03-execution.json", obj, state);
   return obj;
