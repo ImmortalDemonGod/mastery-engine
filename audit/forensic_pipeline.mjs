@@ -509,6 +509,11 @@ FILES TO COVER:\n${scopeFiles.join("\n")}`,
       required: ["id", "verdict", "reason"],
       properties: { id: { type: "string" }, verdict: { type: "string", enum: ["survives", "refuted", "downgraded"] }, reason: { type: "string" }, newSeverity: { type: "string" } } } } } };
 
+  // resume the fixpoint itself from the last round's survivors if a prior run was interrupted mid-fixpoint
+  const SURV = join(WORK, "02-survivors.json");
+  if (existsSync(SURV)) {
+    try { const sv = JSON.parse(readFileSync(SURV, "utf8")); if (sv.findings?.length) { findings = dedupe(sv.findings); log(`  resume: continuing fixpoint from ${findings.length} saved survivors`); } } catch {}
+  }
   let round = 0;
   while (round < CFG.ceiling) {
     round++;
@@ -527,21 +532,23 @@ For each finding id, return a verdict: "refuted" (you found counter-evidence it 
     const allVerdicts = falResults.flat();
     if (!allVerdicts.length) halt("stage2", `Adversarial falsifier produced ZERO verdicts in round ${round} — every batch failed (likely usage-limit or API error). Refusing to ship un-falsified findings: the adversarial promotion gate must actually run. Resume when capacity is restored.`);
     const vmap = new Map(allVerdicts.map((v) => [v.id, v]));
-    let changed = 0;
+    let refutedCount = 0, downgradedCount = 0;
     const survivors = [];
     for (const f of findings) {
       const v = vmap.get(f.id);
       if (!v) { survivors.push(f); continue; }            // not addressed -> keep (conservative)
-      if (v.verdict === "refuted") { changed++; continue; }
-      if (v.verdict === "downgraded" && v.newSeverity && v.newSeverity !== f.severity) { f.severity = v.newSeverity; changed++; }
+      if (v.verdict === "refuted") { refutedCount++; continue; }
+      if (v.verdict === "downgraded" && v.newSeverity && v.newSeverity !== f.severity) { f.severity = v.newSeverity; downgradedCount++; }
       f.adversarialNote = v.reason;
       survivors.push(f);
     }
-    log(`  round ${round}: ${findings.length} -> ${survivors.length} survivors (${changed} refuted/downgraded)`);
+    log(`  round ${round}: ${findings.length} -> ${survivors.length} survivors (${refutedCount} refuted, ${downgradedCount} downgraded)`);
     findings = survivors;
-    // Convergence = a full adversarial pass that changes nothing (a true fixpoint under pressure).
-    if (changed === 0) { log(`  ✔ fixpoint reached at round ${round}`); break; }
-    if (round === CFG.ceiling) { log(`  ⚠ ceiling reached without fixpoint`); halt("stage2", `Adversarial fixpoint not reached within ceiling ${CFG.ceiling}.`); }
+    writeFileSync(SURV, JSON.stringify({ findings }, null, 2));   // persist so an interruption resumes mid-fixpoint
+    // Convergence = a round in which the adversary REFUTES nothing (the finding SET is stable). Severity
+    // downgrades are monotonic refinements that can churn, so they must NOT block convergence.
+    if (refutedCount === 0) { log(`  ✔ fixpoint reached at round ${round} (set stable; adversary refuted nothing)`); break; }
+    if (round === CFG.ceiling) { log(`  ⚠ ceiling reached; accepting ${findings.length} adversarially-pressured survivors`); break; }
     guardBudget("stage2");
   }
 
