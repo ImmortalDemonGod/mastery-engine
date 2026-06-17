@@ -459,47 +459,60 @@ FILES TO COVER:\n${scopeFiles.join("\n")}`,
   const lensById = Object.fromEntries(lenses.map((l) => [l[0], l]));
   log(`  routing: ${codeFiles.length} code, ${docFiles.length} doc, ${dataFiles.length} data files`);
 
-  let findings = [];
-  const visited = new Set();
-  // parallel barrier: code through security+correctness+design; docs through drift; data through supply-chain
-  const jobs = [];
-  for (const lid of ["security", "correctness", "design_defect"]) for (const ch of chunksOf(codeFiles, 55)) jobs.push([lensById[lid], ch]);
-  for (const ch of chunksOf(docFiles, 30)) jobs.push([lensById["doc_code_drift"], ch]);
-  for (const ch of chunksOf(dataFiles.concat(codeFiles.filter((p) => /(^|\/)(pyproject|package|setup|tox|noxfile|conftest)/i.test(p))), 60)) jobs.push([lensById["dependency_supplychain"], ch]);
-  const lensResults = await pMap(jobs, ([lens, ch]) => auditLens(lens, ch));
-  for (const res of lensResults) { (res.findings || []).forEach((f) => findings.push(f)); (res.visited || []).forEach((v) => visited.add(v.split(":")[0])); }
-  guardBudget("stage2");
-
-  // coverage stop-test: every denominator source/test/config visited >=1
   const mustVisit = denom.filter((p) => !p.endsWith(".lock"));
-  let unvisited = mustVisit.filter((p) => !visited.has(p));
-  let cround = 0;
-  while (unvisited.length && cround < CFG.ceiling) {
-    cround++;
-    log(`  coverage gap: ${unvisited.length} files unvisited by any lens -> round ${cround}`);
-    const r = await auditLens(["correctness", "any defects, broad sweep"], unvisited.slice(0, 120));
-    (r.findings || []).forEach((f) => findings.push(f));
-    (r.visited || []).forEach((v) => visited.add(v.split(":")[0]));
-    unvisited = mustVisit.filter((p) => !visited.has(p));
+  const dedupe = (list) => { const m = new Map(); for (const f of list) m.set(fingerprint(f), f); return [...m.values()]; };
+  const RAW = join(WORK, "02-raw-findings.json");
+
+  // Resume support: lens discovery is the expensive (~40min) part. If a prior run already
+  // produced the raw findings, reuse them and go straight to falsification; otherwise run the
+  // lens passes + coverage sweep and PERSIST the result so an interruption never re-scans.
+  let findings, visited;
+  if (existsSync(RAW)) {
+    const saved = JSON.parse(readFileSync(RAW, "utf8"));
+    findings = dedupe(saved.findings || []);
+    visited = new Set(saved.visited || []);
+    log(`  resume: reusing ${findings.length} raw findings from a prior lens pass; skipping lens re-scan`);
+  } else {
+    findings = [];
+    visited = new Set();
+    // parallel barrier: code through security+correctness+design; docs through drift; data through supply-chain
+    const jobs = [];
+    for (const lid of ["security", "correctness", "design_defect"]) for (const ch of chunksOf(codeFiles, 55)) jobs.push([lensById[lid], ch]);
+    for (const ch of chunksOf(docFiles, 30)) jobs.push([lensById["doc_code_drift"], ch]);
+    for (const ch of chunksOf(dataFiles.concat(codeFiles.filter((p) => /(^|\/)(pyproject|package|setup|tox|noxfile|conftest)/i.test(p))), 60)) jobs.push([lensById["dependency_supplychain"], ch]);
+    const lensResults = await pMap(jobs, ([lens, ch]) => auditLens(lens, ch));
+    for (const res of lensResults) { (res.findings || []).forEach((f) => findings.push(f)); (res.visited || []).forEach((v) => visited.add(v.split(":")[0])); }
     guardBudget("stage2");
+    // coverage stop-test: every denominator source/test/config visited >=1
+    let unvisited = mustVisit.filter((p) => !visited.has(p));
+    let cround = 0;
+    while (unvisited.length && cround < CFG.ceiling) {
+      cround++;
+      log(`  coverage gap: ${unvisited.length} files unvisited by any lens -> round ${cround}`);
+      const r = await auditLens(["correctness", "any defects, broad sweep"], unvisited.slice(0, 120));
+      (r.findings || []).forEach((f) => findings.push(f));
+      (r.visited || []).forEach((v) => visited.add(v.split(":")[0]));
+      unvisited = mustVisit.filter((p) => !visited.has(p));
+      guardBudget("stage2");
+    }
+    findings = dedupe(findings);
+    writeFileSync(RAW, JSON.stringify({ findings, visited: [...visited] }, null, 2));
   }
   log(`  raw findings: ${findings.length}; visited ${visited.size}/${mustVisit.length} required files`);
 
-  // adversarial fixpoint: audit -> falsify -> keep survivors -> re-audit remainder -> until stable
+  // adversarial fixpoint: falsify -> keep survivors -> re-falsify until a full pass refutes/downgrades
+  // NOTHING. Falsification only removes/downgrades, so the set shrinks monotonically and this ALWAYS
+  // converges. (An earlier version re-ran the full lens sweep each round, injecting new nondeterministic
+  // findings faster than they were refuted -> divergence; that re-audit has been removed.)
   const FALSIFY_SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"],
     properties: { verdicts: { type: "array", items: { type: "object", additionalProperties: false,
       required: ["id", "verdict", "reason"],
       properties: { id: { type: "string" }, verdict: { type: "string", enum: ["survives", "refuted", "downgraded"] }, reason: { type: "string" }, newSeverity: { type: "string" } } } } } };
 
-  function dedupe(list) { const m = new Map(); for (const f of list) m.set(fingerprint(f), f); return [...m.values()]; }
-  findings = dedupe(findings);
-
-  let prevSig = "";
   let round = 0;
   while (round < CFG.ceiling) {
     round++;
-    // chunked adversarial falsification — handing 200+ findings to one agent degrades quality
-    // and risks timeouts; falsify in batches (parallel), then merge verdicts.
+    // chunked adversarial falsification — batches in parallel (one giant call degrades quality / times out)
     const fbatches = chunksOf(findings, 40);
     fbatches.forEach((b, bi) => writeJSON(`02-fbatch-r${round}-${bi}.json`, { findings: b }));
     const falResults = await pMap(fbatches.map((b, bi) => ({ b, bi })), async ({ b, bi }) => {
@@ -514,29 +527,21 @@ For each finding id, return a verdict: "refuted" (you found counter-evidence it 
     const allVerdicts = falResults.flat();
     if (!allVerdicts.length) halt("stage2", `Adversarial falsifier produced ZERO verdicts in round ${round} — every batch failed (likely usage-limit or API error). Refusing to ship un-falsified findings: the adversarial promotion gate must actually run. Resume when capacity is restored.`);
     const vmap = new Map(allVerdicts.map((v) => [v.id, v]));
+    let changed = 0;
     const survivors = [];
     for (const f of findings) {
       const v = vmap.get(f.id);
       if (!v) { survivors.push(f); continue; }            // not addressed -> keep (conservative)
-      if (v.verdict === "refuted") continue;
-      if (v.verdict === "downgraded" && v.newSeverity) f.severity = v.newSeverity;
+      if (v.verdict === "refuted") { changed++; continue; }
+      if (v.verdict === "downgraded" && v.newSeverity && v.newSeverity !== f.severity) { f.severity = v.newSeverity; changed++; }
       f.adversarialNote = v.reason;
       survivors.push(f);
     }
-    const sig = survivors.map(fingerprint).sort().join("||");
-    log(`  round ${round}: ${findings.length} -> ${survivors.length} survivors`);
+    log(`  round ${round}: ${findings.length} -> ${survivors.length} survivors (${changed} refuted/downgraded)`);
     findings = survivors;
-    if (sig === prevSig) { log(`  ✔ fixpoint reached at round ${round}`); break; }   // stable across a full cycle
-    prevSig = sig;
+    // Convergence = a full adversarial pass that changes nothing (a true fixpoint under pressure).
+    if (changed === 0) { log(`  ✔ fixpoint reached at round ${round}`); break; }
     if (round === CFG.ceiling) { log(`  ⚠ ceiling reached without fixpoint`); halt("stage2", `Adversarial fixpoint not reached within ceiling ${CFG.ceiling}.`); }
-
-    // re-audit remainder: one more correctness+security sweep over the code to surface anything the falsifier's pressure implies
-    const reJobs = [];
-    for (const lid of ["correctness", "security"]) for (const ch of chunksOf(codeFiles, 55)) reJobs.push([lensById[lid], ch]);
-    const reaudit = await pMap(reJobs, ([lens, ch]) => auditLens(lens, ch));
-    let added = 0;
-    for (const res of reaudit) for (const f of (res.findings || [])) { const before = findings.length; findings = dedupe([...findings, f]); if (findings.length > before) added++; }
-    log(`  re-audit added ${added} new candidate(s)`);
     guardBudget("stage2");
   }
 
