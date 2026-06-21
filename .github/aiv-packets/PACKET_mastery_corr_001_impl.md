@@ -29,7 +29,7 @@ classification:
 1. mark_stage_complete('harden', 'softmax') appends 'softmax' to completed_modules, not 'module_0' — engine/schemas.py:166-172
 2. mark_stage_complete('harden') with no module_id raises ValueError('module_id is required for harden stage') — engine/schemas.py:168-170
 3. mark_stage_complete signature has module_id: Optional[str] = None; existing build/justify calls are unaffected — engine/schemas.py:156
-4. No existing tests were modified or deleted during this change — tests/engine/test_state.py, tests/engine/test_submit_handlers.py, tests/e2e/test_complete_bjh_loop.py
+4. Three pre-existing tests (test_state.py, test_submit_handlers.py, test_complete_bjh_loop.py) were updated because they encoded the CORR-001 bug; oracle justification at .aiv/oracle-corrections/mastery-corr-001-impl.md — see commit 926449b (retracted; re-committed as aiv commit)
 5. main.py:511 calls mark_stage_complete('harden', current_module.id) — not bare ('harden') — engine/main.py:511
 6. main.py:1825 calls mark_stage_complete('harden', current_module.id) — not bare ('harden') — engine/main.py:1825
 7. grep for bare mark_stage_complete("harden") in engine/main.py returns zero matches — engine/main.py:511
