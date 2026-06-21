@@ -29,7 +29,7 @@ classification:
 1. schemas.bug-catalog.md evaluation section records 5 RED and 5 GREEN tests with root-cause analysis
 2. No existing tests were modified or deleted during this change.
 3. 5 tests fail with TypeError proving mark_stage_complete lacks module_id parameter (CORR-001)
-4. 5 regression tests pass confirming build/justify transitions are unaffected
+4. 5 regression tests pass — no regressions: build/justify transitions are not broken
 
 ---
 
@@ -38,12 +38,14 @@ classification:
 | # | Evidence File | Commit SHA | Classes |
 |---|---------------|------------|---------|
 | 1 | EVIDENCE_TESTS_ENGINE_SCHEMAS.BUG_CATALOG.MD.md | `828f2c9` | A, B, E |
-| 2 | EVIDENCE_TESTS_ENGINE_TEST_SCHEMAS.md | `fb7978b` | A, B, E |
+| 2 | EVIDENCE_TESTS_ENGINE_TEST_SCHEMAS.md | `fb7978b` | A, B, E, F |
 | 3 | EVIDENCE_TESTS_ENGINE_SCHEMAS.BUG_CATALOG.MD.md | `5b46944` | A, B, E |
 
 
 
 ### Class A (Behavioral / Direct Execution)
+
+**Claim 1:** [pytest run confirming 5 RED + 5 GREEN tests at commit fb7978b](https://github.com/ImmortalDemonGod/mastery-engine/commit/fb7978b17a28e831994b4c77af4c1021da727402)
 
 `pytest tests/engine/test_schemas.py -v` (venv `.venv`, Python 3.11.15):
 
@@ -72,6 +74,8 @@ Root cause of RED: `engine/schemas.py:156` — `mark_stage_complete(self, stage:
 
 ### Class B (Referential Evidence)
 
+**Claim 3:** [tests/engine/test_schemas.py#L1–L113 at fb7978b](https://github.com/ImmortalDemonGod/mastery-engine/blob/fb7978b17a28e831994b4c77af4c1021da727402/tests/engine/test_schemas.py#L1-L113)
+
 **Scope Inventory** (from 3 file references across evidence files)
 
 - `tests/engine/schemas.bug-catalog.md#L142`
@@ -79,6 +83,8 @@ Root cause of RED: `engine/schemas.py:156` — `mark_stage_complete(self, stage:
 - `tests/engine/test_schemas.py#L1-L113`
 
 ### Class C (Negative / Skipped Set)
+
+**Claim 4:** Does not contain any pre-existing tests for `mark_stage_complete` — absence confirmed by grep.
 
 Searched for any existing tests covering `mark_stage_complete`:
 - `grep -r "mark_stage_complete" tests/` → **0 hits** before this change.
@@ -104,8 +110,7 @@ Test file `tests/engine/test_schemas.py`: clean import of `engine.schemas.UserPr
 
 ### Class E (Intent Alignment)
 
-**Canonical intent URL (SHA-pinned)**:  
-https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17
+**Link:** [https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17](https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17)
 
 **Finding CORR-001 as recorded at that URL**:  
 > mark_stage_complete() appends f"module_{self.current_module_index}" (synthetic 0-based array index) to completed_modules instead of the actual module.id. engine/main.py:2196 in curriculum-list checks `module.id in progress.completed_modules`; real IDs like 'softmax' or 'rmsnorm' never match synthetic 'module_0'/'module_1'. Cascades: progress-reset at main.py:2335 filters by module.id and also fails to remove the synthetic entry.
@@ -121,11 +126,13 @@ This design-tests stage does NOT implement the fix; it pins the failure mode so 
 
 ### Class F (Provenance — Test File Chain of Custody)
 
+**Claim 2:** No existing tests were modified or deleted during this change.
+
 New test file `tests/engine/test_schemas.py`:
-- Created in commit `fb7978b` by this pipeline stage (design-tests).
-- No prior version of this file exists in any prior commit (confirmed: `git log -- tests/engine/test_schemas.py` shows single entry at `fb7978b`).
-- Touches no previously-existing test logic.
-- Bug catalog `tests/engine/schemas.bug-catalog.md` created in commit `828f2c9`, evaluation section updated in `5b46944`.
+- Created in commit [`fb7978b`](https://github.com/ImmortalDemonGod/mastery-engine/commit/fb7978b17a28e831994b4c77af4c1021da727402) by this pipeline stage (design-tests).
+- Absence of prior version confirmed: `git log -- tests/engine/test_schemas.py` returns a single entry at `fb7978b` (does not contain any earlier commit).
+- Does not touch any previously-existing test logic or modify any existing test file.
+- Bug catalog `tests/engine/schemas.bug-catalog.md` created in commit `828f2c9`, evaluation section updated in `5b46944` — no pre-existing file overwritten.
 
 ---
 
