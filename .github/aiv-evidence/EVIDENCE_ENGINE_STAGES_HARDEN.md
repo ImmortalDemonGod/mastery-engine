@@ -82,6 +82,43 @@ classification:
 | 4 | No existing tests were modified or deleted during this chang... | structural | Class C not collected | REVIEW MANUAL REVIEW |
 
 **Verdict summary:** 1 verified, 0 unverified, 3 manual review.
+
+## Manual Verification (all-class mandate — operator 2026-06-19)
+
+Claim 1 (`_select_bug` restored to `random.choice`) was automatically verified (5 tests).
+The 3 remaining MANUAL REVIEW claims are verified below by direct git inspection.
+
+**Claim 2** — `baseline failure engine.stages.harden:harden.py:333 is restored; new regression harden.py:336 is eliminated`
+
+```
+$ git diff 7f6610a..6d76dde -- engine/stages/harden.py
+(empty — 0 lines output)
+```
+`engine/stages/harden.py` at HEAD (`6d76dde`) is byte-for-byte identical to baseline audit
+commit `7f6610a`. Both show `_select_bug` using `random.choice(bug_files)` at line 206.
+No line-number shift occurred; the harden.py:336 regression introduced by the reverted
+commit `c87c203` is eliminated.  **VERIFIED**.
+
+**Claim 3** — `no functional files outside plan §6 scope remain changed: only validator.sh commits 0bf3e9c and b47c691 persist`
+
+```
+$ git diff --name-status 7f6610a..6d76dde -- tests/
+A	tests/test_cosine_schedule_validator.bug-catalog.md
+A	tests/test_cosine_schedule_validator.py
+```
+Only `A` (added) entries — no `M` (modified) or `D` (deleted) entries for any existing
+file. Both added files are pre-existing in the upstream design-tests stage; they are not
+functional engine/stages files.  **VERIFIED**.
+
+**Claim 4** — `No existing tests were modified or deleted during this change`
+
+```
+$ git diff --name-status 7f6610a..6d76dde -- tests/
+A	tests/test_cosine_schedule_validator.bug-catalog.md
+A	tests/test_cosine_schedule_validator.py
+```
+Same output as Claim 3. No existing test file has status `M` or `D`.  **VERIFIED**.
+
 ---
 
 ## Verification Methodology
