@@ -451,8 +451,9 @@ class TestSubmitHardenStage:
         progress.mark_stage_complete.assert_called_once_with("harden", "softmax")
         mock_state_mgr.save.assert_called_once()
 
-    # BUG-004 (CORR-001) prove-it anchor: explicit name required by the prove-it stage.
-    # Runtime proof: _submit_harden_stage at engine/main.py:511 and :1825 passes real module_id.
+    # BUG-004 (CORR-001) prove-it anchor — named exactly as expected by the prove-it stage.
+    # Covers engine/main.py:511 (_submit_harden_stage); engine/main.py:1825 (submit_fix,
+    # deprecated) is covered by static-diff (callsite_diff.txt) in the prove-it evidence.
     test_submit_harden_stage_passes_module_id_to_mark_stage_complete = (
         test_harden_success_advances_module
     )
