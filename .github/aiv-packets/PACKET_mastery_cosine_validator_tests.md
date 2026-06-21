@@ -19,7 +19,14 @@ classification:
   sod_mode: S0
   critical_surfaces: []
   blast_radius: component
-  classification_rationale: "TODO: Describe why this tier was chosen"
+  classification_rationale: >
+    R1: test-only additions — 2 new files (tests/test_cosine_schedule_validator.bug-catalog.md
+    and tests/test_cosine_schedule_validator.py). No production code modified, no existing
+    test files altered or deleted. Both files introduce RED behavioral tests that target
+    bugs B1/B2 in validator.sh; they are read-only assertions about the shell script text
+    and do not mutate any runtime state. Blast radius is confined to the new test-support
+    files only. Zero auth/security surface. S0 because a single design-tests worker produces
+    both artefacts in one stage with no SoD dependency.
   classified_by: "Claude"
   classified_at: "2026-06-21T02:35:35Z"
 ```
