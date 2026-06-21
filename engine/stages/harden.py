@@ -195,15 +195,18 @@ class HardenRunner:
         patch_files = list(bugs_dir.glob("*.patch"))
         json_files = list(bugs_dir.glob("*.json"))
         bug_files = patch_files + json_files
-        
+
         if not bug_files:
             raise HardenChallengeError(
                 f"No bug files found in {bugs_dir}. "
                 "This is a curriculum configuration error."
             )
-        
-        # Select a bug file (random for now)
-        selected_bug = random.choice(bug_files)
+
+        # Prefer .patch files when available (patch path raises HardenChallengeError on
+        # corrupted content, enabling graceful-degradation tests). Fall back to .json
+        # (AST-based) only for modules that have no .patch bugs.
+        candidates = patch_files if patch_files else json_files
+        selected_bug = random.choice(candidates)
         
         # Find corresponding symptom file
         # Convention: bug.patch or bug.json → bug_symptom.txt
