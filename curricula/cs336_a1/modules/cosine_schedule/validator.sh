@@ -15,6 +15,7 @@ fi
 # HARDEN STAGE: File already copied by submit-fix, just cd to shadow worktree
 if [ "$(pwd)" != "$SHADOW_WORKTREE" ]; then
     # BUILD STAGE: We're in main directory, copy file and cd to shadow worktree
+    # utils.py (not optimizer.py): get_lr_cosine_schedule lives in cs336_basics.utils (tests/adapters.py:15)
     cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
     cd "$SHADOW_WORKTREE"
 else
