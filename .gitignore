@@ -185,3 +185,6 @@ coverage_html/
 
 # Prevent API key leaks
 .env.backup
+# AIV scaffolding — reasoning trail, captured in the training corpus; kept off main (#1/#40)
+.aiv/launch-briefs/
+.aiv/plans/
