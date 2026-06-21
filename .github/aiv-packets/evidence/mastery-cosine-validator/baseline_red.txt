@@ -1,0 +1,42 @@
+=== BASELINE RED: Design tests on origin/main ===
+baseline_sha: 7f6610a902befcb84fc47e5c82a161e3d3184ce4
+head_sha: d4970aa82ba5392c23f199169ad15c73ccabf902
+worktree: /tmp/mastery-cosine-validator_base
+command: uv run --no-project --with pytest pytest tests/test_cosine_schedule_validator.py -v --tb=short --noconftest
+run_date: 2026-06-21T03:46:40Z
+
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0
+cachedir: .pytest_cache
+rootdir: /tmp/mastery-cosine-validator_base
+configfile: pyproject.toml
+collecting ... collected 3 items
+
+tests/test_cosine_schedule_validator.py::test_validator_sh_copies_utils_py_not_optimizer_py FAILED
+tests/test_cosine_schedule_validator.py::test_validator_sh_pytest_node_id_matches_test_get_lr_cosine_schedule FAILED
+tests/test_cosine_schedule_validator.py::test_validator_propagates_utils_py_to_shadow_worktree FAILED
+
+=================================== FAILURES ===================================
+______________ test_validator_sh_copies_utils_py_not_optimizer_py ______________
+AssertionError: validator.sh:18 copies optimizer.py instead of utils.py;
+get_lr_cosine_schedule is defined in cs336_basics/utils.py (tests/adapters.py:15)
+so utils.py must be copied to propagate the student's implementation
+
+_____ test_validator_sh_pytest_node_id_matches_test_get_lr_cosine_schedule _____
+AssertionError: validator.sh uses pytest node ID ::test_lr_cosine_schedule, but the actual function
+in tests/test_optimizer.py:52 is test_get_lr_cosine_schedule (with 'get_' prefix);
+pytest collects 0 tests and exits non-zero
+
+____________ test_validator_propagates_utils_py_to_shadow_worktree _____________
+AssertionError: validator.sh must copy cs336_basics/utils.py to $SHADOW_WORKTREE/cs336_basics/utils.py
+in the BUILD stage (Bug B1: currently only optimizer.py is copied, leaving utils.py stale).
+validator exit=4; stderr=ERROR: file or directory not found: tests/test_optimizer.py::test_lr_cosine_schedule
+
+assert '# STALE ...' != '# STALE ...'  (file was NOT overwritten — bug confirmed)
+
+=========================== short test summary info ============================
+FAILED tests/test_cosine_schedule_validator.py::test_validator_sh_copies_utils_py_not_optimizer_py
+FAILED tests/test_cosine_schedule_validator.py::test_validator_sh_pytest_node_id_matches_test_get_lr_cosine_schedule
+FAILED tests/test_cosine_schedule_validator.py::test_validator_propagates_utils_py_to_shadow_worktree
+============================== 3 failed in 0.22s ===============================
+exit_code: 1

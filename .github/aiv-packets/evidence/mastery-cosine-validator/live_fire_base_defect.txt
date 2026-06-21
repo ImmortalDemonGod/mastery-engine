@@ -1,0 +1,38 @@
+=== LIVE-FIRE DEFECT: BASELINE validator.sh — bug in action ===
+baseline_sha: 7f6610a902befcb84fc47e5c82a161e3d3184ce4
+validator: (origin/main) curricula/cs336_a1/modules/cosine_schedule/validator.sh
+cwd: modes/developer/ (developer reference implementation as submission)
+SHADOW_WORKTREE: /tmp/tmp.VGcEw97Du4 (stale sentinel in utils.py)
+Before: shadow cs336_basics/utils.py = '# STALE — baseline must NOT overwrite (bug: copies optimizer.py)'
+run_date: 2026-06-21T03:46:40Z
+
+Defect exhibited:
+  (1) validator.sh:18 ran: cp cs336_basics/optimizer.py "$SHADOW_WORKTREE/cs336_basics/optimizer.py"
+      → utils.py was NEVER copied; shadow cs336_basics/utils.py remains stale sentinel
+  (2) pytest node ID used: test_lr_cosine_schedule (non-existent function)
+      → ERROR: file or directory not found: tests/test_optimizer.py::test_lr_cosine_schedule
+
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-8.4.1, pluggy-1.6.0
+rootdir: /tmp/tmp.VGcEw97Du4
+collecting ... collected 0 items / 1 error
+
+==================================== ERRORS ====================================
+___________________ ERROR collecting tests/test_optimizer.py ___________________
+ImportError while importing test module '/tmp/tmp.VGcEw97Du4/tests/test_optimizer.py'.
+tests/adapters.py:11: in <module>
+    from cs336_basics.utils import (
+E   ImportError: cannot import name 'softmax' from 'cs336_basics.utils'
+        (/tmp/tmp.VGcEw97Du4/cs336_basics/utils.py)
+=========================== short test summary info ============================
+ERROR tests/test_optimizer.py
+=============================== 1 error in 0.02s ==============================
+ERROR: found no collectors for /tmp/tmp.VGcEw97Du4/tests/test_optimizer.py::test_lr_cosine_schedule
+
+exit_code: 4
+
+After: shadow cs336_basics/utils.py still stale: YES — BUG CONFIRMED (utils.py never copied)
+
+Root cause confirmed: baseline validator copies optimizer.py (B1) and references
+non-existent test node test_lr_cosine_schedule (B2); cosine-schedule validation
+permanently broken regardless of correct student implementation.
