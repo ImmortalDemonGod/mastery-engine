@@ -19,7 +19,7 @@ classification:
   sod_mode: S0
   critical_surfaces: []
   blast_radius: component
-  classification_rationale: "TODO: Describe why this tier was chosen"
+  classification_rationale: "R1: signature param add to existing method (module_id: Optional[str]=None) + ValueError guard in harden branch; 2 call-site edits in engine/main.py (lines 511, 1825); 3 test-file oracle corrections replacing synthetic-ID assertions with real module IDs; 0 new files, 0 DB/schema migrations; 196/196 engine suite passes at exit 0"
   classified_by: "Claude"
   classified_at: "2026-06-21T07:21:56Z"
 ```

@@ -169,7 +169,7 @@ $ grep -n '"module_0"\|"module_1"' tests/e2e/test_complete_bjh_loop.py
 (zero output — exit 0)
 ```
 
-Skipped from bug catalog: `tests/test_tokenizer.py`, `tests/test_model.py`, `tests/test_train_bpe.py`, `tests/test_data.py`, `tests/test_nn_utils.py`, `tests/test_optimizer.py`, `tests/test_serialization.py` — all `NotImplementedError` (pre-existing TODO stubs, not in scope of CORR-001).
+Skipped from bug catalog: `tests/test_tokenizer.py`, `tests/test_model.py`, `tests/test_train_bpe.py`, `tests/test_data.py`, `tests/test_nn_utils.py`, `tests/test_optimizer.py`, `tests/test_serialization.py` — all raise `NotImplementedError` (pre-existing unimplemented stubs outside the scope of CORR-001).
 
 ### Class D (Static Analysis)
 

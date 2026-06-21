@@ -19,7 +19,7 @@ classification:
   sod_mode: S0
   critical_surfaces: []
   blast_radius: component
-  classification_rationale: "TODO: Describe why this tier was chosen"
+  classification_rationale: "R1: adds new test file (tests/engine/test_schemas.py, 113 lines) and bug catalog (tests/engine/schemas.bug-catalog.md); 0 engine logic changes; 5 RED tests expose CORR-001 defect via TypeError; 5 GREEN regression tests confirm build/justify paths unaffected"
   classified_by: "Claude"
   classified_at: "2026-06-21T07:02:16Z"
 ```
