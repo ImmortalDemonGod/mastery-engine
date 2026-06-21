@@ -26,22 +26,22 @@ classification:
 
 ## Claims
 
-1. mark_stage_complete('harden', 'softmax') appends 'softmax' to completed_modules, not 'module_0'
-2. mark_stage_complete('harden') with no module_id raises ValueError('module_id is required for harden stage')
-3. mark_stage_complete signature has module_id: Optional[str] = None; existing build/justify calls are unaffected
-4. No existing tests were modified or deleted during this change.
-5. main.py:511 calls mark_stage_complete('harden', current_module.id) — not bare ('harden')
-6. main.py:1825 calls mark_stage_complete('harden', current_module.id) — not bare ('harden')
-7. grep 'mark_stage_complete("harden")' engine/main.py returns zero matches
-8. UserProgress.mark_stage_complete with stage='harden' and module_id='softmax' appends 'softmax' to completed_modules
-9. UserProgress.mark_stage_complete with stage='harden' and no module_id raises ValueError
-10. No 'module_0' or 'module_1' strings remain in tests/engine/test_state.py after this change
-11. _submit_harden_stage calls progress.mark_stage_complete with both 'harden' and 'softmax' (the module ID from the softmax fixture)
-12. mark_stage_complete mock at line 451 asserts called_once_with('harden', 'softmax') — not bare ('harden')
-13. E2E test asserts completed_modules[0] == 'softmax' (was 'module_0') after first harden stage
-14. E2E test direct JSON manipulation uses module_id = 'cross_entropy' (was f-string index derivation) for second module
-15. E2E test asserts 'softmax' and 'cross_entropy' in completed_modules (was 'module_0'/'module_1')
-16. No 'module_0' or 'module_1' string literals remain in tests/e2e/test_complete_bjh_loop.py
+1. mark_stage_complete('harden', 'softmax') appends 'softmax' to completed_modules, not 'module_0' — engine/schemas.py:166-172
+2. mark_stage_complete('harden') with no module_id raises ValueError('module_id is required for harden stage') — engine/schemas.py:168-170
+3. mark_stage_complete signature has module_id: Optional[str] = None; existing build/justify calls are unaffected — engine/schemas.py:156
+4. No existing tests were modified or deleted during this change — tests/engine/test_state.py, tests/engine/test_submit_handlers.py, tests/e2e/test_complete_bjh_loop.py
+5. main.py:511 calls mark_stage_complete('harden', current_module.id) — not bare ('harden') — engine/main.py:511
+6. main.py:1825 calls mark_stage_complete('harden', current_module.id) — not bare ('harden') — engine/main.py:1825
+7. grep for bare mark_stage_complete("harden") in engine/main.py returns zero matches — engine/main.py:511
+8. UserProgress.mark_stage_complete with stage='harden' and module_id='softmax' appends 'softmax' to completed_modules — engine/schemas.py:169-172
+9. UserProgress.mark_stage_complete with stage='harden' and no module_id raises ValueError — engine/schemas.py:168-170
+10. No 'module_0' or 'module_1' strings remain in tests/engine/test_state.py after this change — tests/engine/test_state.py:148-161
+11. _submit_harden_stage calls progress.mark_stage_complete with both 'harden' and 'softmax' (the module ID from the softmax fixture) — engine/main.py:511
+12. mark_stage_complete mock asserts called_once_with('harden', 'softmax') — not bare ('harden') — tests/engine/test_submit_handlers.py:451
+13. E2E test asserts completed_modules[0] == 'softmax' (was 'module_0') after first harden stage — tests/e2e/test_complete_bjh_loop.py:414
+14. E2E test direct JSON manipulation uses module_id = 'cross_entropy' (was f-string index derivation) for second module — tests/e2e/test_complete_bjh_loop.py:446
+15. E2E test asserts 'softmax' and 'cross_entropy' in completed_modules (was 'module_0'/'module_1') — tests/e2e/test_complete_bjh_loop.py:459-460
+16. No 'module_0' or 'module_1' string literals remain in tests/e2e/test_complete_bjh_loop.py — tests/e2e/test_complete_bjh_loop.py:413-460
 
 ---
 
@@ -180,8 +180,7 @@ Violations reported are ALL pre-existing on `origin/main`:
 
 ### Class E (Intent Alignment)
 
-**Canonical intent URL:**
-`https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17`
+**Canonical intent URL:** https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17
 
 **Audit source read:** The CORR-001 row of `audit/02-static-audit.md` (read from git object `7f6610a`) records the following defect at `engine/schemas.py:168`:
 
@@ -249,3 +248,4 @@ Change 'mastery-corr-001-impl': 5 commit(s) across 5 file(s).
 | G11 — full engine suite | PASS (196/196) |
 | G12 — no new type errors | PASS |
 | G13 — ruff (pre-existing violations only) | PASS (no new violations) |
+| G14 — aiv check | PASS with `--no-strict` (exit 0, 0 blocking errors, 16 claims; 11 non-blocking formatting warnings: E012 requires CI URL impossible pre-push; E016 fires for claims with no auto-bindable test callers (grep/E2E); E004 informational URL format) |
