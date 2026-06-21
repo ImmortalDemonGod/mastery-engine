@@ -29,7 +29,7 @@ classification:
 1. mark_stage_complete('harden', 'softmax') appends 'softmax' to completed_modules, not 'module_0'
 2. mark_stage_complete('harden') with no module_id raises ValueError('module_id is required for harden stage')
 3. mark_stage_complete signature has module_id: Optional[str] = None; existing build/justify calls are unaffected
-4. No existing tests were modified or deleted during this change.
+4. Three existing test files were modified to replace bug-encoding oracles with correct-behavior oracles — see `.aiv/oracle-corrections/mastery-corr-001-impl.md` for per-test justification of each oracle change.
 5. main.py:511 calls mark_stage_complete('harden', current_module.id) — not bare ('harden')
 6. main.py:1825 calls mark_stage_complete('harden', current_module.id) — not bare ('harden')
 7. grep 'mark_stage_complete("harden")' engine/main.py returns zero matches
@@ -56,7 +56,9 @@ classification:
 
 ### Class E (Intent Alignment)
 
-- **Requirement:** https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17 — mark_stage_complete() appends synthetic module index instead of real module.id; fix adds module_id param, raises ValueError on None for harden, passes current_module.id at both call sites in main.py, updates 3 test files to assert real IDs
+- **Requirement:** [audit/02-static-audit.md L17 (SHA 7f6610a)](https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L17)
+
+**Alignment assessment:** The audit source at L17 (SHA-pinned, immutable) records that `mark_stage_complete()` in `engine/schemas.py:168` appends `f"module_{self.current_module_index}"` — a synthetic zero-based index — to `completed_modules` instead of the real `module.id` supplied by the caller. The cascade: `main.py:2196` checks `module.id in progress.completed_modules` (always False for synthetic entries); `main.py:2335` filters by `module_id` (also fails). This change: (1) adds `module_id: Optional[str] = None` to `mark_stage_complete` signature at `schemas.py:156`, (2) replaces the synthetic f-string with `raise ValueError("module_id is required for harden stage")` when `module_id is None`, (3) passes `current_module.id` at both harden call sites in `main.py` (lines 511 and 1825), and (4) updates 3 test files to assert real IDs instead of synthetic ones. This directly addresses all three defect effects named in the audit source.
 
 ### Class B (Referential Evidence)
 
@@ -76,6 +78,127 @@ classification:
 - `tests/e2e/test_complete_bjh_loop.py#L413-L414`
 - `tests/e2e/test_complete_bjh_loop.py#L446`
 - `tests/e2e/test_complete_bjh_loop.py#L459-L460`
+
+### Class A (Behavioral / Direct Execution Evidence)
+
+**G6 — Real ID appended (core CORR-001 fix):**
+```
+$ python -c "
+from engine.schemas import UserProgress
+p = UserProgress(curriculum_id='t', current_stage='harden')
+p.mark_stage_complete('harden', 'softmax')
+assert 'softmax' in p.completed_modules
+assert 'module_0' not in p.completed_modules
+print('PASS: completed_modules =', p.completed_modules)
+"
+PASS: completed_modules = ['softmax']
+```
+
+**G7 — ValueError on absent module_id:**
+```
+$ python -c "
+from engine.schemas import UserProgress
+p = UserProgress(curriculum_id='t', current_stage='harden')
+try:
+    p.mark_stage_complete('harden')
+except ValueError as e:
+    print(f'PASS: {e}')
+"
+PASS: module_id is required for harden stage
+```
+
+**G10 — Unit test suite (TestUserProgressModel, 4 tests):**
+```
+$ uv run pytest tests/engine/test_state.py::TestUserProgressModel -v --tb=short
+tests/engine/test_state.py::TestUserProgressModel::test_mark_stage_complete_build_to_justify PASSED
+tests/engine/test_state.py::TestUserProgressModel::test_mark_stage_complete_justify_to_harden PASSED
+tests/engine/test_state.py::TestUserProgressModel::test_mark_stage_complete_harden_advances_module PASSED
+tests/engine/test_state.py::TestUserProgressModel::test_mark_stage_complete_harden_requires_module_id PASSED
+4 passed in 0.09s
+```
+
+**G11 — Full engine suite (197 tests):**
+```
+$ uv run pytest tests/engine/ -v -m "not integration" --tb=short
+197 passed, 10 warnings in 1.26s
+```
+Exit 0. No regressions.
+
+**BUG-004 anchor — call-site runtime verification:**
+```
+$ uv run pytest tests/engine/test_submit_handlers.py::TestSubmitHardenStage -v --tb=short
+tests/engine/test_submit_handlers.py::TestSubmitHardenStage::test_harden_success_advances_module PASSED
+tests/engine/test_submit_handlers.py::TestSubmitHardenStage::test_submit_harden_stage_passes_module_id_to_mark_stage_complete PASSED
+2 passed in 0.49s
+```
+Mock assertion `progress.mark_stage_complete.assert_called_once_with("harden", "softmax")` at `test_submit_handlers.py:451` PASSES — confirms `main.py:511` call site passes real module ID.
+
+**Adversarial regression test (test_corrupted_patch_file):**
+```
+$ uv run pytest tests/e2e/test_adversarial_stress.py::TestAdversarialStress::test_corrupted_patch_file -v --tb=short
+tests/e2e/test_adversarial_stress.py::TestAdversarialStress::test_corrupted_patch_file PASSED
+1 passed in 2.84s
+```
+No regression from revert commit `222907b`.
+
+### Class C (Negative Evidence)
+
+**G1 — No synthetic f-string remains in `engine/schemas.py`:**
+```
+$ grep -n 'f"module_' engine/schemas.py
+(zero output — exit 0)
+```
+Searched: `engine/schemas.py` at HEAD `f981605`. No synthetic index construction present.
+
+**G5 — No bare `mark_stage_complete("harden")` call in `engine/main.py`:**
+```
+$ grep -n 'mark_stage_complete("harden")' engine/main.py
+(zero output — exit 0)
+```
+Both harden call sites now pass `current_module.id`. No third harden site found.
+
+**G8 — No `"module_0"` or `"module_1"` in `tests/engine/test_state.py`:**
+```
+$ grep -n '"module_0"\|"module_1"' tests/engine/test_state.py
+(zero output — exit 0)
+```
+
+**G9 — No `"module_0"` or `"module_1"` in `tests/e2e/test_complete_bjh_loop.py`:**
+```
+$ grep -n '"module_0"\|"module_1"' tests/e2e/test_complete_bjh_loop.py
+(zero output — exit 0)
+```
+
+Skipped from bug catalog: `tests/test_tokenizer.py`, `tests/test_model.py`, `tests/test_train_bpe.py`, `tests/test_data.py`, `tests/test_nn_utils.py`, `tests/test_optimizer.py`, `tests/test_serialization.py` — all `NotImplementedError` (pre-existing TODO stubs, not in scope of CORR-001).
+
+### Class D (Static Analysis)
+
+**G13 — Ruff lint check:**
+```
+$ uv run ruff check engine/ tests/ --output-format=github 2>&1
+... (violations in test_submit_handlers.py:27, test_validator.py, test_workspace.py, etc.)
+```
+Exit non-zero, but ALL violations are pre-existing on `origin/main` — confirmed by running `ruff check` on `git show origin/main:tests/engine/test_submit_handlers.py`. No new violations introduced by CORR-001 changes. See baseline ruff output (14 fixable violations at F401/F841/E402 in pre-existing code).
+
+**G4 — Two harden call sites pass `current_module.id`:**
+```
+$ grep -n 'mark_stage_complete.*harden.*current_module.id' engine/main.py
+511:        progress.mark_stage_complete("harden", current_module.id)
+1825:            progress.mark_stage_complete("harden", current_module.id)
+```
+Count: 2. Both sites updated.
+
+### Class F (Provenance — git chain-of-custody for touched test files)
+
+Three test files were modified to replace bug-encoding oracles with correct-behavior oracles. Each modification is justified in `.aiv/oracle-corrections/mastery-corr-001-impl.md` (committed at HEAD).
+
+| Test file | Modifying commit | Oracle correction summary |
+|-----------|-----------------|--------------------------|
+| `tests/engine/test_state.py` | `305ed1b` (2026-06-21T07:20:17Z) | `test_mark_stage_complete_harden_advances_module`: old oracle called without module_id and checked only `len()==1`; correct oracle calls with `"softmax"` and asserts `"softmax" in completed_modules`. New `test_mark_stage_complete_harden_requires_module_id` added. |
+| `tests/engine/test_submit_handlers.py` | `f4ee9ff` (2026-06-21T07:20:31Z); `8d13f2d` (2026-06-21T08:22:47Z) | Line 451: `assert_called_once_with("harden")` → `assert_called_once_with("harden", "softmax")`. BUG-004 alias added. Both changes justified: old oracle asserted the buggy one-arg calling convention. |
+| `tests/e2e/test_complete_bjh_loop.py` | `19aa603` (2026-06-21T07:21:00Z) | Lines 413-414, 446, 459-460: synthetic `"module_0"`/`f"module_{index}"`/`"module_1"` replaced with `"softmax"`/`"cross_entropy"`. Old oracle asserted bug artifacts; correct oracle asserts real manifest IDs. |
+
+**Justification basis:** `.aiv/oracle-corrections/mastery-corr-001-impl.md` at HEAD `f981605` documents that each original oracle was wrong on two independent grounds rooted in the finding itself (not the fix): (1) it accepted the synthetic ID without verifying the stored value, and (2) it exercised the buggy call convention. The correct oracles are uniquely constrained by the manifest IDs `"softmax"` and `"cross_entropy"` at indices 0 and 1 of `curricula/cs336_a1/manifest.json`.
 
 ---
 
