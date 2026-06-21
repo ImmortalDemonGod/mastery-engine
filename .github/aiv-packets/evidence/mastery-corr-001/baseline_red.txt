@@ -1,0 +1,133 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /tmp/mastery-corr-001_base
+configfile: pyproject.toml
+collecting ... collected 10 items
+
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_records_caller_supplied_module_id_not_synthetic_index FAILED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_does_not_append_synthetic_index FAILED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_curriculum_list_lookup_matches_after_mark_complete FAILED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_subsequent_module_records_its_own_id FAILED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_idempotent_real_module_id FAILED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenValidation::test_harden_raises_if_module_id_is_none PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_build_advances_to_justify_without_module_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_justify_advances_to_harden_without_module_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_build_does_not_record_completed_module PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_justify_does_not_record_completed_module PASSED
+
+=================================== FAILURES ===================================
+_ TestMarkStageCompleteHardenRecordsRealId.test_harden_records_caller_supplied_module_id_not_synthetic_index _
+
+self = <tests.engine.test_schemas.TestMarkStageCompleteHardenRecordsRealId object at 0x7f10a52367d0>
+
+    def test_harden_records_caller_supplied_module_id_not_synthetic_index(self):
+        """CORR-001 BUG-A: mark_stage_complete('harden', module_id='softmax') must add
+        'softmax' to completed_modules — guards against synthetic 'module_0' alias
+        making curriculum-list completion check at main.py:2196 always miss."""
+        progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0)
+>       progress.mark_stage_complete("harden", module_id="softmax")
+E       TypeError: UserProgress.mark_stage_complete() got an unexpected keyword argument 'module_id'
+
+tests/engine/test_schemas.py:28: TypeError
+_ TestMarkStageCompleteHardenRecordsRealId.test_harden_does_not_append_synthetic_index _
+
+self = <tests.engine.test_schemas.TestMarkStageCompleteHardenRecordsRealId object at 0x7f10a406f090>
+
+    def test_harden_does_not_append_synthetic_index(self):
+        """CORR-001 BUG-A (contract pin): after harden, the synthetic 'module_0' string
+        must NOT appear in completed_modules — its presence makes module.id lookup
+        always return False."""
+        progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0)
+>       progress.mark_stage_complete("harden", module_id="softmax")
+E       TypeError: UserProgress.mark_stage_complete() got an unexpected keyword argument 'module_id'
+
+tests/engine/test_schemas.py:36: TypeError
+_ TestMarkStageCompleteHardenRecordsRealId.test_curriculum_list_lookup_matches_after_mark_complete _
+
+self = <tests.engine.test_schemas.TestMarkStageCompleteHardenRecordsRealId object at 0x7f10a406f450>
+
+    def test_curriculum_list_lookup_matches_after_mark_complete(self):
+        """CORR-001 BUG-A (integration contract): id stored by mark_stage_complete must
+        satisfy the 'module.id in progress.completed_modules' check used by the
+        curriculum-list command at engine/main.py:2196."""
+        progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0)
+>       progress.mark_stage_complete("harden", module_id="softmax")
+E       TypeError: UserProgress.mark_stage_complete() got an unexpected keyword argument 'module_id'
+
+tests/engine/test_schemas.py:44: TypeError
+_ TestMarkStageCompleteHardenRecordsRealId.test_harden_subsequent_module_records_its_own_id _
+
+self = <tests.engine.test_schemas.TestMarkStageCompleteHardenRecordsRealId object at 0x7f10a406f810>
+
+    def test_harden_subsequent_module_records_its_own_id(self):
+        """CORR-001 BUG-D: each module's real id must be stored independent of its
+        position index — 'rmsnorm' at index 1 must not collide with 'softmax' at
+        index 0; both must appear in completed_modules."""
+        progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0)
+>       progress.mark_stage_complete("harden", module_id="softmax")
+E       TypeError: UserProgress.mark_stage_complete() got an unexpected keyword argument 'module_id'
+
+tests/engine/test_schemas.py:54: TypeError
+_ TestMarkStageCompleteHardenRecordsRealId.test_harden_idempotent_real_module_id _
+
+self = <tests.engine.test_schemas.TestMarkStageCompleteHardenRecordsRealId object at 0x7f10a406fd90>
+
+    def test_harden_idempotent_real_module_id(self):
+        """CORR-001 BUG-C: calling mark_stage_complete('harden') twice with the same
+        module_id must not duplicate the entry — deduplication guard must operate on
+        the real id, not the synthetic one."""
+        progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0)
+>       progress.mark_stage_complete("harden", module_id="softmax")
+E       TypeError: UserProgress.mark_stage_complete() got an unexpected keyword argument 'module_id'
+
+tests/engine/test_schemas.py:64: TypeError
+=============================== warnings summary ===============================
+engine/schemas.py:242
+  /tmp/mastery-corr-001_base/engine/schemas.py:242: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContextReference(BaseModel):
+
+engine/schemas.py:250
+  /tmp/mastery-corr-001_base/engine/schemas.py:250: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NameNode(BaseModel):
+
+engine/schemas.py:259
+  /tmp/mastery-corr-001_base/engine/schemas.py:259: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NestedPattern(BaseModel):
+
+engine/schemas.py:269
+  /tmp/mastery-corr-001_base/engine/schemas.py:269: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class KeywordArg(BaseModel):
+
+engine/schemas.py:278
+  /tmp/mastery-corr-001_base/engine/schemas.py:278: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Pattern(BaseModel):
+
+engine/schemas.py:295
+  /tmp/mastery-corr-001_base/engine/schemas.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Condition(BaseModel):
+
+engine/schemas.py:306
+  /tmp/mastery-corr-001_base/engine/schemas.py:306: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Replacement(BaseModel):
+
+engine/schemas.py:316
+  /tmp/mastery-corr-001_base/engine/schemas.py:316: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PassDefinition(BaseModel):
+
+engine/schemas.py:331
+  /tmp/mastery-corr-001_base/engine/schemas.py:331: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugMetadata(BaseModel):
+
+engine/schemas.py:342
+  /tmp/mastery-corr-001_base/engine/schemas.py:342: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugDefinition(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_records_caller_supplied_module_id_not_synthetic_index
+FAILED tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_does_not_append_synthetic_index
+FAILED tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_curriculum_list_lookup_matches_after_mark_complete
+FAILED tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_subsequent_module_records_its_own_id
+FAILED tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_idempotent_real_module_id
+=================== 5 failed, 5 passed, 10 warnings in 0.14s ===================

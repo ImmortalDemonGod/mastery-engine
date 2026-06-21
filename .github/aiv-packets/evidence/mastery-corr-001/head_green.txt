@@ -1,0 +1,61 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /home/user/mastery-engine-mastery-corr-001
+configfile: pyproject.toml
+collecting ... collected 10 items
+
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_records_caller_supplied_module_id_not_synthetic_index PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_does_not_append_synthetic_index PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_curriculum_list_lookup_matches_after_mark_complete PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_subsequent_module_records_its_own_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenRecordsRealId::test_harden_idempotent_real_module_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteHardenValidation::test_harden_raises_if_module_id_is_none PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_build_advances_to_justify_without_module_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_justify_advances_to_harden_without_module_id PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_build_does_not_record_completed_module PASSED
+tests/engine/test_schemas.py::TestMarkStageCompleteNonHardenRegressions::test_justify_does_not_record_completed_module PASSED
+
+=============================== warnings summary ===============================
+engine/schemas.py:243
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:243: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContextReference(BaseModel):
+
+engine/schemas.py:251
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:251: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NameNode(BaseModel):
+
+engine/schemas.py:260
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:260: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NestedPattern(BaseModel):
+
+engine/schemas.py:270
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:270: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class KeywordArg(BaseModel):
+
+engine/schemas.py:279
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:279: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Pattern(BaseModel):
+
+engine/schemas.py:296
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:296: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Condition(BaseModel):
+
+engine/schemas.py:307
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:307: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Replacement(BaseModel):
+
+engine/schemas.py:317
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:317: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PassDefinition(BaseModel):
+
+engine/schemas.py:332
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:332: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugMetadata(BaseModel):
+
+engine/schemas.py:343
+  /home/user/mastery-engine-mastery-corr-001/engine/schemas.py:343: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugDefinition(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 10 passed, 10 warnings in 0.13s ========================
