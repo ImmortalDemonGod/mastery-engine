@@ -153,9 +153,9 @@ class UserProgress(BaseModel):
     completed_patterns: list[str] = Field(default_factory=list)    # Library mode pattern theory
     completed_problems: list[str] = Field(default_factory=list)    # Library mode problems
     
-    def mark_stage_complete(self, stage: str) -> None:
+    def mark_stage_complete(self, stage: str, module_id: Optional[str] = None) -> None:
         """Advance to next stage in BJH loop or next module.
-        
+
         NOTE: This method maintains legacy LINEAR behavior for backward compatibility.
         LIBRARY mode logic will be implemented in Phase 2 (CLI refactor).
         """
@@ -165,7 +165,8 @@ class UserProgress(BaseModel):
             self.current_stage = "harden"
         elif stage == "harden":
             # Module complete, advance to next
-            module_id = f"module_{self.current_module_index}"  # Will be replaced with actual ID
+            if module_id is None:
+                raise ValueError("module_id is required for harden stage")
             if module_id not in self.completed_modules:
                 self.completed_modules.append(module_id)
             self.current_module_index += 1
