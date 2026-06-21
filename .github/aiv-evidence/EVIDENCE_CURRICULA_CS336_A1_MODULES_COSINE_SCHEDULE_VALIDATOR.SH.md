@@ -63,6 +63,51 @@ This file has no claim-specific execution evidence.
 | 4 | No existing tests were modified or deleted during this chang... | structural | Class C not collected | REVIEW MANUAL REVIEW |
 
 **Verdict summary:** 0 verified, 0 unverified, 4 manual review.
+
+## Manual Verification (all-class mandate — operator 2026-06-19)
+
+The automatic binding system could not match claims to test results because the changed
+file is a shell script (not a Python module). All 4 claims are verifiable by direct
+inspection and test execution; evidence is reproduced below for human adjudication.
+
+**Claim 1** — `validator.sh BUILD stage copies cs336_basics/utils.py (not optimizer.py)`
+
+```
+$ grep -n "cp cs336_basics/utils.py" curricula/cs336_a1/modules/cosine_schedule/validator.sh
+19:    cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
+```
+1 match at line 19. No `cp cs336_basics/optimizer.py` present.  **VERIFIED**.
+
+**Claim 2** — `validator.sh pytest invocations use test_get_lr_cosine_schedule`
+
+```
+$ grep -n "test_get_lr_cosine_schedule" curricula/cs336_a1/modules/cosine_schedule/validator.sh
+34:    "$MASTERY_PYTHON" -m pytest tests/test_optimizer.py::test_get_lr_cosine_schedule ...
+38:    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_optimizer.py::test_get_lr_cosine_schedule ...
+41:    uv run pytest tests/test_optimizer.py::test_get_lr_cosine_schedule ...
+```
+3 matches (lines 34, 38, 41). No `::test_lr_cosine_schedule` (wrong ID) present.  **VERIFIED**.
+
+**Claim 3** — `all 3 RED tests in tests/test_cosine_schedule_validator.py pass`
+
+```
+$ uv run pytest tests/test_cosine_schedule_validator.py -v --tb=short
+collected 3 items
+tests/test_cosine_schedule_validator.py::test_validator_sh_copies_utils_py_not_optimizer_py PASSED
+tests/test_cosine_schedule_validator.py::test_validator_sh_pytest_node_id_matches_test_get_lr_cosine_schedule PASSED
+tests/test_cosine_schedule_validator.py::test_validator_propagates_utils_py_to_shadow_worktree PASSED
+3 passed in 0.39s
+```
+**VERIFIED**.
+
+**Claim 4** — `No existing tests were modified or deleted during this change`
+
+```
+$ git diff c57efea..6d76dde -- tests/ cs336_basics/
+(empty — 0 lines output)
+```
+No diff output; no existing test or cs336_basics file was modified or deleted.  **VERIFIED**.
+
 ---
 
 ## Verification Methodology
