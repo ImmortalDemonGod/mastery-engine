@@ -165,22 +165,28 @@ exit 0
         with open(state_file, 'w') as f:
             json.dump(state, f, indent=2)
         
-        # Corrupt the patch file
+        # Corrupt the patch file; hide JSON bugs so the engine is forced to pick the patch
         bugs_dir = isolated_repo / "curricula/cs336_a1/modules/softmax/bugs"
         patch_file = list(bugs_dir.glob("*.patch"))[0]
         patch_backup = patch_file.with_suffix('.patch.bak')
         patch_file.rename(patch_backup)
-        
+
+        # Hide JSON bug files so random.choice can only land on the corrupted patch
+        json_bugs = list(bugs_dir.glob("*.json"))
+        json_backups = [(jf, jf.with_suffix('.json.bak')) for jf in json_bugs]
+        for jf, jbak in json_backups:
+            jf.rename(jbak)
+
         corrupted_patch = '''This is not a valid patch file!
 Just random text that will cause the patch command to fail.
 No proper patch headers or hunks.
 '''
         patch_file.write_text(corrupted_patch)
-        
+
         try:
             # Try to start harden challenge
             result = run_engine_command(isolated_repo, "start-challenge")
-            
+
             # Should fail gracefully
             assert result.returncode != 0
             # Should have clear error message
@@ -189,6 +195,9 @@ No proper patch headers or hunks.
             # Restore original patch
             patch_file.unlink()
             patch_backup.rename(patch_file)
+            # Restore JSON bug files
+            for jf, jbak in json_backups:
+                jbak.rename(jf)
     
     def test_filesystem_permissions_error(self, isolated_repo: Path, tmp_path: Path):
         """
