@@ -139,8 +139,29 @@ Audit reference: https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a
 
 ---
 
-## 5. Evaluation (to be filled after tests run)
+## 5. Evaluation (post-first-run)
 
-- **Bugs caught** (test failed first run, fix needed): _pending_
-- **Bugs characterized** (test passed first run, behavior pinned): _pending_
-- **Bugs discovered during writing**: _pending_
+**5 FAILED / 5 PASSED** (`pytest tests/engine/test_schemas.py -v`, venv activated)
+
+- **Bugs caught** (test FAILED first run — bug is present and fix is needed):
+  - BUG-A: `test_harden_records_caller_supplied_module_id_not_synthetic_index` — `TypeError: mark_stage_complete() got an unexpected keyword argument 'module_id'` (current signature lacks the parameter).
+  - BUG-A: `test_harden_does_not_append_synthetic_index` — same TypeError.
+  - BUG-A: `test_curriculum_list_lookup_matches_after_mark_complete` — same TypeError.
+  - BUG-D: `test_harden_subsequent_module_records_its_own_id` — same TypeError.
+  - BUG-C: `test_harden_idempotent_real_module_id` — same TypeError.
+
+- **Bugs characterized** (test PASSED first run — behavior pinned, existing regression guards):
+  - BUG-B: `test_harden_raises_if_module_id_is_none` — PASSES (TypeError from wrong arity is caught by `pytest.raises((ValueError, TypeError))`). After the fix this must remain GREEN with ValueError.
+  - BUG-E: `test_build_advances_to_justify_without_module_id` — PASSES (existing behavior preserved).
+  - BUG-E: `test_justify_advances_to_harden_without_module_id` — PASSES (existing behavior preserved).
+  - BUG-E: `test_build_does_not_record_completed_module` — PASSES (existing behavior preserved).
+  - BUG-E: `test_justify_does_not_record_completed_module` — PASSES (existing behavior preserved).
+
+- **Bugs discovered during writing**: None beyond the catalogued set. The `module_id` parameter is simply absent from `mark_stage_complete`; the fix is straightforward. No hidden aliasing or encoding issues found.
+
+### Investigation pass on suspect findings
+
+- `test_harden_raises_if_module_id_is_none` is PASS for the wrong reason (arity TypeError, not semantic ValueError). Retains value as a regression guard after the fix — **downgrade from BUG-B to regression guard**: after fix it must raise ValueError/TypeError for None input.
+- "0 additional bugs caught" beyond BUG-A primary: probed for a secondary encoding issue (`None` in the list, duplicate insertion) — confirmed the deduplication guard at line 169 uses the synthetic string so BUG-C is real but not separately exercisable until the primary fix is applied.
+
+**Honest final stats: 5 RED (fix required), 5 GREEN (regression coverage). All RED tests target the single root cause: missing `module_id` parameter on `mark_stage_complete`.**
