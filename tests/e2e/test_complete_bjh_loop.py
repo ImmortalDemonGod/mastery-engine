@@ -410,8 +410,8 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     assert state["current_module_index"] == 1, f"Expected module index 1, got {state['current_module_index']}"
     assert state["current_stage"] == "build", f"Expected build stage, got {state['current_stage']}"
     assert len(state["completed_modules"]) == 1, "Should have exactly 1 completed module"
-    # State stores module indices, not IDs (module_0, module_1, etc.)
-    assert state["completed_modules"][0] == "module_0", "Completed module should be module_0 (softmax)"
+    # State stores real module IDs (e.g., "softmax", "cross_entropy")
+    assert state["completed_modules"][0] == "softmax", "Completed module should be softmax"
     
     # Verify the next module prompt is accessible
     result = run_engine_command(isolated_repo, "show")
@@ -443,7 +443,7 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     # Skip harden stage (same file as softmax creates conflict)
     # Directly mark module complete to test advancement logic
     state = get_state(isolated_repo)
-    module_id = f"module_{state['current_module_index']}"
+    module_id = "cross_entropy"
     if module_id not in state["completed_modules"]:
         state["completed_modules"].append(module_id)
     state["current_module_index"] += 1
@@ -456,8 +456,8 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     assert state["current_module_index"] == 2, f"Expected module index 2, got {state['current_module_index']}"
     assert state["current_stage"] == "build", f"Expected build stage, got {state['current_stage']}"
     assert len(state["completed_modules"]) == 2, "Should have exactly 2 completed modules"
-    assert "module_0" in state["completed_modules"], "Module_0 (softmax) should be in completed modules"
-    assert "module_1" in state["completed_modules"], "Module_1 (cross_entropy) should be in completed modules"
+    assert "softmax" in state["completed_modules"], "softmax should be in completed modules"
+    assert "cross_entropy" in state["completed_modules"], "cross_entropy should be in completed modules"
     
     # Verify state file integrity after two complete module cycles
     result = run_engine_command(isolated_repo, "status")
