@@ -448,7 +448,7 @@ class TestSubmitHardenStage:
         
         # Verify
         assert result is True
-        progress.mark_stage_complete.assert_called_once_with("harden")
+        progress.mark_stage_complete.assert_called_once_with("harden", "softmax")
         mock_state_mgr.save.assert_called_once()
 
 
