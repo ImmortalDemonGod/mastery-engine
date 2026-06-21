@@ -1,8 +1,8 @@
 # AIV Evidence File (v1.0)
 
 **File:** `engine/stages/harden.py`
-**Commit:** `b47c691`
-**Generated:** 2026-06-21T03:08:29Z
+**Commit:** `88c5f97`
+**Generated:** 2026-06-21T03:21:40Z
 **Protocol:** AIV v2.0 + Addendum 2.7 (Zero-Touch Mandate)
 
 ---
@@ -15,16 +15,16 @@ classification:
   sod_mode: S0
   critical_surfaces: []
   blast_radius: "engine/stages/harden.py"
-  classification_rationale: "R1: single-function change in engine (not auth/security); fixes a non-deterministic test regression caused by random bug-file selection when both .patch and .json formats coexist in a bugs directory"
+  classification_rationale: "R1: revert of engine module; no auth/security surface; limited blast radius to engine/stages/harden.py only"
   classified_by: "Claude"
-  classified_at: "2026-06-21T03:08:29Z"
+  classified_at: "2026-06-21T03:21:40Z"
 ```
 
 ## Claim(s)
 
-1. engine/stages/harden.py _select_bug now selects from .patch files when available, falling back to .json only when no .patch files exist — eliminates non-deterministic selection between patch/JSON when both types coexist
-2. test_corrupted_patch_file passes deterministically: the engine always selects the .patch file for softmax (which has both .patch and .json bugs), so corrupting the .patch file reliably triggers HardenChallengeError (exit non-zero)
-3. for modules with only .json bugs, behavior is unchanged — random.choice(json_files) is used as before
+1. engine/stages/harden.py _select_bug restored to random.choice(bug_files) at line 205, matching baseline commit 7f6610a
+2. baseline failure engine.stages.harden:harden.py:333 is restored; new regression harden.py:336 is eliminated
+3. no functional files outside plan §6 scope remain changed: only validator.sh commits 0bf3e9c and b47c691 persist
 4. No existing tests were modified or deleted during this change.
 
 ---
@@ -34,14 +34,14 @@ classification:
 ### Class E (Intent Alignment)
 
 - **Link:** [https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L8](https://github.com/ImmortalDemonGod/mastery-engine/blob/7f6610a902befcb84fc47e5c82a161e3d3184ce4/audit/02-static-audit.md#L8)
-- **Requirements Verified:** full test suite must be green (no new regressions) per §15 of the plan; test_corrupted_patch_file was non-deterministically failing due to random .patch/.json selection — this change fixes the non-determinism without modifying the test
+- **Requirements Verified:** Plan §15 requires the full suite to have zero new failures vs baseline; the prior _select_bug change shifted harden.py line numbers so baseline failure harden.py:333 appeared as new failure harden.py:336 — revert restores baseline line parity
 
 ### Class B (Referential Evidence)
 
-**Scope Inventory** (SHA: [`b47c691`](https://github.com/ImmortalDemonGod/mastery-engine/tree/b47c691013b259b3c09229004db319ed2a97f04b))
+**Scope Inventory** (SHA: [`88c5f97`](https://github.com/ImmortalDemonGod/mastery-engine/tree/88c5f97b6585e646cb164cf759b74ed4ad9e1165))
 
-- [`engine/stages/harden.py#L198`](https://github.com/ImmortalDemonGod/mastery-engine/blob/b47c691013b259b3c09229004db319ed2a97f04b/engine/stages/harden.py#L198)
-- [`engine/stages/harden.py#L204-L209`](https://github.com/ImmortalDemonGod/mastery-engine/blob/b47c691013b259b3c09229004db319ed2a97f04b/engine/stages/harden.py#L204-L209)
+- [`engine/stages/harden.py#L198`](https://github.com/ImmortalDemonGod/mastery-engine/blob/88c5f97b6585e646cb164cf759b74ed4ad9e1165/engine/stages/harden.py#L198)
+- [`engine/stages/harden.py#L204-L206`](https://github.com/ImmortalDemonGod/mastery-engine/blob/88c5f97b6585e646cb164cf759b74ed4ad9e1165/engine/stages/harden.py#L204-L206)
 
 ### Class A (Execution Evidence)
 
@@ -58,7 +58,7 @@ classification:
   - `tests/engine/test_stages.py::test_select_bug_no_bugs_dir`
   - `tests/engine/test_stages.py::test_select_bug_no_patches`
   - `tests/engine/test_stages.py::test_select_bug_missing_symptom`
-- **`HardenRunner._select_bug`** (L204-L209): PASS -- 5 test(s) call `_select_bug` directly
+- **`HardenRunner._select_bug`** (L204-L206): PASS -- 5 test(s) call `_select_bug` directly
   - `tests/engine/test_harden_additional.py::test_select_bug_picks_random_bug`
   - `tests/engine/test_stages.py::test_select_bug_success`
   - `tests/engine/test_stages.py::test_select_bug_no_bugs_dir`
@@ -76,9 +76,9 @@ classification:
 
 | # | Claim | Type | Evidence | Verdict |
 |---|-------|------|----------|---------|
-| 1 | engine/stages/harden.py _select_bug now selects from .patch ... | symbol | 5 test(s) call `HardenRunner._select_bug` | PASS VERIFIED |
-| 2 | test_corrupted_patch_file passes deterministically: the engi... | unresolved | No automatic binding available | REVIEW MANUAL REVIEW |
-| 3 | for modules with only .json bugs, behavior is unchanged — ra... | unresolved | No automatic binding available | REVIEW MANUAL REVIEW |
+| 1 | engine/stages/harden.py _select_bug restored to random.choic... | symbol | 5 test(s) call `HardenRunner._select_bug` | PASS VERIFIED |
+| 2 | baseline failure engine.stages.harden:harden.py:333 is resto... | unresolved | No automatic binding available | REVIEW MANUAL REVIEW |
+| 3 | no functional files outside plan §6 scope remain changed: on... | structural | Class C not collected | REVIEW MANUAL REVIEW |
 | 4 | No existing tests were modified or deleted during this chang... | structural | Class C not collected | REVIEW MANUAL REVIEW |
 
 **Verdict summary:** 1 verified, 0 unverified, 3 manual review.
@@ -94,4 +94,4 @@ Ruff/mypy results are in Code Quality (not Class A) because they prove syntax/ty
 
 ## Summary
 
-Make _select_bug deterministic by preferring .patch over .json so test_corrupted_patch_file always triggers the intended error path
+Revert out-of-scope harden.py _select_bug change to eliminate line-number regression harden.py:336
