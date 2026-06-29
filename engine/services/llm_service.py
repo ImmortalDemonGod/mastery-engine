@@ -13,6 +13,9 @@ Key design principles:
 
 import logging
 import os
+import re
+import shutil
+import subprocess
 from typing import Optional
 
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError, AuthenticationError
@@ -24,6 +27,37 @@ from engine.schemas import JustifyQuestion, LLMEvaluationResponse
 logger = logging.getLogger(__name__)
 
 
+# Justify grader provider hooks (Cycle-2: real `claude -p`, NOT the OpenRouter free shim).
+GRADER_MOCK_ENV = "MASTERY_GRADER_MOCK"   # "1" => explicit demo auto-pass
+CLAUDE_BIN_ENV = "MASTERY_CLAUDE_BIN"     # override path to the real claude CLI
+
+
+def _resolve_claude_bin() -> Optional[str]:
+    """Locate the REAL Anthropic `claude` CLI (never the OpenRouter free shim).
+
+    Order: $MASTERY_CLAUDE_BIN -> ~/.local/bin/claude -> `claude` on PATH.
+    """
+    env_bin = os.getenv(CLAUDE_BIN_ENV)
+    if env_bin and os.path.exists(env_bin):
+        return env_bin
+    default = os.path.expanduser("~/.local/bin/claude")
+    if os.path.exists(default):
+        return default
+    return shutil.which("claude")
+
+
+def _extract_json(text: str) -> Optional[str]:
+    """Extract the first JSON object from an LLM text response (tolerates prose/fences)."""
+    text = text.strip()
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence:
+        return fence.group(1)
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        return text[start:end + 1]
+    return None
+
+
 class LLMService:
     """
     Service for evaluating user justifications using OpenAI's API.
@@ -33,7 +67,7 @@ class LLMService:
     """
     
     DEFAULT_MODEL = "gpt-4o-mini"
-    DEFAULT_TIMEOUT = 30  # seconds
+    DEFAULT_TIMEOUT = 120  # seconds (a `claude -p` subprocess can be slow)
     
     def __init__(
         self,
@@ -52,33 +86,34 @@ class LLMService:
         Raises:
             ConfigurationError: If API key is missing or invalid
         """
-        # Load API key from environment if not provided
-        if api_key is None:
-            api_key = os.getenv("OPENAI_API_KEY")
-        
-        # Enable mock mode if no API key (for demo/portfolio viewing)
-        if not api_key:
-            self.use_mock = True
-            self.client = None
-            self.model = model
-            self.timeout = timeout
-            logger.warning(
-                "⚠️  No OpenAI API key found. LLMService operating in MOCK mode.\n"
-                "   Justify stage will auto-pass with simulated feedback.\n"
-                "   Set OPENAI_API_KEY environment variable for production use.\n"
-                "   Get a key from: https://platform.openai.com/api-keys"
-            )
-            return
-        
-        self.use_mock = False
         self.model = model
         self.timeout = timeout
-        
-        try:
-            self.client = OpenAI(api_key=api_key, timeout=timeout)
-            logger.info(f"LLMService initialized with model={model}, timeout={timeout}s")
-        except Exception as e:
-            raise ConfigurationError(f"Failed to initialize OpenAI client: {e}") from e
+
+        # Justify grader runs on the REAL `claude -p` (judgment-critical; Cycle-2 lock).
+        self.claude_bin = _resolve_claude_bin()
+        # Demo auto-pass is now EXPLICIT-only (was: any missing OpenAI key auto-passed → fail-open).
+        self.use_mock = os.getenv(GRADER_MOCK_ENV) == "1"
+
+        # OpenAI client retained ONLY for generate_completion() (create-bug / Harden authoring).
+        if api_key is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            try:
+                self.client = OpenAI(api_key=api_key, timeout=timeout)
+            except Exception as e:
+                raise ConfigurationError(f"Failed to initialize OpenAI client: {e}") from e
+        else:
+            self.client = None
+
+        if self.use_mock:
+            logger.warning(f"⚠️  {GRADER_MOCK_ENV}=1 — Justify grader auto-passes (demo mode).")
+        elif not self.claude_bin:
+            logger.warning(
+                "No `claude` binary found — Justify grader will FAIL CLOSED. "
+                f"Set {CLAUDE_BIN_ENV}, or {GRADER_MOCK_ENV}=1 for demo."
+            )
+        else:
+            logger.info(f"Justify grader: claude -p at {self.claude_bin} (timeout={timeout}s)")
     
     def evaluate_justification(
         self,
@@ -105,89 +140,70 @@ class LLMService:
             LLMResponseError: If response is malformed or unparsable
             LLMAPIError: If API call fails (network, auth, rate limit, etc.)
         """
-        # Mock mode: auto-pass for demo/portfolio viewing
+        # Explicit demo mode only (MASTERY_GRADER_MOCK=1): auto-pass with a clear marker.
         if self.use_mock:
-            logger.info(f"[MOCK MODE] Auto-passing justify question '{question.id}'")
+            logger.info(f"[GRADER MOCK] Auto-passing justify question '{question.id}'")
+            concepts = ", ".join(question.required_concepts[:3])
             return LLMEvaluationResponse(
                 is_correct=True,
                 feedback=(
-                    "🎭 MOCK MODE: No OpenAI API key detected.\n\n"
-                    "In production, GPT-4o would evaluate your response against:\n"
-                    f"- Model Answer: {question.model_answer[:100]}...\n"
-                    f"- Required Concepts: {', '.join(question.required_concepts[:3])}\n"
-                    f"- Failure Modes: {', '.join(question.failure_modes[:3])}\n\n"
-                    "This step is auto-passed for demonstration purposes.\n"
-                    "Set OPENAI_API_KEY to enable real LLM evaluation."
-                )
+                    f"MOCK MODE ({GRADER_MOCK_ENV}=1): auto-passed for demo. "
+                    f"Real grading would assess concepts: {concepts}."
+                ),
+            )
+
+        # Graded mode: FAIL CLOSED if the grader engine is unavailable (never silently pass).
+        if not self.claude_bin:
+            raise LLMAPIError(
+                "Justify grader unavailable: no `claude` binary found. "
+                f"Set {CLAUDE_BIN_ENV} to the real claude CLI, or {GRADER_MOCK_ENV}=1 for demo."
             )
         
+        # Construct the (provider-agnostic) Chain-of-Thought prompt and grade via claude -p.
+        prompt = self._build_cot_prompt(question, user_answer)
+        logger.debug(f"Grading question '{question.id}' via claude -p")
+        raw = self._run_claude(prompt)
+
+        payload = _extract_json(raw)
+        if payload is None:
+            raise LLMResponseError(f"Grader returned no parseable JSON. Output head: {raw[:160]!r}")
         try:
-            # Construct Chain-of-Thought prompt
-            prompt = self._build_cot_prompt(question, user_answer)
-            
-            logger.debug(f"Sending evaluation request for question '{question.id}'")
-            
-            # Make API call with JSON mode
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert technical educator evaluating student understanding. "
-                            "Analyze the student's answer using chain-of-thought reasoning, then provide "
-                            "a structured evaluation in JSON format."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                response_format={"type": "json_object"},  # Enforce JSON mode
-                temperature=0.3,  # Lower temperature for consistent evaluation
+            evaluation = LLMEvaluationResponse.model_validate_json(payload)
+        except ValidationError as e:
+            raise LLMResponseError(f"Grader JSON does not match expected schema: {e}") from e
+        logger.info(f"Evaluation complete for question '{question.id}': "
+                    f"is_correct={evaluation.is_correct}")
+        return evaluation
+
+    def _run_claude(self, prompt: str) -> str:
+        """Invoke the real `claude -p` with the prompt on stdin; return stdout.
+
+        Fails CLOSED: any non-zero exit, timeout, or empty output raises (never auto-passes).
+        """
+        system = (
+            "You are an expert technical educator grading a student's conceptual answer. "
+            "Reason step by step, then output ONLY a JSON object: "
+            '{"is_correct": true|false, "feedback": "..."} - no prose, no code fences.'
+        )
+        full_prompt = f"{system}\n\n{prompt}"
+        try:
+            proc = subprocess.run(
+                [self.claude_bin, "-p"],
+                input=full_prompt,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
             )
-            
-            # Extract response content
-            content = response.choices[0].message.content
-            
-            if not content:
-                raise LLMResponseError("LLM returned empty response")
-            
-            logger.debug(f"Received LLM response: {content[:100]}...")
-            
-            # Parse and validate response
-            try:
-                evaluation = LLMEvaluationResponse.model_validate_json(content)
-                logger.info(f"Evaluation complete for question '{question.id}': "
-                           f"is_correct={evaluation.is_correct}")
-                return evaluation
-            except ValidationError as e:
-                raise LLMResponseError(f"LLM response does not match expected schema: {e}") from e
-        
-        except LLMResponseError:
-            # Re-raise response errors without wrapping
-            raise
-        except AuthenticationError as e:
-            raise LLMAPIError(
-                "Authentication failed. Please check your OpenAI API key."
-            ) from e
-        except RateLimitError as e:
-            raise LLMAPIError(
-                "Rate limit exceeded. Please try again later or upgrade your OpenAI plan."
-            ) from e
-        except APIConnectionError as e:
-            raise LLMAPIError(
-                f"Network error connecting to OpenAI API: {e}"
-            ) from e
-        except APIError as e:
-            raise LLMAPIError(
-                f"OpenAI API error: {e}"
-            ) from e
+        except subprocess.TimeoutExpired as e:
+            raise LLMAPIError(f"Grader timed out after {self.timeout}s") from e
         except Exception as e:
-            # Catch-all for unexpected errors
-            logger.exception(f"Unexpected error during LLM evaluation: {e}")
-            raise LLMAPIError(f"Unexpected error during evaluation: {e}") from e
+            raise LLMAPIError(f"Grader subprocess failed to launch: {e}") from e
+        if proc.returncode != 0:
+            raise LLMAPIError(f"Grader exited {proc.returncode}: {(proc.stderr or '')[:200]}")
+        out = (proc.stdout or "").strip()
+        if not out:
+            raise LLMResponseError("Grader returned empty output")
+        return out
     
     def generate_completion(
         self,

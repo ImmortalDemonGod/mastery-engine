@@ -1,20 +1,22 @@
 """
 Unit tests for engine.services.llm_service.LLMService.
 
-These tests achieve 100% coverage on the LLMService using pytest-mock
-to simulate OpenAI API responses without making live API calls.
+The Justify grader runs on a real `claude -p` subprocess (Cycle-2). These tests
+mock `subprocess.run` so no live grader call is made, and cover the JSON parsing,
+the prose/fence tolerance, the fail-closed behavior, and the explicit demo mock.
 """
 
-import pytest
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
-from openai import AuthenticationError, RateLimitError, APIConnectionError, APIError
+
+import pytest
 
 from engine.services.llm_service import (
     LLMService,
-    ConfigurationError,
     LLMResponseError,
-    LLMAPIError
+    LLMAPIError,
+    _extract_json,
 )
 from engine.schemas import JustifyQuestion, FailureMode
 
@@ -37,227 +39,168 @@ def sample_question():
     )
 
 
+def _graded_service():
+    """A service wired for graded mode with a stand-in claude binary (subprocess is mocked)."""
+    service = LLMService(api_key="test-key")
+    service.claude_bin = "/dummy/claude"
+    return service
+
+
+def _proc(stdout="", returncode=0, stderr=""):
+    m = MagicMock()
+    m.stdout = stdout
+    m.returncode = returncode
+    m.stderr = stderr
+    return m
+
+
 class TestLLMServiceInit:
     """Test cases for LLMService initialization."""
-    
+
     def test_init_with_api_key(self):
-        """Should initialize successfully with provided API key."""
+        """Default model + (new) 120s timeout; OpenAI client retained for generate_completion."""
         service = LLMService(api_key="test-key-123")
         assert service.model == "gpt-4o-mini"
-        assert service.timeout == 30
-    
+        assert service.timeout == 120
+        assert service.client is not None
+
     def test_init_with_env_var(self, monkeypatch):
-        """Should load API key from environment variable."""
+        """Should load the OpenAI key from env for the generate_completion client."""
         monkeypatch.setenv("OPENAI_API_KEY", "env-key-456")
         service = LLMService()
         assert service.client is not None
-    
-    def test_init_missing_api_key_enables_mock_mode(self, monkeypatch):
-        """Should enable mock mode when API key is missing (for demo purposes)."""
+
+    def test_init_no_openai_key_is_failclosed_not_mock(self, monkeypatch):
+        """No OpenAI key => client None, but grader is NOT auto-mock (fail-closed by default)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        
+        monkeypatch.delenv("MASTERY_GRADER_MOCK", raising=False)
         service = LLMService()
-        assert service.use_mock is True
         assert service.client is None
-    
+        assert service.use_mock is False
+
+    def test_init_grader_mock_env_enables_mock(self, monkeypatch):
+        """Mock mode is now EXPLICIT via MASTERY_GRADER_MOCK=1."""
+        monkeypatch.setenv("MASTERY_GRADER_MOCK", "1")
+        service = LLMService(api_key="test-key")
+        assert service.use_mock is True
+
     def test_init_custom_model_and_timeout(self):
-        """Should accept custom model and timeout parameters."""
         service = LLMService(api_key="test-key", model="gpt-4", timeout=60)
         assert service.model == "gpt-4"
         assert service.timeout == 60
 
 
 class TestEvaluateJustification:
-    """Test cases for LLMService.evaluate_justification()."""
-    
+    """Test cases for LLMService.evaluate_justification() over the claude -p seam."""
+
     def test_evaluate_correct_answer(self, sample_question):
-        """Should correctly evaluate a correct answer."""
-        # Mock OpenAI client
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content=json.dumps({
-                        "is_correct": True,
-                        "feedback": "Excellent! You've identified the key mechanism."
-                    })
-                )
-            )
-        ]
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        # Patch OpenAI constructor to return our mock
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
+        service = _graded_service()
+        out = json.dumps({"is_correct": True, "feedback": "Excellent! Key mechanism identified."})
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout=out)) as run:
             result = service.evaluate_justification(
                 sample_question,
                 "The subtract-max trick prevents overflow by shifting values to (-inf, 0]"
             )
-        
         assert result.is_correct is True
         assert "Excellent" in result.feedback
-        
-        # Verify API was called with correct parameters
-        mock_client.chat.completions.create.assert_called_once()
-        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
-        assert call_kwargs['model'] == 'gpt-4o-mini'
-        assert call_kwargs['response_format'] == {'type': 'json_object'}
-        assert call_kwargs['temperature'] == 0.3
-    
+        # Invoked the resolved claude binary with -p, prompt on stdin.
+        assert run.call_args.args[0] == ["/dummy/claude", "-p"]
+        assert "Why is the subtract-max" in run.call_args.kwargs["input"]
+
     def test_evaluate_incorrect_answer(self, sample_question):
-        """Should correctly evaluate an incorrect answer."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content=json.dumps({
-                        "is_correct": False,
-                        "feedback": "Can you explain the specific numerical problem this solves?"
-                    })
-                )
-            )
-        ]
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            result = service.evaluate_justification(
-                sample_question,
-                "It makes the code more stable."
-            )
-        
+        service = _graded_service()
+        out = json.dumps({"is_correct": False, "feedback": "Explain the specific numerical problem."})
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout=out)):
+            result = service.evaluate_justification(sample_question, "It makes the code more stable.")
         assert result.is_correct is False
         assert "numerical problem" in result.feedback
-    
-    def test_evaluate_empty_response_raises_error(self, sample_question):
-        """Should raise LLMResponseError if LLM returns empty content."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock(message=MagicMock(content=None))]
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMResponseError, match="empty response"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_malformed_json_raises_error(self, sample_question):
-        """Should raise LLMResponseError if response is malformed JSON."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content="Not valid JSON"))
-        ]
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMResponseError):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_invalid_schema_raises_error(self, sample_question):
-        """Should raise LLMResponseError if response doesn't match schema."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        # Missing required 'feedback' field
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content=json.dumps({"is_correct": True})
-                )
-            )
-        ]
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
+
+    def test_evaluate_tolerates_prose_preamble(self, sample_question):
+        """claude often adds prose; _extract_json must still recover the object."""
+        service = _graded_service()
+        out = 'Here is my evaluation:\n{"is_correct": true, "feedback": "ok"} \nDone.'
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout=out)):
+            result = service.evaluate_justification(sample_question, "answer")
+        assert result.is_correct is True
+
+    def test_evaluate_tolerates_code_fence(self, sample_question):
+        service = _graded_service()
+        out = '```json\n{"is_correct": false, "feedback": "hint"}\n```'
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout=out)):
+            result = service.evaluate_justification(sample_question, "answer")
+        assert result.is_correct is False
+
+    def test_evaluate_empty_output_raises(self, sample_question):
+        service = _graded_service()
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout="")):
+            with pytest.raises(LLMResponseError, match="empty output"):
+                service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_no_json_raises(self, sample_question):
+        service = _graded_service()
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout="I cannot.")):
+            with pytest.raises(LLMResponseError, match="no parseable JSON"):
+                service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_invalid_schema_raises(self, sample_question):
+        service = _graded_service()
+        out = json.dumps({"is_correct": True})  # missing required 'feedback'
+        with patch("engine.services.llm_service.subprocess.run", return_value=_proc(stdout=out)):
             with pytest.raises(LLMResponseError, match="does not match expected schema"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_authentication_error(self, sample_question):
-        """Should raise LLMAPIError on authentication failure."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = AuthenticationError(
-            "Invalid API key",
-            response=MagicMock(status_code=401),
-            body=None
-        )
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMAPIError, match="Authentication failed"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_rate_limit_error(self, sample_question):
-        """Should raise LLMAPIError on rate limit exceeded."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = RateLimitError(
-            "Rate limit exceeded",
-            response=MagicMock(status_code=429),
-            body=None
-        )
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMAPIError, match="Rate limit exceeded"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_connection_error(self, sample_question):
-        """Should raise LLMAPIError on network connection failure."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = APIConnectionError(
-            request=MagicMock()
-        )
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMAPIError, match="Network error"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_api_error(self, sample_question):
-        """Should raise LLMAPIError on generic API error."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = APIError(
-            "Internal server error",
-            request=MagicMock(),
-            body=None
-        )
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMAPIError, match="OpenAI API error"):
-                service.evaluate_justification(sample_question, "Some answer")
-    
-    def test_evaluate_unexpected_error(self, sample_question):
-        """Should raise LLMAPIError on unexpected exceptions."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = RuntimeError("Unexpected!")
-        
-        with patch('engine.services.llm_service.OpenAI', return_value=mock_client):
-            service = LLMService(api_key="test-key")
-            
-            with pytest.raises(LLMAPIError, match="Unexpected error"):
-                service.evaluate_justification(sample_question, "Some answer")
+                service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_nonzero_exit_raises(self, sample_question):
+        service = _graded_service()
+        with patch("engine.services.llm_service.subprocess.run",
+                   return_value=_proc(returncode=1, stderr="boom")):
+            with pytest.raises(LLMAPIError, match="exited 1"):
+                service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_timeout_raises(self, sample_question):
+        service = _graded_service()
+        with patch("engine.services.llm_service.subprocess.run",
+                   side_effect=subprocess.TimeoutExpired(cmd=["claude"], timeout=120)):
+            with pytest.raises(LLMAPIError, match="timed out"):
+                service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_fail_closed_when_no_binary(self, sample_question):
+        """No grader engine => FAIL CLOSED (raise), never silently pass."""
+        service = LLMService(api_key="test-key")
+        service.claude_bin = None
+        with pytest.raises(LLMAPIError, match="grader unavailable"):
+            service.evaluate_justification(sample_question, "answer")
+
+    def test_evaluate_mock_mode_autopasses(self, sample_question, monkeypatch):
+        """Explicit demo mock (MASTERY_GRADER_MOCK=1) auto-passes with a clear marker."""
+        monkeypatch.setenv("MASTERY_GRADER_MOCK", "1")
+        service = LLMService(api_key="test-key")
+        result = service.evaluate_justification(sample_question, "anything")
+        assert result.is_correct is True
+        assert "MOCK MODE" in result.feedback
+
+
+class TestExtractJson:
+    """Test cases for the prose/fence-tolerant JSON extractor."""
+
+    def test_plain_object(self):
+        assert _extract_json('{"a": 1}') == '{"a": 1}'
+
+    def test_prose_wrapped(self):
+        assert _extract_json('text {"a": 1} more') == '{"a": 1}'
+
+    def test_fenced(self):
+        assert _extract_json('```json\n{"a": 1}\n```') == '{"a": 1}'
+
+    def test_no_json_returns_none(self):
+        assert _extract_json("no object here") is None
 
 
 class TestBuildCOTPrompt:
     """Test cases for Chain-of-Thought prompt construction."""
-    
+
     def test_build_cot_prompt_includes_all_elements(self, sample_question):
-        """Should include question, model answer, and required concepts."""
         service = LLMService(api_key="test-key")
         prompt = service._build_cot_prompt(sample_question, "User's answer here")
-        
-        # Verify all key elements are present
         assert sample_question.question in prompt
         assert "User's answer here" in prompt
         assert sample_question.model_answer in prompt
@@ -266,12 +209,9 @@ class TestBuildCOTPrompt:
         assert "mathematical equivalence" in prompt
         assert "chain-of-thought" in prompt.lower()
         assert "JSON" in prompt
-    
+
     def test_build_cot_prompt_formats_required_concepts(self, sample_question):
-        """Should format required concepts as bullet list."""
         service = LLMService(api_key="test-key")
         prompt = service._build_cot_prompt(sample_question, "Answer")
-        
-        # Check that concepts are formatted with bullet points
         assert "- overflow prevention" in prompt
         assert "- range shift" in prompt

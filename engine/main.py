@@ -48,6 +48,7 @@ from engine.validator import (
 from engine.stages.harden import HardenRunner, HardenChallengeError
 from engine.stages.justify import JustifyRunner, JustifyQuestionsError
 from engine.services.llm_service import LLMService, ConfigurationError, LLMAPIError, LLMResponseError
+from engine.services.evidence_sink import EvidenceSink
 from engine.utils import find_project_root
 import subprocess
 
@@ -384,9 +385,22 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         # llm_service already created above (line 270) for mock mode check
         console.print()
         console.print("[dim]Evaluating your answer...[/dim]")
-        
+
         evaluation = llm_service.evaluate_justification(question, answer)
-        
+
+        # Record cognitive evidence — every graded attempt (pass or fail), best-effort.
+        try:
+            EvidenceSink().record(
+                curriculum_id=progress.curriculum_id,
+                module_id=current_module.id,
+                question_id=question.id,
+                answer=answer,
+                is_correct=evaluation.is_correct,
+                feedback=evaluation.feedback,
+            )
+        except Exception as _sink_err:
+            logger.warning(f"evidence sink write failed (non-fatal): {_sink_err}")
+
         # Step C: Feedback and state transition
         console.print()
         if evaluation.is_correct:
