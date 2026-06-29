@@ -238,6 +238,26 @@ def _submit_build_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         return False
 
 
+def _record_justify_evidence(progress, module_id, question_id, *, answer, is_correct, feedback, outcome):
+    """Append one justify-stage cognitive-evidence event (best-effort; never breaks the flow).
+
+    Called for EVERY outcome (graded, mock_autopass, fast_filter_reject) so the ledger
+    reflects activity honestly; `outcome` keeps the graded-only currency tally distinct.
+    """
+    try:
+        EvidenceSink().record(
+            curriculum_id=progress.curriculum_id,
+            module_id=module_id,
+            question_id=question_id,
+            answer=answer,
+            is_correct=is_correct,
+            feedback=feedback,
+            outcome=outcome,
+        )
+    except Exception as _sink_err:
+        logger.warning(f"evidence sink write failed (non-fatal): {_sink_err}")
+
+
 def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     """
     Submit and evaluate the current module's Justify-stage answer and advance progress on success.
@@ -292,6 +312,12 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         ))
         console.print()
         
+        # Record the (non-graded) mock auto-pass so the ledger reflects it honestly.
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer="", is_correct=True, feedback="mock auto-pass", outcome="mock_autopass",
+        )
+
         # Advance state to harden
         progress.mark_stage_complete("justify")
         state_mgr.save(progress)
@@ -378,6 +404,10 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         ))
         console.print()
         logger.info(f"Justify response rejected by fast filter for module '{current_module.id}'")
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer=answer, is_correct=False, feedback=fast_feedback, outcome="fast_filter_reject",
+        )
         return False
     
     # Step B: LLM semantic evaluation
@@ -388,18 +418,12 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
 
         evaluation = llm_service.evaluate_justification(question, answer)
 
-        # Record cognitive evidence — every graded attempt (pass or fail), best-effort.
-        try:
-            EvidenceSink().record(
-                curriculum_id=progress.curriculum_id,
-                module_id=current_module.id,
-                question_id=question.id,
-                answer=answer,
-                is_correct=evaluation.is_correct,
-                feedback=evaluation.feedback,
-            )
-        except Exception as _sink_err:
-            logger.warning(f"evidence sink write failed (non-fatal): {_sink_err}")
+        # Record cognitive evidence for the graded attempt (pass or fail).
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer=answer, is_correct=evaluation.is_correct,
+            feedback=evaluation.feedback, outcome="graded",
+        )
 
         # Step C: Feedback and state transition
         console.print()

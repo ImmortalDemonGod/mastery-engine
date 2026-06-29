@@ -11,10 +11,10 @@ Key design principles:
 - Cost-effective model selection (gpt-4o-mini default)
 """
 
+import json
 import logging
 import os
 import re
-import shutil
 import subprocess
 from typing import Optional
 
@@ -33,9 +33,12 @@ CLAUDE_BIN_ENV = "MASTERY_CLAUDE_BIN"     # override path to the real claude CLI
 
 
 def _resolve_claude_bin() -> Optional[str]:
-    """Locate the REAL Anthropic `claude` CLI (never the OpenRouter free shim).
+    """Locate the REAL Anthropic `claude` CLI from TRUSTED locations only.
 
-    Order: $MASTERY_CLAUDE_BIN -> ~/.local/bin/claude -> `claude` on PATH.
+    Order: $MASTERY_CLAUDE_BIN -> ~/.local/bin/claude. We deliberately do NOT
+    fall back to `shutil.which("claude")`: that could resolve a wrapper/shim on
+    PATH (e.g. an OpenRouter free-model shim) and silently send grading to the
+    wrong backend, violating the "real claude -p only" contract.
     """
     env_bin = os.getenv(CLAUDE_BIN_ENV)
     if env_bin and os.path.exists(env_bin):
@@ -43,18 +46,25 @@ def _resolve_claude_bin() -> Optional[str]:
     default = os.path.expanduser("~/.local/bin/claude")
     if os.path.exists(default):
         return default
-    return shutil.which("claude")
+    return None
 
 
 def _extract_json(text: str) -> Optional[str]:
-    """Extract the first JSON object from an LLM text response (tolerates prose/fences)."""
+    """Extract the FIRST valid JSON object from an LLM text response (tolerates prose/fences)."""
     text = text.strip()
     fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fence:
         return fence.group(1)
-    start, end = text.find("{"), text.rfind("}")
-    if start != -1 and end > start:
-        return text[start:end + 1]
+    # Scan each '{' and try to decode a full object there; return the first that parses.
+    # (A first-brace-to-last-brace slice breaks when prose contains extra braces.)
+    decoder = json.JSONDecoder()
+    idx = text.find("{")
+    while idx != -1:
+        try:
+            _, end = decoder.raw_decode(text[idx:])
+            return text[idx:idx + end]
+        except json.JSONDecodeError:
+            idx = text.find("{", idx + 1)
     return None
 
 
@@ -230,10 +240,11 @@ class LLMService:
         Raises:
             LLMAPIError: If API call fails
         """
-        # Mock mode: return placeholder
-        if self.use_mock:
-            logger.warning("[MOCK MODE] generate_completion called without API key - returning placeholder")
-            return "MOCK_RESPONSE: LLM generation not available in mock mode"
+        # Placeholder only when no OpenAI client (this path uses OpenAI, not the grader).
+        # NOT gated on self.use_mock: the grader demo flag must not disable authoring flows.
+        if self.client is None:
+            logger.warning("[NO OPENAI CLIENT] generate_completion has no key - returning placeholder")
+            return "MOCK_RESPONSE: LLM generation not available without OPENAI_API_KEY"
         
         try:
             messages = []

@@ -65,3 +65,42 @@ def test_submit_justify_writes_evidence(tmp_path, monkeypatch):
     assert rec["answer"].strip() == "because it prevents overflow"
     assert rec["outcome"] == "graded"
     assert rec["ts"]
+
+
+def test_submit_justify_records_fast_filter_reject(tmp_path, monkeypatch):
+    """A fast-filter rejection is recorded (outcome=fast_filter_reject) and skips the grader."""
+    monkeypatch.setenv("MASTERY_EVIDENCE_PATH", str(tmp_path / "ev.jsonl"))
+
+    question = JustifyQuestion(
+        id="q1", question="why?", model_answer="m", failure_modes=[], required_concepts=["c"]
+    )
+    module = ModuleMetadata(id="softmax", name="Softmax", path="modules/softmax")
+    manifest = CurriculumManifest(curriculum_name="cs336_a1", author="x", version="1", modules=[module])
+    progress = UserProgress(curriculum_id="cs336_a1", current_module_index=0, current_stage="justify")
+    state_mgr = MagicMock()
+    curr_mgr = MagicMock()
+
+    jr = MagicMock()
+    jr.load_questions.return_value = [question]
+    jr.check_fast_filter.return_value = (True, "too vague")  # fast filter rejects
+    monkeypatch.setattr(m, "JustifyRunner", MagicMock(return_value=jr))
+
+    svc = MagicMock()
+    svc.use_mock = False
+    monkeypatch.setattr(m, "LLMService", MagicMock(return_value=svc))
+
+    def fake_editor(args, *a, **k):
+        with open(args[1], "w") as f:
+            f.write("# Justify Question\n\n# Your Answer\nvague stuff\n")
+        return MagicMock(returncode=0)
+
+    monkeypatch.setattr(m.subprocess, "run", fake_editor)
+
+    ok = m._submit_justify_stage(state_mgr, curr_mgr, progress, manifest)
+    assert ok is False
+    svc.evaluate_justification.assert_not_called()  # grader skipped by the fast filter
+
+    rec = json.loads((tmp_path / "ev.jsonl").read_text().strip())
+    assert rec["outcome"] == "fast_filter_reject"
+    assert rec["is_correct"] is False
+    assert rec["answer"].strip() == "vague stuff"

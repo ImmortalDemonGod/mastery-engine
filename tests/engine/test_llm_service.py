@@ -43,6 +43,7 @@ def _graded_service():
     """A service wired for graded mode with a stand-in claude binary (subprocess is mocked)."""
     service = LLMService(api_key="test-key")
     service.claude_bin = "/dummy/claude"
+    service.use_mock = False  # hermetic: ignore any MASTERY_GRADER_MOCK in the outer env
     return service
 
 
