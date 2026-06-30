@@ -1,6 +1,6 @@
 {
   "id": "cross-entropy-no-logsumexp",
-  "description": "Using naive softmax instead of logsumexp",
+  "description": "Replace log-sum-exp with a plain max, breaking the normalization term.",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "cross_entropy",
@@ -13,33 +13,13 @@
         "targets": [
           {
             "node_type": "Name",
-            "id": "log_sum_exp"
+            "id": "lse"
           }
         ]
       },
       "replacement": {
-        "type": "delete_statement"
-      }
-    },
-    {
-      "pass": 2,
-      "type": "find_and_replace",
-      "pattern": {
-        "node_type": "Assign",
-        "targets": [
-          {
-            "node_type": "Name",
-            "id": "log_probs"
-          }
-        ],
-        "value": {
-          "node_type": "BinOp",
-          "op": "Sub"
-        }
-      },
-      "replacement": {
-        "type": "replace_with",
-        "source": "exp_logits = torch.exp(x32)\nsoftmax_probs = exp_logits / exp_logits.sum(dim=-1, keepdim=True)\ntarget_probs = softmax_probs.gather(dim=-1, index=t.unsqueeze(-1)).squeeze(-1)\nlog_probs = torch.log(target_probs + 1e-10)"
+        "type": "replace_value_with",
+        "source": "x32.max(dim=-1).values"
       }
     }
   ]

@@ -132,6 +132,12 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
     
     # Create initial commit (required for git worktree to work)
     subprocess.run(["git", "add", "-A"], cwd=test_repo, check=True, capture_output=True)
+    # The copied .gitignore ignores the unanchored name `cs336_basics`, which also
+    # matches modes/{student,developer}/cs336_basics. In a fresh repo those dirs are
+    # untracked-and-ignored, so `git add -A` skips them — leaving the shadow
+    # worktree's cs336_basics symlink dangling. Force-add modes so the reference and
+    # student implementations are committed and present in the worktree.
+    subprocess.run(["git", "add", "-f", "modes"], cwd=test_repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit"],
         cwd=test_repo, check=True, capture_output=True
@@ -167,21 +173,40 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
     # Alternative: Add test_repo to PYTHONPATH for the subprocess
     # This works even if pip install fails
     import os
+    saved_env = {k: os.environ.get(k) for k in ("PYTHONPATH", "HOME", "COLUMNS")}
     os.environ['PYTHONPATH'] = f"{test_repo}:{os.environ.get('PYTHONPATH', '')}"
-    
-    yield test_repo
-    
-    # Cleanup: Remove any shadow worktrees before cleaning up directory
-    shadow_worktree = test_repo / ".mastery_engine_worktree"
-    if shadow_worktree.exists():
-        try:
-            subprocess.run(
-                ["git", "worktree", "remove", str(shadow_worktree), "--force"],
-                cwd=test_repo,
-                capture_output=True
-            )
-        except subprocess.CalledProcessError:
-            pass
+
+    # ISOLATION: redirect HOME into the temp repo so the engine's state file
+    # (~/.mastery_progress.json) and evidence ledger never touch the real home.
+    # Path.home() honors $HOME on POSIX, so both the subprocess AND this test's
+    # in-process get_state() read the isolated copy.
+    fake_home = test_repo / ".home"
+    fake_home.mkdir(exist_ok=True)
+    os.environ['HOME'] = str(fake_home)
+    # Force a wide console so Rich panels don't wrap (paths split across lines
+    # would otherwise break substring assertions on stdout).
+    os.environ['COLUMNS'] = "200"
+
+    try:
+        yield test_repo
+    finally:
+        # Cleanup: Remove any shadow worktrees before cleaning up directory
+        shadow_worktree = test_repo / ".mastery_engine_worktree"
+        if shadow_worktree.exists():
+            try:
+                subprocess.run(
+                    ["git", "worktree", "remove", str(shadow_worktree), "--force"],
+                    cwd=test_repo,
+                    capture_output=True
+                )
+            except subprocess.CalledProcessError:
+                pass
+        # Restore environment we mutated.
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 def run_engine_command(repo_path: Path, *args: str) -> subprocess.CompletedProcess:

@@ -1,12 +1,12 @@
-# Bug Symptom: Gradient Clipping — gradient-clipping-wrong-norm
+# Bug Symptom: Transformer Block — transformer-block-missing-residual
 
 ## Observed Behavior
-A subtle semantic bug has been injected into your `gradient_clipping` implementation. Your code
+A subtle semantic bug has been injected into your `transformer_block` implementation. Your code
 runs without raising a syntax error, but the module's correctness test now fails:
-Global gradient norm computed with L1 (norm(1)) instead of L2.
+Drop the attention residual add (x = attn_out instead of x + attn_out).
 
 ## Your Challenge
-A single line in `cs336_basics/utils.py` no longer matches your correct implementation. Read the
+A single line in `cs336_basics/layers.py` no longer matches your correct implementation. Read the
 function, form a hypothesis from the symptom above, and locate the divergence.
 Restore the correct behavior — do not rewrite the whole function.
 

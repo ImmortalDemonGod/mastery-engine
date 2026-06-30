@@ -1,12 +1,12 @@
-# Bug Symptom: Gradient Clipping — gradient-clipping-wrong-norm
+# Bug Symptom: Adamw — adamw-missing-bias-correction
 
 ## Observed Behavior
-A subtle semantic bug has been injected into your `gradient_clipping` implementation. Your code
+A subtle semantic bug has been injected into your `step` implementation. Your code
 runs without raising a syntax error, but the module's correctness test now fails:
-Global gradient norm computed with L1 (norm(1)) instead of L2.
+Use the raw first moment without bias correction (exp_avg_hat = exp_avg).
 
 ## Your Challenge
-A single line in `cs336_basics/utils.py` no longer matches your correct implementation. Read the
+A single line in `cs336_basics/optimizer.py` no longer matches your correct implementation. Read the
 function, form a hypothesis from the symptom above, and locate the divergence.
 Restore the correct behavior — do not rewrite the whole function.
 

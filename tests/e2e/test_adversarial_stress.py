@@ -165,17 +165,19 @@ exit 0
         with open(state_file, 'w') as f:
             json.dump(state, f, indent=2)
         
-        # Corrupt the patch file
+        # Corrupt the active bug definition. The engine now injects bugs via AST
+        # `.json` definitions (legacy `.patch` files were removed), so the modern
+        # "corrupted bug asset" scenario is an unparseable bug-definition JSON.
         bugs_dir = isolated_repo / "curricula/cs336_a1/modules/softmax/bugs"
-        patch_file = list(bugs_dir.glob("*.patch"))[0]
-        patch_backup = patch_file.with_suffix('.patch.bak')
-        patch_file.rename(patch_backup)
-        
-        corrupted_patch = '''This is not a valid patch file!
-Just random text that will cause the patch command to fail.
-No proper patch headers or hunks.
+        bug_file = list(bugs_dir.glob("*.json"))[0]
+        bug_backup = bug_file.with_suffix('.json.bak')
+        bug_file.rename(bug_backup)
+
+        corrupted_bug = '''This is not a valid bug definition!
+Just random text that will cause JSON parsing to fail.
+No proper injection schema.
 '''
-        patch_file.write_text(corrupted_patch)
+        bug_file.write_text(corrupted_bug)
         
         try:
             # Try to start harden challenge
@@ -186,9 +188,9 @@ No proper patch headers or hunks.
             # Should have clear error message
             assert "error" in result.stdout.lower() or "failed" in result.stdout.lower()
         finally:
-            # Restore original patch
-            patch_file.unlink()
-            patch_backup.rename(patch_file)
+            # Restore original bug definition
+            bug_file.unlink()
+            bug_backup.rename(bug_file)
     
     def test_filesystem_permissions_error(self, isolated_repo: Path, tmp_path: Path):
         """

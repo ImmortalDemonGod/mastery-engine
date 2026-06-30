@@ -1,6 +1,6 @@
 {
   "id": "embedding-wrong-dimension-order",
-  "description": "Swapped num_embeddings and embedding_dim",
+  "description": "Embedding weight allocated with (embedding_dim, num_embeddings) \u2014 dims swapped.",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "__init__",
@@ -10,19 +10,41 @@
       "type": "find_and_replace",
       "pattern": {
         "node_type": "Assign",
-        "targets": [
-          {
-            "node_type": "Attribute",
-            "attr": "embedding"
-          }
-        ],
         "value": {
-          "node_type": "Call"
+          "node_type": "Call",
+          "func": {
+            "node_type": "Attribute",
+            "attr": "Parameter"
+          },
+          "args": [
+            {
+              "node_type": "Call",
+              "func": {
+                "node_type": "Attribute",
+                "attr": "empty"
+              },
+              "args": [
+                {
+                  "node_type": "Tuple",
+                  "elts": [
+                    {
+                      "node_type": "Name",
+                      "id": "num_embeddings"
+                    },
+                    {
+                      "node_type": "Name",
+                      "id": "embedding_dim"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       },
       "replacement": {
-        "type": "replace_with",
-        "source": "self.embedding = nn.Embedding(num_embeddings=embedding_dim, embedding_dim=num_embeddings)"
+        "type": "replace_value_with",
+        "source": "nn.Parameter(torch.empty((embedding_dim, num_embeddings)))"
       }
     }
   ]
