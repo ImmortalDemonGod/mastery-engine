@@ -137,6 +137,31 @@ def _load_curriculum_state() -> tuple:
     return state_mgr, curr_mgr, progress, manifest
 
 
+def _harden_source_relpath(module) -> Path:
+    """Repo-relative path to the file holding a module's implementation (the Harden target).
+
+    Curricula declare this via each module's ``metadata['source_file']`` (e.g.
+    ``cs336_basics/layers.py``) so the engine stays curriculum-agnostic and the same
+    file is used for injection, the user's fix, and validation. Falls back to legacy
+    heuristics for older packs that predate the field.
+    """
+    declared = (getattr(module, "metadata", None) or {}).get("source_file")
+    if declared:
+        p = Path(declared)
+        # Defense-in-depth: this path is joined onto the shadow worktree, so an
+        # absolute or parent-traversing value could escape it. Reject such configs.
+        if p.is_absolute() or ".." in p.parts:
+            raise ValueError(
+                f"Invalid source_file '{declared}' for module '{getattr(module, 'id', '?')}': "
+                "must be a repo-relative path without parent traversal ('..')."
+            )
+        return p
+    # Legacy fallback (pre-metadata curricula).
+    if getattr(module, "id", None) == "softmax":
+        return Path("cs336_basics/utils.py")
+    return Path(f"{module.id}.py")
+
+
 def _check_curriculum_complete(progress, manifest) -> bool:
     """
     Check if user has completed all modules.
@@ -520,13 +545,10 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
     console.print()
     
-    # Determine file locations
-    if current_module.id == "softmax":
-        harden_file = harden_workspace / "utils.py"
-        shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
-    else:
-        harden_file = harden_workspace / f"{current_module.id}.py"
-        shadow_dest = shadow_worktree / f"{current_module.id}.py"
+    # Determine file locations from the curriculum-declared source file.
+    src_rel = _harden_source_relpath(current_module)
+    harden_file = harden_workspace / src_rel.name
+    shadow_dest = shadow_worktree / src_rel
     
     # Copy fixed file to shadow worktree
     import shutil
@@ -1296,11 +1318,8 @@ def start_challenge():
             # Get current module
             current_module = manifest.modules[progress.current_module_index]
             
-            # Determine source file based on module
-            if current_module.id == "softmax":
-                source_file = Path("cs336_basics/utils.py")
-            else:
-                source_file = Path(f"{current_module.id}.py")
+            # Determine the file holding the module's implementation (curriculum-declared).
+            source_file = _harden_source_relpath(current_module)
             
             # Present challenge (WRITES FILES)
             console.print()
@@ -1831,15 +1850,11 @@ def submit_fix():
         console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
         console.print()
         
-        # CRITICAL: Copy fixed file from harden workspace to shadow worktree root
-        # The validator expects files in their normal locations (e.g., cs336_basics/utils.py)
-        # Determine source file based on module
-        if current_module.id == "softmax":
-            harden_file = harden_workspace / "utils.py"
-            shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
-        else:
-            harden_file = harden_workspace / f"{current_module.id}.py"
-            shadow_dest = shadow_worktree / f"{current_module.id}.py"
+        # Copy the fixed file from the harden workspace to its normal location in the
+        # shadow worktree (curriculum-declared source file), then validate there.
+        src_rel = _harden_source_relpath(current_module)
+        harden_file = harden_workspace / src_rel.name
+        shadow_dest = shadow_worktree / src_rel
         
         # Copy fixed file to shadow worktree for validation
         import shutil
