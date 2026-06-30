@@ -42,6 +42,14 @@ def test_resolver_legacy_fallback():
     assert _harden_source_relpath(other) == Path("hello.py")
 
 
+@pytest.mark.parametrize("bad", ["/etc/passwd", "../../etc/passwd", "cs336_basics/../../x.py"])
+def test_resolver_rejects_unsafe_source_file(bad):
+    mod = ModuleMetadata(id="evil", name="Evil", path="modules/evil",
+                         metadata={"source_file": bad})
+    with pytest.raises(ValueError):
+        _harden_source_relpath(mod)
+
+
 def _defines(path: Path, name: str) -> bool:
     if not path.exists():
         return False
@@ -73,7 +81,12 @@ def test_manifest_source_file_defines_bug_target(module: str):
     declared = _SOURCE_BY_ID.get(module)
     assert declared, f"module '{module}' has a bug def but no metadata.source_file in the manifest"
 
-    bug = json.loads(next((MODULES / module / "bugs").glob("*.json")).read_text(encoding="utf-8"))
+    active = [
+        p for p in (MODULES / module / "bugs").glob("*.json")
+        if not (p.stem.endswith("_v2") or "_draft" in p.stem)
+    ]
+    assert active, f"module '{module}' has no active bug definition"
+    bug = json.loads(active[0].read_text(encoding="utf-8"))
     target = bug["target_function"]
 
     fname = Path(declared).name

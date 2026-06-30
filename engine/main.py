@@ -147,7 +147,15 @@ def _harden_source_relpath(module) -> Path:
     """
     declared = (getattr(module, "metadata", None) or {}).get("source_file")
     if declared:
-        return Path(declared)
+        p = Path(declared)
+        # Defense-in-depth: this path is joined onto the shadow worktree, so an
+        # absolute or parent-traversing value could escape it. Reject such configs.
+        if p.is_absolute() or ".." in p.parts:
+            raise ValueError(
+                f"Invalid source_file '{declared}' for module '{getattr(module, 'id', '?')}': "
+                "must be a repo-relative path without parent traversal ('..')."
+            )
+        return p
     # Legacy fallback (pre-metadata curricula).
     if getattr(module, "id", None) == "softmax":
         return Path("cs336_basics/utils.py")
