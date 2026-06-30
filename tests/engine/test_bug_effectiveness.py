@@ -61,6 +61,8 @@ NODE = {
     "checkpointing": "test_serialization.py::test_checkpointing",
     "bpe_tokenizer": "test_train_bpe.py::test_train_bpe",
     "tokenizer_class": "test_tokenizer.py::test_overlapping_special_tokens",
+    "text_generation": "test_generation.py::test_generate",
+    "training_loop": "test_training.py::test_train_loop",
 }
 
 # Assignment test assets to mirror into the sandbox (NOT tests/engine or tests/e2e,
@@ -69,6 +71,7 @@ _TEST_FILES = [
     "__init__.py", "adapters.py", "common.py", "conftest.py", "one_d_probes.py",
     "test_data.py", "test_model.py", "test_nn_utils.py", "test_optimizer.py",
     "test_serialization.py", "test_tokenizer.py", "test_train_bpe.py",
+    "test_generation.py", "test_training.py",
 ]
 _TEST_DIRS = ["_snapshots", "fixtures"]
 
