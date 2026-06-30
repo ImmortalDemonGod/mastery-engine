@@ -30,12 +30,20 @@ logger = logging.getLogger(__name__)
 class JustifyRunner:
     """
     Manages the Justify stage workflow (STUB).
-    
+
     The Justify stage tests conceptual understanding by asking users
     to explain their implementation choices. This stub version simply
     ensures the state machine is complete.
     """
-    
+
+    # The keyword fast-filter is a cheap pre-screen meant to bounce lazy one-liners
+    # ("it's more stable") before paying for an LLM grade. Its failure-mode keywords
+    # (e.g. "overflow", "stability") also legitimately appear in CORRECT, substantive
+    # answers, so it must only screen BRIEF answers — anything longer goes to the
+    # grader, which can actually judge depth. Answers with >= this many words bypass
+    # the filter entirely.
+    SUBSTANTIVE_ANSWER_WORDS = 30
+
     def __init__(self, curriculum_manager: CurriculumManager):
         """
         Initialize justify runner.
@@ -103,7 +111,15 @@ class JustifyRunner:
         if os.getenv('MASTERY_DISABLE_FAST_FILTER', '').lower() in ('true', '1', 'yes'):
             logger.info("Fast filter DISABLED via MASTERY_DISABLE_FAST_FILTER environment variable")
             return False, None
-        
+
+        # Only screen brief answers. A substantive answer that happens to use a
+        # failure-mode keyword (e.g. "overflow") must NOT be rejected here — defer to
+        # the LLM grader, which can judge whether the depth is actually present.
+        if len(user_answer.split()) >= self.SUBSTANTIVE_ANSWER_WORDS:
+            logger.info("Answer is substantive (>= %d words); skipping fast filter",
+                        self.SUBSTANTIVE_ANSWER_WORDS)
+            return False, None
+
         user_answer_lower = user_answer.lower()
         
         for failure_mode in question.failure_modes:
