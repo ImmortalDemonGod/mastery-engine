@@ -1,8 +1,9 @@
 """Tests for autoregressive text generation (`cs336_basics.generation.generate`).
 
-Uses a tiny deterministic toy LM whose next-token logits depend only on the current
-token, so greedy decoding (`top_k=1`) has a single, checkable answer — no trained
-model, GPU, or snapshots required.
+Uses a tiny LM whose weights are constructed deterministically (no RNG, so behaviour
+is identical across torch versions/platforms): token ``i`` deterministically predicts
+token ``(i+1) % vocab``. Greedy decoding (``top_k=1``) therefore walks a known,
+non-degenerate sequence — exactly checkable, no trained model/GPU/snapshots needed.
 """
 import torch
 from torch import nn
@@ -10,16 +11,18 @@ from torch import nn
 from .adapters import run_generate
 
 
-class _TinyLM(nn.Module):
-    """Deterministic toy LM: logits for the next token depend only on the last token."""
+class _CounterLM(nn.Module):
+    """Deterministic toy LM: the next-token argmax for token i is (i+1) % vocab."""
 
-    def __init__(self, vocab: int = 12, seed: int = 1):
+    def __init__(self, vocab: int = 12):
         super().__init__()
         self.vocab = vocab
-        gen = torch.Generator().manual_seed(seed)
+        weight = torch.zeros(vocab, vocab)
+        for i in range(vocab):
+            weight[i, (i + 1) % vocab] = 1.0
         self.table = nn.Embedding(vocab, vocab)
         with torch.no_grad():
-            self.table.weight.copy_(torch.randn(vocab, vocab, generator=gen))
+            self.table.weight.copy_(weight)
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:  # (1, T) -> (1, T, vocab)
         return self.table(tokens)
@@ -37,27 +40,18 @@ class _IdTokenizer:
         return " ".join(str(int(i)) for i in ids)
 
 
-def _expected_greedy(model: nn.Module, start: list[int], steps: int) -> list[int]:
-    toks = list(start)
-    for _ in range(steps):
-        with torch.no_grad():
-            logits = model(torch.tensor([toks]))
-        toks.append(int(logits[0, -1].argmax()))
-    return toks
-
-
 def test_generate():
-    model = _TinyLM(vocab=12, seed=1)
+    vocab = 12
+    model = _CounterLM(vocab=vocab)
     tok = _IdTokenizer()
 
-    # top_k=1 is greedy/argmax -> deterministic and exactly checkable.
+    # top_k=1 is greedy/argmax; with the counter model the walk is 3,4,5,6,7,8,9.
     out = run_generate(model, tok, "3", max_length=6, top_k=1, device="cpu")
-    expected = _IdTokenizer().decode(_expected_greedy(model, [3], 6))
+    expected = " ".join(str((3 + i) % vocab) for i in range(7))
     assert out == expected, f"greedy output {out!r} != expected {expected!r}"
 
-    # The reference greedy walk must actually move (not a constant token), otherwise
-    # a "wrong-position" bug could not be detected.
-    assert len(set(out.split())) > 1, "toy model degenerate; pick another seed"
+    # The greedy walk genuinely moves (so a wrong-position bug is detectable).
+    assert len(set(out.split())) == 7
 
     # Determinism: identical inputs -> identical output.
     assert run_generate(model, tok, "3", max_length=6, top_k=1, device="cpu") == out
@@ -69,4 +63,4 @@ def test_generate():
     for kwargs in ({"temperature": 0.8}, {"top_k": 3}, {"top_p": 0.9}):
         result = run_generate(model, tok, "3", max_length=4, device="cpu", **kwargs)
         ids = [int(x) for x in result.split()]
-        assert all(0 <= i < 12 for i in ids)
+        assert all(0 <= i < vocab for i in ids)
