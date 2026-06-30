@@ -16,6 +16,8 @@ via subprocess). Two cross-cutting concerns are handled here for every E2E test:
 """
 import pytest
 
+from engine.state import StateManager
+
 
 @pytest.fixture(autouse=True)
 def isolated_home_and_wide_console(tmp_path, monkeypatch):
@@ -23,4 +25,9 @@ def isolated_home_and_wide_console(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("COLUMNS", "200")
+    # StateManager.STATE_FILE is computed from Path.home() at IMPORT time, so setting
+    # $HOME alone does not redirect it for in-process (CliRunner) tests that already
+    # imported engine.state. Patch it explicitly so EVERY e2e test — in-process or
+    # subprocess — uses the isolated progress file, never the developer's real one.
+    monkeypatch.setattr(StateManager, "STATE_FILE", home / ".mastery_progress.json")
     yield

@@ -275,6 +275,7 @@ class Pattern(BaseModel):
     """AST pattern for matching nodes"""
     node_type: str
     targets: Optional[List[NameNode]] = None
+    target: Optional[NameNode] = None  # singular target, e.g. for AugAssign nodes
     value: Optional[NestedPattern] = None
     attr: Optional[str] = None
     op: Optional[str] = None
@@ -310,7 +311,7 @@ class PassDefinition(BaseModel):
     """Single pass in bug injection logic"""
     pass_: int = Field(..., alias="pass")
     type: str
-    description: str
+    description: Optional[str] = None  # shipped defs omit per-pass descriptions
     pattern: Optional[Pattern] = None
     conditions: Optional[List[Condition]] = None
     track_as: Optional[Dict[str, str]] = None
@@ -337,6 +338,9 @@ class BugDefinition(BaseModel):
     engine_version: str
     target_function: str
     logic: List[PassDefinition]
-    metadata: BugMetadata
+    # Optional: hand-authored/shipped bug defs omit this; only the LLM authoring
+    # tool (bug_author) populates it. Keeping it required would reject every
+    # shipped definition.
+    metadata: Optional[BugMetadata] = None
     
     model_config = ConfigDict(extra='forbid')

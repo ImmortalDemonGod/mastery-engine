@@ -78,11 +78,15 @@ def check(path: Path) -> tuple[str, str]:
     if ref is None:
         return "NO_TARGET_FN", f"'{target}' not defined in any reference file"
     try:
-        _, ok = GenericBugInjector(bug).inject(src)
+        buggy_src, ok = GenericBugInjector(bug).inject(src)
     except Exception as e:  # noqa: BLE001
         return "DEF_ERROR", f"{type(e).__name__}: {e}"
     if not ok:
         return "PATTERN_MISS", f"target '{target}' in {ref.name}, but no node matched"
+    # inject() can return ok=True yet leave the source unchanged; a no-op "match" is
+    # not a real bug, so hold it to the same bar as test_bug_defs_match.py.
+    if ast.dump(ast.parse(buggy_src)) == ast.dump(ast.parse(src)):
+        return "PATTERN_MISS", f"target '{target}' in {ref.name}, but injection was a no-op"
     return "INJECTED_OK", f"{target} in {ref.name}"
 
 
