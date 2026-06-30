@@ -64,3 +64,14 @@ def test_generate():
         result = run_generate(model, tok, "3", max_length=4, device="cpu", **kwargs)
         ids = [int(x) for x in result.split()]
         assert all(0 <= i < vocab for i in ids)
+
+
+def test_nucleus_sampling_includes_crossing_token():
+    """top-p keeps the smallest prefix with cumulative prob >= p, INCLUDING the token
+    that crosses p (probs [0.6, 0.3, 0.1], p=0.7 -> {0.6, 0.3}, never the 0.1 token)."""
+    from cs336_basics.generation import _nucleus_sample  # lazy: only defined in a real impl
+
+    logits = torch.log(torch.tensor([0.6, 0.3, 0.1]))
+    sampled = {int(_nucleus_sample(logits, 0.7)) for _ in range(300)}
+    assert sampled <= {0, 1}, f"sampled an excluded token: {sampled}"
+    assert sampled == {0, 1}, f"crossing token 1 should be eligible, got {sampled}"

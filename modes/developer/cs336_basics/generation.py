@@ -25,8 +25,10 @@ def _nucleus_sample(logits: torch.Tensor, p: float) -> torch.Tensor:
     probs = F.softmax(logits, dim=-1)
     sorted_probs, sorted_indices = torch.sort(probs, descending=True)
     cumsum = torch.cumsum(sorted_probs, dim=-1)
-    # Keep tokens up to and including the first that reaches p (always keep one).
-    keep = cumsum < p
+    # Keep the smallest prefix whose cumulative prob >= p, INCLUDING the token that
+    # crosses the threshold. A token is kept iff the cumulative mass strictly BEFORE
+    # it is < p (so probs [0.6, 0.3, 0.1] with p=0.7 keeps {0.6, 0.3}).
+    keep = (cumsum - sorted_probs) < p
     keep[0] = True
     filtered = torch.where(keep, sorted_probs, torch.zeros_like(sorted_probs))
     filtered = filtered / filtered.sum()
