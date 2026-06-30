@@ -15,7 +15,7 @@ fi
 # HARDEN STAGE: File already copied by submit-fix, just cd to shadow worktree
 if [ "$(pwd)" != "$SHADOW_WORKTREE" ]; then
     # BUILD STAGE: We're in main directory, copy file and cd to shadow worktree
-    cp cs336_basics/optimizer.py "$SHADOW_WORKTREE/cs336_basics/optimizer.py"
+    cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
     cd "$SHADOW_WORKTREE"
 else
     # HARDEN STAGE: Already in shadow worktree, file was copied by submit-fix
@@ -30,14 +30,14 @@ start_time=$(python3 -c 'import time; print(time.time())')
 if [ -n "$MASTERY_PYTHON" ]; then
     # Engine provided its Python executable - use it
     export PYTHONPATH="$(pwd):$PYTHONPATH"
-    "$MASTERY_PYTHON" -m pytest tests/test_optimizer.py::test_lr_cosine_schedule -v --tb=short --import-mode=importlib
+    "$MASTERY_PYTHON" -m pytest tests/test_optimizer.py::test_get_lr_cosine_schedule -v --tb=short --import-mode=importlib
 elif [ -n "$VIRTUAL_ENV" ]; then
     # We're in an active virtual environment - use its Python explicitly
     export PYTHONPATH="$(pwd):$PYTHONPATH"
-    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_optimizer.py::test_lr_cosine_schedule -v --tb=short --import-mode=importlib
+    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_optimizer.py::test_get_lr_cosine_schedule -v --tb=short --import-mode=importlib
 else
     # No active environment - use uv to create one
-    uv run pytest tests/test_optimizer.py::test_lr_cosine_schedule -v --tb=short --import-mode=importlib
+    uv run pytest tests/test_optimizer.py::test_get_lr_cosine_schedule -v --tb=short --import-mode=importlib
 fi
 
 # Record end time

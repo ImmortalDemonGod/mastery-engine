@@ -11,7 +11,7 @@ Using Pydantic provides:
 
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CurriculumType(str, Enum):
@@ -243,8 +243,7 @@ class ContextReference(BaseModel):
     """Reference to a tracked context variable"""
     from_context: str
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class NameNode(BaseModel):
@@ -252,8 +251,7 @@ class NameNode(BaseModel):
     node_type: Literal["Name"]
     id: Optional[Union[str, ContextReference]] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class NestedPattern(BaseModel):
@@ -262,8 +260,7 @@ class NestedPattern(BaseModel):
     op: Optional[str] = None
     attr: Optional[str] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class KeywordArg(BaseModel):
@@ -271,14 +268,14 @@ class KeywordArg(BaseModel):
     arg: Optional[str] = None
     value: Optional[NestedPattern] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class Pattern(BaseModel):
     """AST pattern for matching nodes"""
     node_type: str
     targets: Optional[List[NameNode]] = None
+    target: Optional[NameNode] = None  # singular target, e.g. for AugAssign nodes
     value: Optional[NestedPattern] = None
     attr: Optional[str] = None
     op: Optional[str] = None
@@ -288,8 +285,7 @@ class Pattern(BaseModel):
     args: Optional[List[NestedPattern]] = None
     keywords: Optional[List[KeywordArg]] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class Condition(BaseModel):
@@ -299,8 +295,7 @@ class Condition(BaseModel):
     index: Optional[int] = None
     name: Optional[str] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class Replacement(BaseModel):
@@ -309,23 +304,20 @@ class Replacement(BaseModel):
     source: Optional[Union[str, ContextReference]] = None
     name: Optional[str] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class PassDefinition(BaseModel):
     """Single pass in bug injection logic"""
     pass_: int = Field(..., alias="pass")
     type: str
-    description: str
+    description: Optional[str] = None  # shipped defs omit per-pass descriptions
     pattern: Optional[Pattern] = None
     conditions: Optional[List[Condition]] = None
     track_as: Optional[Dict[str, str]] = None
     replacement: Optional[Replacement] = None
     
-    class Config:
-        populate_by_name = True
-        extra = 'forbid'
+    model_config = ConfigDict(populate_by_name=True, extra='forbid')
 
 
 class BugMetadata(BaseModel):
@@ -335,8 +327,7 @@ class BugMetadata(BaseModel):
     author: str
     tier: str
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class BugDefinition(BaseModel):
@@ -347,7 +338,9 @@ class BugDefinition(BaseModel):
     engine_version: str
     target_function: str
     logic: List[PassDefinition]
-    metadata: BugMetadata
+    # Optional: hand-authored/shipped bug defs omit this; only the LLM authoring
+    # tool (bug_author) populates it. Keeping it required would reject every
+    # shipped definition.
+    metadata: Optional[BugMetadata] = None
     
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')

@@ -40,9 +40,17 @@ def isolated_workspace(tmp_path, monkeypatch):
     # Set up temporary state file location
     state_file = tmp_path / ".mastery_progress.json"
     
-    # Patch the workspace and state file paths
-    monkeypatch.setattr("engine.workspace.WorkspaceManager.WORKSPACE_DIR", workspace_dir)
+    # Patch the state file path. (WorkspaceManager no longer exposes a class-level
+    # WORKSPACE_DIR — it resolves workspace_root per-instance — so there is nothing
+    # to patch there; HOME isolation in conftest covers the rest.)
     monkeypatch.setattr("engine.state.StateManager.STATE_FILE", state_file)
+
+    # The engine's commands call require_shadow_worktree(), which only checks that
+    # SHADOW_WORKTREE_DIR exists. Point it at an isolated temp dir so in-process
+    # (CliRunner) tests don't depend on a real worktree in the developer's repo.
+    worktree_dir = tmp_path / "worktree"
+    worktree_dir.mkdir()
+    monkeypatch.setattr("engine.main.SHADOW_WORKTREE_DIR", worktree_dir)
     
     return {
         "workspace": workspace_dir,
@@ -84,10 +92,17 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
     return out.to(orig_dtype)
 """
     
+    @pytest.mark.skip(
+        reason="Superseded by tests/e2e/test_complete_bjh_loop.py (fully isolated, "
+        "subprocess-driven, passing). This in-process variant asserts the obsolete "
+        "patch-based Harden internals (WorkspaceManager.create_harden_workspace / "
+        "apply_patch) that AST injection replaced, so it can no longer reflect the "
+        "real loop. Kept (skipped) as a record; the loop is covered by the replacement."
+    )
     def test_complete_softmax_bjh_loop(self, isolated_workspace, mocker):
         """
         Test the complete softmax Build-Justify-Harden loop.
-        
+
         This is the fortress test that validates all components working together.
         """
         workspace = isolated_workspace["workspace"]
@@ -152,6 +167,7 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
         
         # Mock LLMService to verify it's NOT called
         mock_llm = MagicMock()
+        mock_llm.use_mock = False  # exercise the real grading path (fast-filter + LLM)
         
         with patch('engine.main.LLMService', return_value=mock_llm):
             result = runner.invoke(app, ["submit-justification", shallow_answer])
@@ -181,6 +197,7 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
         
         # Mock LLM to return success
         mock_llm = MagicMock()
+        mock_llm.use_mock = False  # exercise the real grading path (fast-filter + LLM)
         mock_evaluation = LLMEvaluationResponse(
             is_correct=True,
             feedback="Excellent! You've demonstrated deep understanding of the numerical stability mechanism."
@@ -269,18 +286,21 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
         
         # Test 1: Keyword "stability" should trigger fast filter
         mock_llm = MagicMock()
+        mock_llm.use_mock = False  # exercise the real grading path (fast-filter + LLM)
         with patch('engine.main.LLMService', return_value=mock_llm):
             result = runner.invoke(app, ["submit-justification", "It improves stability"])
             mock_llm.evaluate_justification.assert_not_called()
         
         # Test 2: Keyword "overflow" alone should trigger fast filter
         mock_llm = MagicMock()
+        mock_llm.use_mock = False  # exercise the real grading path (fast-filter + LLM)
         with patch('engine.main.LLMService', return_value=mock_llm):
             result = runner.invoke(app, ["submit-justification", "It prevents overflow"])
             mock_llm.evaluate_justification.assert_not_called()
         
         # Test 3: No matching keywords should call LLM
         mock_llm = MagicMock()
+        mock_llm.use_mock = False  # exercise the real grading path (fast-filter + LLM)
         mock_llm.evaluate_justification.return_value = LLMEvaluationResponse(
             is_correct=False,
             feedback="Try explaining the mathematical equivalence."
@@ -288,3 +308,22 @@ def softmax(in_features: Float[torch.Tensor, " ..."], dim: int) -> Float[torch.T
         with patch('engine.main.LLMService', return_value=mock_llm):
             result = runner.invoke(app, ["submit-justification", "The technique adjusts values"])
             mock_llm.evaluate_justification.assert_called_once()
+
+        # Test 4: No matching keywords + LLM ACCEPTS should advance past justify.
+        # (Covers the accept->advance path through the real command, complementing
+        # the unit-level coverage in test_submit_handlers.py.)
+        state_file = isolated_workspace["state_file"]
+        assert load_state(state_file).current_stage == "justify"  # not advanced by Tests 1-3
+        mock_llm = MagicMock()
+        mock_llm.use_mock = False
+        mock_llm.evaluate_justification.return_value = LLMEvaluationResponse(
+            is_correct=True,
+            feedback="Correct — the exp(c) factors cancel in the softmax ratio.",
+        )
+        with patch('engine.main.LLMService', return_value=mock_llm):
+            result = runner.invoke(
+                app,
+                ["submit-justification", "Subtracting the max rescales logits; the shared factor cancels in the ratio."],
+            )
+            mock_llm.evaluate_justification.assert_called_once()
+        assert load_state(state_file).current_stage == "harden", "accepted justification must advance to harden"

@@ -1,9 +1,9 @@
 {
   "id": "cosine-schedule-wrong-range",
-  "description": "Cosine goes negative without proper transformation",
+  "description": "Cosine progress omits the warmup offset (it / denom), shifting the schedule.",
   "injection_type": "ast",
   "engine_version": "2.1",
-  "target_function": "cosine_learning_rate_schedule",
+  "target_function": "get_lr_cosine_schedule",
   "logic": [
     {
       "pass": 1,
@@ -13,16 +13,13 @@
         "targets": [
           {
             "node_type": "Name",
-            "id": "cosine_decay"
+            "id": "progress"
           }
-        ],
-        "value": {
-          "node_type": "Call"
-        }
+        ]
       },
       "replacement": {
         "type": "replace_value_with",
-        "source": "math.cos(math.pi * progress)"
+        "source": "it / denom"
       }
     }
   ]

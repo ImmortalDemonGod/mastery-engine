@@ -1,9 +1,9 @@
-# Bug Symptom: Gradient Clipping — gradient-clipping-wrong-norm
+# Bug Symptom: Data Loader — data-loader-wrong-sampling-range
 
 ## Observed Behavior
-A subtle semantic bug has been injected into your `gradient_clipping` implementation. Your code
+A subtle semantic bug has been injected into your `get_batch` implementation. Your code
 runs without raising a syntax error, but the module's correctness test now fails:
-Global gradient norm computed with L1 (norm(1)) instead of L2.
+Wrong high bound in randint causing out-of-bounds
 
 ## Your Challenge
 A single line in `cs336_basics/utils.py` no longer matches your correct implementation. Read the
