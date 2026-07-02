@@ -570,9 +570,32 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         # Advance to next module
         progress.mark_stage_complete("harden")
         state_mgr.save(progress)
-        
+
         logger.info(f"Harden stage completed for module '{current_module.id}'")
-        
+
+        # Auto-archive the learner's own implementation to their solutions branch.
+        # Opt-in + best-effort: only fires if the 'my-solutions' branch exists, and
+        # can never disrupt the session (git plumbing, no checkout, errors swallowed).
+        try:
+            from engine.services.solution_archive import archive_solution, SOLUTIONS_BRANCH
+            recorded = archive_solution(
+                repo_root=find_project_root(),
+                source_content=Path(harden_file).read_text(),
+                repo_relpath=str(Path("modes/student") / src_rel),
+                commit_message=(
+                    f"solution({current_module.id}): {current_module.name}\n\n"
+                    f"Auto-archived by the engine on module completion.\n"
+                    f"Curriculum: {progress.curriculum_id}."
+                ),
+            )
+            if recorded:
+                console.print(
+                    f"[dim]📓 Recorded your {current_module.name} solution to "
+                    f"'{SOLUTIONS_BRANCH}'.[/dim]"
+                )
+        except Exception:
+            logger.exception("Solution archival failed (non-fatal)")
+
         if progress.current_module_index < len(manifest.modules):
             next_module = manifest.modules[progress.current_module_index]
             console.print(Panel(
