@@ -185,3 +185,7 @@ coverage_html/
 
 # Prevent API key leaks
 .env.backup
+# AIV scaffolding (corpus-captured) + provisioned venv — kept off the PR (#1/#40; .venv dangles on CI)
+.aiv/launch-briefs/
+.aiv/plans/
+.venv/

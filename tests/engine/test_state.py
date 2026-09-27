@@ -146,10 +146,16 @@ class TestUserProgressModel:
         assert progress.current_module_index == 0
     
     def test_mark_stage_complete_harden_advances_module(self):
-        """Should advance to next module after harden completion."""
+        """Should advance to next module after harden completion and record real module ID."""
         progress = UserProgress(curriculum_id="test", current_stage="harden")
-        progress.mark_stage_complete("harden")
-        
+        progress.mark_stage_complete("harden", "softmax")
+
         assert progress.current_stage == "build"
         assert progress.current_module_index == 1
-        assert len(progress.completed_modules) == 1
+        assert "softmax" in progress.completed_modules
+
+    def test_mark_stage_complete_harden_requires_module_id(self):
+        """Should raise ValueError when module_id is absent for harden stage."""
+        progress = UserProgress(curriculum_id="test", current_stage="harden")
+        with pytest.raises(ValueError, match="module_id is required for harden stage"):
+            progress.mark_stage_complete("harden")

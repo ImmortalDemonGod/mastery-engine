@@ -568,7 +568,7 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         console.print()
         
         # Advance to next module
-        progress.mark_stage_complete("harden")
+        progress.mark_stage_complete("harden", current_module.id)
         state_mgr.save(progress)
 
         logger.info(f"Harden stage completed for module '{current_module.id}'")
@@ -1898,9 +1898,9 @@ def submit_fix():
             console.print()
             
             # Advance state to complete (finish module)
-            progress.mark_stage_complete("harden")
+            progress.mark_stage_complete("harden", current_module.id)
             state_mgr.save(progress)
-            
+
             logger.info(f"Harden stage completed for module '{current_module.id}'")
             
             # Show next action
