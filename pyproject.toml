@@ -50,7 +50,8 @@ log_cli = true
 log_cli_level = "WARNING"
 addopts = "-s"
 markers = [
-    "integration: marks tests as integration tests that use real API calls (deselect with '-m \"not integration\"')"
+    "integration: marks tests as integration tests that use real API calls (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow-running (deselect with '-m \"not slow\"')"
 ]
 
 [tool.ruff]

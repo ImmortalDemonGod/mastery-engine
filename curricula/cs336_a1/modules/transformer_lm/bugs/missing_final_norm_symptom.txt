@@ -1,0 +1,14 @@
+# Bug Symptom: Transformer Lm — transformer-lm-missing-final-norm
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `transformer_lm` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+Skip the final RMSNorm before the LM head (x = x instead of ln_final(x)).
+
+## Your Challenge
+A single line in `cs336_basics/layers.py` no longer matches your correct implementation. Read the
+function, form a hypothesis from the symptom above, and locate the divergence.
+Restore the correct behavior — do not rewrite the whole function.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

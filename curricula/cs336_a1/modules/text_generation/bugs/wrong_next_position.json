@@ -1,0 +1,24 @@
+{
+  "id": "text-generation-wrong-next-position",
+  "description": "Reads next-token logits from the first sequence position instead of the last, so generation ignores everything after the first token.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "generate",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          { "node_type": "Name", "id": "next_logits" }
+        ],
+        "value": { "node_type": "Subscript" }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "logits[0, 0, :]"
+      }
+    }
+  ]
+}

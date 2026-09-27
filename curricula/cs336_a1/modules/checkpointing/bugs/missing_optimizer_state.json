@@ -1,6 +1,6 @@
 {
   "id": "checkpointing-missing-optimizer-state",
-  "description": "Missing optimizer state from checkpoint",
+  "description": "Checkpoint omits optimizer_state_dict, so resume loses optimizer moments.",
   "injection_type": "ast",
   "engine_version": "2.1",
   "target_function": "save_checkpoint",
@@ -13,12 +13,9 @@
         "targets": [
           {
             "node_type": "Name",
-            "id": "checkpoint"
+            "id": "payload"
           }
-        ],
-        "value": {
-          "node_type": "Dict"
-        }
+        ]
       },
       "replacement": {
         "type": "replace_value_with",

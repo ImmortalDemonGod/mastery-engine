@@ -1,0 +1,370 @@
+deck: "cs336 · softmax · numerical stability"
+source: "2026-07-02 softmax BJH session — root-cause remediation"
+schema:
+  types: [cloze, qa, discrimination, spot_bug, critique, production, transfer]
+  fields: "front, back, rc, type; optional: family, sched, ver, src"
+  rules:
+    - "Every card = ONE retrieval (Rule 4). Multi-part cards were split."
+    - "spot_bug + critique are FAMILIES (Rule 17) — interleave, never review siblings adjacently."
+    - "RC3 pos/neg direction cards must be scheduled apart (Rule 11)."
+    - "`ver` = software version stamp for API facts (Rule 19)."
+    - "`src` = ONE published source to re-verify the fact (Rule 18). Not provenance — a citation. One source, no combos."
+    - "checklist block is NOT for import — habits/env, not flashcards."
+  src_key:
+    F&D:    "Franke & Degen (2023), softmax math/conceptual paper (cited by numbered Fact)"
+    Mody:   "Jay Mody, 'numerically stable softmax & cross-entropy' blog"
+    Vieira: "Tim Vieira, 'exp-normalize trick' blog"
+    Wiki:   "Wikipedia, 'Softmax function'"
+    DLB:    "Deep Learning Book §6.2.2.3 (Goodfellow et al.) — NOTE: not re-fetched; verify before trusting"
+    torch:  "PyTorch 2.x docs (torch.max / torch.sum / torch.exp)"
+
+cards:
+
+  # ── RC1 — softmax is ONE formula: numerator and denominator share the same `exps` ──
+  - rc: RC1
+    type: qa
+    src: Vieira
+    front: "In a numerically-stable softmax, the denominator is the sum of *exactly* what?"
+    back: "The same `exps` as the numerator — `exp(x−max)`. (Not the raw input; not the shifted-but-un-exp'd values.)"
+
+  - rc: RC1
+    type: spot_bug
+    family: numdenom
+    src: Vieira
+    front: "Bug? `exps = exp(x - m); return exps / (x - m).sum()`"
+    back: "Denominator sums the *shifted values*, not the exponentials. Must be `exps.sum(...)`."
+
+  - rc: RC1
+    type: spot_bug
+    family: numdenom
+    src: Vieira
+    front: "Bug? `return torch.exp(x) / exps.sum()`  (exps = exp(x - m))"
+    back: "Numerator is *unshifted* `exp(x)` while denom is the shifted sum — inconsistent. Both must use `exps`."
+
+  - rc: RC1
+    type: spot_bug
+    family: numdenom
+    src: Vieira
+    front: "Bug? `return exps / torch.exp(x).sum()`  (exps = exp(x - m))"
+    back: "Denominator re-exponentiates the *raw* input (which can overflow) instead of summing `exps`."
+
+  - rc: RC1
+    type: spot_bug
+    family: numdenom
+    src: torch
+    front: "Bug? `exps = exp(x - x.max(dim=d).values); return exps / exps.sum(dim=d)`"
+    back: "No `keepdim=True` on the max/sum → the reduced tensor won't broadcast back over `dim`; shapes mismatch."
+
+  - rc: RC1
+    type: critique
+    family: impossible_output
+    src: Wiki
+    front: "A 'softmax' returns [1.7, 4.7, 94.5] (the output you actually got). Without recomputing — what's wrong?"
+    back: "Values > 1 → impossible for probabilities → numerator/denominator are inconsistent."
+
+  - rc: RC1
+    type: critique
+    family: impossible_output
+    src: Wiki
+    front: "A softmax over dim returns [0.2, 0.2, 0.2]. Wrong — why?"
+    back: "Sums to 0.6, not 1 → not a valid distribution along dim."
+
+  - rc: RC1
+    type: critique
+    family: impossible_output
+    src: "F&D Fact 1"
+    front: "A softmax output contains a negative value. Immediate conclusion?"
+    back: "Impossible — softmax outputs are `exp(...)/positive-sum` ≥ 0. Something isn't the softmax formula."
+
+  # ── RC2 — the stabilization identity (the WHY, not the ritual) ──
+  - rc: RC2
+    type: qa
+    src: "F&D Fact 2"
+    front: "Why is softmax(x) unchanged if you subtract a constant c from every element?"
+    back: "`exp(xᵢ−c) = exp(xᵢ)·exp(−c)`; the shared `exp(−c)` factors out of numerator and denominator → cancels."
+
+  - rc: RC2
+    type: discrimination
+    src: Vieira
+    front: "`exp(x) - max`  vs  `exp(x - max)` — which is the stabilization, and why does the other fail?"
+    back: "`exp(x - max)` — shift is *inside* the exponent. `exp(x) - max` exponentiates first (already overflowed) and isn't softmax."
+
+  - rc: RC2
+    type: qa
+    src: "F&D Fact 7"
+    front: "Is subtracting the max a *scaling* of the inputs?"
+    back: "No — an additive *shift* (subtraction), not multiplicative scaling."
+
+  # ── RC3 — overflow vs underflow (confusable pair — SPACE THESE APART, Rule 11) ──
+  - rc: RC3
+    type: qa
+    src: Vieira
+    sched: "keep apart from the large-negative sibling"
+    front: "`exp(x)` for large *positive* x (e.g. 1000) → ?"
+    back: "Overflow → `inf` (then `inf / inf = NaN`)."
+
+  - rc: RC3
+    type: qa
+    src: Vieira
+    sched: "keep apart from the large-positive sibling"
+    front: "`exp(x)` for large *negative* x (e.g. −1000) → ?"
+    back: "Underflow → 0."
+
+  - rc: RC3
+    type: qa
+    src: Vieira
+    front: "Does underflow (`exp` of a large negative) hurt softmax? Why?"
+    back: "No — those terms are ≈ 0 anyway, so rounding them to 0 is harmless."
+
+  - rc: RC3
+    type: qa
+    src: Vieira
+    front: "One-rule anchor for the over/underflow pair?"
+    back: "Positive blows up (over), negative vanishes (under). Softmax only fears the positive end — which is why we subtract the *max*."
+
+  - rc: RC3
+    type: production
+    src: Vieira
+    front: "Trace naive `softmax([1,2,3] + 100)` on a real computer, step by step."
+    back: "inputs ≈ 103 → `exp(103) ≈ 10⁴⁴` → overflow to `inf` → `inf / inf` → `NaN`."
+
+  - rc: RC3
+    type: qa
+    src: Vieira
+    front: "Subtract-max prevents overflow or underflow — and by what mechanism, exactly?"
+    back: "Overflow. After the shift the largest exponent is 0, so the biggest `exp` is exactly 1 → nothing can reach `inf`."
+
+  # ── RC4 — number-sense reflex (the quiet gap that let bugs survive) ──
+  - rc: RC4
+    type: qa
+    src: Wiki
+    front: "Before trusting any softmax intermediate/output, what two checks? (procedure/summary card)"
+    back: "(1) output ∈ [0,1] and sums to 1 along dim; (2) the denominator is a sum of `exp(...)` → strictly positive."
+
+  - rc: RC4
+    type: critique
+    family: reflex
+    src: "F&D Fact 1"
+    front: "Your stable-softmax denominator comes out −10. Immediate conclusion?"
+    back: "Impossible — it's a sum of `exp(...)`, all positive → you summed the wrong thing."
+
+  - rc: RC4
+    type: critique
+    family: reflex
+    src: Wiki
+    front: "Your softmax outputs sum to 1.4 along dim. Conclusion?"
+    back: "Not normalized correctly — denominator ≠ sum of the numerator's `exps` (or wrong `dim`)."
+
+  - rc: RC4
+    type: critique
+    family: reflex
+    src: Vieira
+    front: "An `exps` intermediate contains `inf`. Conclusion?"
+    back: "Overflow — the subtract-max step is missing or wrong; you exponentiated a large raw value."
+
+  # ── API facts (atomic, single-deletion — Rule 4; version-stamped — Rule 19) ──
+  - rc: API
+    type: cloze
+    ver: "torch 2.x"
+    src: torch
+    front: "`torch.max(x, dim=d, keepdim=True)` returns …"
+    back: "a `(values, indices)` named tuple"
+
+  - rc: API
+    type: cloze
+    ver: "torch 2.x"
+    src: torch
+    front: "To get the max *tensor* out of `torch.max(x, dim=d, keepdim=True)`, take …"
+    back: "`.values`"
+
+  - rc: API
+    type: cloze
+    ver: "torch 2.x"
+    src: torch
+    front: "`torch.sum(x, keepdim=True)` without a `dim` argument → …"
+    back: "errors — `keepdim` requires a `dim`"
+
+  - rc: API
+    type: cloze
+    src: torch
+    front: "`math.exp(a_tensor)` → … (it's scalar-only)"
+    back: "raises / fails"
+
+  - rc: API
+    type: cloze
+    ver: "torch 2.x"
+    src: torch
+    front: "For `exp` of a tensor, use …"
+    back: "`torch.exp`"
+
+  # ── Transfer / abstraction (Rule 17 — the durability multiplier; each atomic) ──
+  - rc: TRANSFER
+    type: transfer
+    src: Vieira
+    front: "The subtract-max trick is a specific case of what general technique?"
+    back: "Max-shift / log-sum-exp stabilization."
+
+  - rc: TRANSFER
+    type: transfer
+    src: Mody
+    front: "Where does the max-shift-before-exp trick reappear in the LOSS function?"
+    back: "cross-entropy (`log Σ exp`)."
+
+  - rc: TRANSFER
+    type: transfer
+    src: Vieira
+    sched: "attention-specific claim is NOT in the 5 sources; Vieira = the general 'applies to any softmax' principle"
+    front: "Where does the max-shift-before-exp trick reappear in ATTENTION?"
+    back: "the attention-score softmax."
+
+  - rc: TRANSFER
+    type: transfer
+    src: Vieira
+    front: "General rule for computing `exp` of large scores before normalizing?"
+    back: "Subtract the max over the reduction axis first, then exponentiate."
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # NEW (2026-07-02 source pass): concepts the 5 sources cover that the original
+  # 31 cards omitted. Groups A–E, priority-ordered.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # ── A · Cross-entropy / log-softmax — bridges to your NEXT module ──
+  - rc: RC-CE
+    type: qa
+    src: Mody
+    front: "Why does naive cross-entropy `-log(softmax(x)[y])` blow up for extreme logits?"
+    back: "softmax can underflow that class to 0 → `log(0) = −inf`."
+
+  - rc: RC-CE
+    type: cloze
+    src: Mody
+    front: "Numerically-stable log-softmax: `log_softmax(x) = x − m − ____`  (m = max x)"
+    back: "`log(Σ exp(x − m))`"
+
+  - rc: RC-CE
+    type: cloze
+    src: Vieira
+    front: "General log-sum-exp stabilization identity: `log Σ exp(x) = ____`"
+    back: "`m + log Σ exp(x − m)`,  m = max(x)"
+
+  - rc: RC-CE
+    type: discrimination
+    src: Vieira
+    front: "You need the probability vector π → which trick? You need log π / the loss → which?"
+    back: "π → exp-normalize (softmax); log π → log-sum-exp (log-softmax)."
+
+  - rc: RC-CE
+    type: qa
+    src: Mody
+    front: "Compute softmax then take its log, or compute log-softmax directly? Why?"
+    back: "log-softmax directly — logging a (possibly-0) softmax output gives `−inf`/instability."
+
+  - rc: RC-CE
+    type: qa
+    src: "DLB §6.2.2.3"
+    sched: "VERIFY vs DLB §6.2.2.3 (not re-fetched)"
+    front: "Why train with log-softmax + NLL instead of softmax-then-log?"
+    back: "the log undoes the exp, so gradients don't vanish when softmax saturates."
+
+  - rc: RC-CE
+    type: qa
+    src: "DLB §6.2.2.3"
+    sched: "VERIFY vs DLB §6.2.2.3 (not re-fetched)"
+    front: "When does softmax 'saturate' (its gradients vanish)?"
+    back: "when one logit is much larger than the rest (extreme differences between inputs)."
+
+  # ── B · Deeper properties — the 'why' behind the ritual (would have prevented RC2) ──
+  - rc: RC-PROP
+    type: qa
+    src: "F&D Fact 2"
+    front: "What alone determines softmax outputs — the scores, or their differences?"
+    back: "only the differences: odds `pᵢ/pⱼ = exp(sᵢ−sⱼ)`. (This is WHY adding a constant is invariant.)"
+
+  - rc: RC-PROP
+    type: discrimination
+    src: "F&D Fact 7"
+    front: "Softmax is invariant to which transform of the logits, and NOT invariant to which?"
+    back: "invariant to ADDING a constant; NOT invariant to MULTIPLYING (scaling)."
+
+  - rc: RC-PROP
+    type: qa
+    src: Wiki
+    front: "For K logits, softmax has how many independent outputs, and why?"
+    back: "K−1 — the constraint Σp=1 removes one DOF (maps to the (K−1)-simplex); you can fix one logit to 0."
+
+  # ── C · Temperature — relevant to your text_generation module ──
+  - rc: RC-TEMP
+    type: cloze
+    src: Wiki
+    front: "Softmax with temperature T applies softmax to `____`."
+    back: "`z / T`"
+
+  - rc: RC-TEMP
+    type: discrimination
+    src: Wiki
+    front: "Temperature T→0 vs T→∞ — what does each do to the distribution?"
+    back: "T→0 sharpens toward argmax (peaky); T→∞ flattens toward uniform."
+
+  # ── D · Number-sense refinement (sharpens RC4's 'denom positive') ──
+  - rc: RC4
+    type: qa
+    src: Mody
+    front: "After subtract-max, why is the denominator always ≥ 1 (not just > 0)?"
+    back: "one shifted value is 0 → its `exp` is 1 → the sum is ≥ 1; so no div-by-zero and the output is never all-zero."
+
+  # ── E · Connections & the elegant gradient (high-value depth) ──
+  - rc: RC-CONN
+    type: qa
+    src: Wiki
+    front: "'Softmax' is a misnomer — it's a smooth approximation to what function?"
+    back: "arg max (so 'soft-argmax'), NOT max."
+
+  - rc: RC-CONN
+    type: qa
+    src: "F&D Fact 3"
+    front: "For 2 classes, softmax reduces to what function?"
+    back: "the logistic sigmoid."
+
+  - rc: RC-CONN
+    type: qa
+    src: Wiki
+    sched: "Wiki gives the Jacobian pᵢ(δᵢⱼ−pⱼ); the p−y contraction is the standard corollary, not stated verbatim"
+    front: "softmax + cross-entropy: the gradient w.r.t. the logits simplifies to …?"
+    back: "`p − y` (predicted probabilities minus the one-hot label)."
+
+  - rc: RC-CONN
+    type: qa
+    src: Wiki
+    front: "Softmax is the gradient of which function?"
+    back: "LogSumExp  (`∂LSE/∂zᵢ = pᵢ`)."
+
+  # ── E (optional/advanced — beyond the forward-only module; hold unless wanted) ──
+  - rc: RC-CONN
+    type: cloze
+    src: Wiki
+    sched: "advanced — enable only when doing backprop"
+    front: "Softmax Jacobian: `∂pᵢ/∂zⱼ = ____`"
+    back: "`pᵢ(δᵢⱼ − pⱼ)`"
+
+  # ── Production capstone (the terminal test — write it from nothing) ──
+  - rc: RC1+RC2
+    type: production
+    src: Mody
+    sched: "high-difficulty item — dense early reps, then space out"
+    front: "Write numerically-stable `softmax(x, dim)` from a blank line."
+    back: |
+      m = x.max(dim=dim, keepdim=True).values
+      exps = torch.exp(x - m)
+      return exps / exps.sum(dim=dim, keepdim=True)
+      # (upcast x.float() / .to(x.dtype) at the ends for float16/bfloat16 inputs)
+
+# ─────────────────────────────────────────────────────────────────────────
+# NOT flashcards — habits/environment. Put on a sticky note / pre-submit check.
+# (Rule-of-thumb: spaced repetition builds recallable knowledge, not procedural discipline.)
+checklist:
+  env:       "Use `uv run python`, never base conda — torch/numpy live in the project venv."
+  editor:    "Indent with spaces (show whitespace) — tabs+spaces = a file that won't even parse."
+  presubmit: "Run the file / `python -c 'import ast; ast.parse(open(f).read())'` before submit — catches typos (.dytpe) and stray paste chars."
+  justify_1: "If a sentence was called wrong, DELETE it — don't staple proof next to it."
+  justify_2: "Enumerate the question's parts before writing (softmax asked TWO things)."
+  transfer:  "Paste the FINISHED REPL line into the file verbatim — don't re-derive from memory."

@@ -389,13 +389,13 @@ class FindAndReplaceTransformer(ast.NodeTransformer):
                         node
                     )
                 else:
-                    # Generic fallback: try to copy all attributes
-                    new_node = node.__class__()
-                    for attr in node._fields:
-                        if attr == 'value':
-                            setattr(new_node, attr, new_value)
-                        elif hasattr(node, attr):
-                            setattr(new_node, attr, getattr(node, attr))
+                    # Generic fallback: shallow-copy the node (preserves required
+                    # fields like AugAssign.op/target) then swap in the new value.
+                    # Avoids the empty `node.__class__()` constructor, which emits a
+                    # DeprecationWarning (and is a hard error from Python 3.15).
+                    import copy as _copy
+                    new_node = _copy.copy(node)
+                    new_node.value = new_value
                     new_node = ast.copy_location(new_node, node)
                 
                 return new_node

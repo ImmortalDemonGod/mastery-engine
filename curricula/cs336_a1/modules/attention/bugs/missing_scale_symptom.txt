@@ -1,0 +1,14 @@
+# Bug Symptom: Attention — attention-missing-scale
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `scaled_dot_product_attention` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+Drop the 1/sqrt(d_k) scaling factor (scale set to 1.0).
+
+## Your Challenge
+A single line in `cs336_basics/layers.py` no longer matches your correct implementation. Read the
+function, form a hypothesis from the symptom above, and locate the divergence.
+Restore the correct behavior — do not rewrite the whole function.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

@@ -48,6 +48,7 @@ from engine.validator import (
 from engine.stages.harden import HardenRunner, HardenChallengeError
 from engine.stages.justify import JustifyRunner, JustifyQuestionsError
 from engine.services.llm_service import LLMService, ConfigurationError, LLMAPIError, LLMResponseError
+from engine.services.evidence_sink import EvidenceSink
 from engine.utils import find_project_root
 import subprocess
 
@@ -134,6 +135,31 @@ def _load_curriculum_state() -> tuple:
     progress = state_mgr.load()
     manifest = curr_mgr.load_manifest(progress.curriculum_id)
     return state_mgr, curr_mgr, progress, manifest
+
+
+def _harden_source_relpath(module) -> Path:
+    """Repo-relative path to the file holding a module's implementation (the Harden target).
+
+    Curricula declare this via each module's ``metadata['source_file']`` (e.g.
+    ``cs336_basics/layers.py``) so the engine stays curriculum-agnostic and the same
+    file is used for injection, the user's fix, and validation. Falls back to legacy
+    heuristics for older packs that predate the field.
+    """
+    declared = (getattr(module, "metadata", None) or {}).get("source_file")
+    if declared:
+        p = Path(declared)
+        # Defense-in-depth: this path is joined onto the shadow worktree, so an
+        # absolute or parent-traversing value could escape it. Reject such configs.
+        if p.is_absolute() or ".." in p.parts:
+            raise ValueError(
+                f"Invalid source_file '{declared}' for module '{getattr(module, 'id', '?')}': "
+                "must be a repo-relative path without parent traversal ('..')."
+            )
+        return p
+    # Legacy fallback (pre-metadata curricula).
+    if getattr(module, "id", None) == "softmax":
+        return Path("cs336_basics/utils.py")
+    return Path(f"{module.id}.py")
 
 
 def _check_curriculum_complete(progress, manifest) -> bool:
@@ -237,6 +263,26 @@ def _submit_build_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         return False
 
 
+def _record_justify_evidence(progress, module_id, question_id, *, answer, is_correct, feedback, outcome):
+    """Append one justify-stage cognitive-evidence event (best-effort; never breaks the flow).
+
+    Called for EVERY outcome (graded, mock_autopass, fast_filter_reject) so the ledger
+    reflects activity honestly; `outcome` keeps the graded-only currency tally distinct.
+    """
+    try:
+        EvidenceSink().record(
+            curriculum_id=progress.curriculum_id,
+            module_id=module_id,
+            question_id=question_id,
+            answer=answer,
+            is_correct=is_correct,
+            feedback=feedback,
+            outcome=outcome,
+        )
+    except Exception as _sink_err:
+        logger.warning(f"evidence sink write failed (non-fatal): {_sink_err}")
+
+
 def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     """
     Submit and evaluate the current module's Justify-stage answer and advance progress on success.
@@ -291,6 +337,12 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         ))
         console.print()
         
+        # Record the (non-graded) mock auto-pass so the ledger reflects it honestly.
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer="", is_correct=True, feedback="mock auto-pass", outcome="mock_autopass",
+        )
+
         # Advance state to harden
         progress.mark_stage_complete("justify")
         state_mgr.save(progress)
@@ -377,6 +429,10 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         ))
         console.print()
         logger.info(f"Justify response rejected by fast filter for module '{current_module.id}'")
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer=answer, is_correct=False, feedback=fast_feedback, outcome="fast_filter_reject",
+        )
         return False
     
     # Step B: LLM semantic evaluation
@@ -384,9 +440,16 @@ def _submit_justify_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         # llm_service already created above (line 270) for mock mode check
         console.print()
         console.print("[dim]Evaluating your answer...[/dim]")
-        
+
         evaluation = llm_service.evaluate_justification(question, answer)
-        
+
+        # Record cognitive evidence for the graded attempt (pass or fail).
+        _record_justify_evidence(
+            progress, current_module.id, question.id,
+            answer=answer, is_correct=evaluation.is_correct,
+            feedback=evaluation.feedback, outcome="graded",
+        )
+
         # Step C: Feedback and state transition
         console.print()
         if evaluation.is_correct:
@@ -482,13 +545,10 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
     console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
     console.print()
     
-    # Determine file locations
-    if current_module.id == "softmax":
-        harden_file = harden_workspace / "utils.py"
-        shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
-    else:
-        harden_file = harden_workspace / f"{current_module.id}.py"
-        shadow_dest = shadow_worktree / f"{current_module.id}.py"
+    # Determine file locations from the curriculum-declared source file.
+    src_rel = _harden_source_relpath(current_module)
+    harden_file = harden_workspace / src_rel.name
+    shadow_dest = shadow_worktree / src_rel
     
     # Copy fixed file to shadow worktree
     import shutil
@@ -508,11 +568,34 @@ def _submit_harden_stage(state_mgr, curr_mgr, progress, manifest) -> bool:
         console.print()
         
         # Advance to next module
-        progress.mark_stage_complete("harden")
+        progress.mark_stage_complete("harden", current_module.id)
         state_mgr.save(progress)
-        
+
         logger.info(f"Harden stage completed for module '{current_module.id}'")
-        
+
+        # Auto-archive the learner's own implementation to their solutions branch.
+        # Opt-in + best-effort: only fires if the 'my-solutions' branch exists, and
+        # can never disrupt the session (git plumbing, no checkout, errors swallowed).
+        try:
+            from engine.services.solution_archive import archive_solution, SOLUTIONS_BRANCH
+            recorded = archive_solution(
+                repo_root=find_project_root(),
+                source_content=Path(harden_file).read_text(),
+                repo_relpath=str(Path("modes/student") / src_rel),
+                commit_message=(
+                    f"solution({current_module.id}): {current_module.name}\n\n"
+                    f"Auto-archived by the engine on module completion.\n"
+                    f"Curriculum: {progress.curriculum_id}."
+                ),
+            )
+            if recorded:
+                console.print(
+                    f"[dim]📓 Recorded your {current_module.name} solution to "
+                    f"'{SOLUTIONS_BRANCH}'.[/dim]"
+                )
+        except Exception:
+            logger.exception("Solution archival failed (non-fatal)")
+
         if progress.current_module_index < len(manifest.modules):
             next_module = manifest.modules[progress.current_module_index]
             console.print(Panel(
@@ -1258,11 +1341,8 @@ def start_challenge():
             # Get current module
             current_module = manifest.modules[progress.current_module_index]
             
-            # Determine source file based on module
-            if current_module.id == "softmax":
-                source_file = Path("cs336_basics/utils.py")
-            else:
-                source_file = Path(f"{current_module.id}.py")
+            # Determine the file holding the module's implementation (curriculum-declared).
+            source_file = _harden_source_relpath(current_module)
             
             # Present challenge (WRITES FILES)
             console.print()
@@ -1793,15 +1873,11 @@ def submit_fix():
         console.print(f"[bold cyan]Running validator on your fix for {current_module.name}...[/bold cyan]")
         console.print()
         
-        # CRITICAL: Copy fixed file from harden workspace to shadow worktree root
-        # The validator expects files in their normal locations (e.g., cs336_basics/utils.py)
-        # Determine source file based on module
-        if current_module.id == "softmax":
-            harden_file = harden_workspace / "utils.py"
-            shadow_dest = shadow_worktree / "cs336_basics" / "utils.py"
-        else:
-            harden_file = harden_workspace / f"{current_module.id}.py"
-            shadow_dest = shadow_worktree / f"{current_module.id}.py"
+        # Copy the fixed file from the harden workspace to its normal location in the
+        # shadow worktree (curriculum-declared source file), then validate there.
+        src_rel = _harden_source_relpath(current_module)
+        harden_file = harden_workspace / src_rel.name
+        shadow_dest = shadow_worktree / src_rel
         
         # Copy fixed file to shadow worktree for validation
         import shutil
@@ -1822,9 +1898,9 @@ def submit_fix():
             console.print()
             
             # Advance state to complete (finish module)
-            progress.mark_stage_complete("harden")
+            progress.mark_stage_complete("harden", current_module.id)
             state_mgr.save(progress)
-            
+
             logger.info(f"Harden stage completed for module '{current_module.id}'")
             
             # Show next action

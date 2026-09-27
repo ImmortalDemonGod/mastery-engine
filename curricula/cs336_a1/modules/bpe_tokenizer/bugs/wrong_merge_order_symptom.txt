@@ -1,0 +1,14 @@
+# Bug Symptom: Bpe Tokenizer — bpe-tokenizer-wrong-merge-count
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `train_bpe` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+A merged token keeps only the left byte sequence and drops the right, so the learned vocabulary diverges from a correct BPE merge.
+
+## Your Challenge
+A single line in `cs336_basics/bpe.py` no longer matches your correct implementation. Read the
+function, form a hypothesis from the symptom above, and locate the divergence.
+Restore the correct behavior — do not rewrite the whole function.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

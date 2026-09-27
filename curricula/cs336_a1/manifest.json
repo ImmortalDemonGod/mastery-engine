@@ -9,126 +9,208 @@
       "name": "Numerically Stable Softmax",
       "path": "modules/softmax",
       "baseline_perf_seconds": 0.15,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "cross_entropy",
       "name": "Numerically Stable Cross-Entropy Loss",
       "path": "modules/cross_entropy",
       "baseline_perf_seconds": 0.15,
-      "dependencies": ["softmax"]
+      "dependencies": [
+        "softmax"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "gradient_clipping",
       "name": "Global Gradient Clipping",
       "path": "modules/gradient_clipping",
-      "baseline_perf_seconds": 0.10,
-      "dependencies": []
+      "baseline_perf_seconds": 0.1,
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "linear",
       "name": "Linear (Fully-Connected) Layer",
       "path": "modules/linear",
       "baseline_perf_seconds": 0.12,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "embedding",
       "name": "Token Embedding Layer (From Scratch)",
       "path": "modules/embedding",
-      "baseline_perf_seconds": 0.10,
-      "dependencies": []
+      "baseline_perf_seconds": 0.1,
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "silu",
       "name": "SiLU (Sigmoid Linear Unit) Activation",
       "path": "modules/silu",
       "baseline_perf_seconds": 0.08,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "rmsnorm",
       "name": "Root Mean Square Layer Normalization",
       "path": "modules/rmsnorm",
       "baseline_perf_seconds": 0.12,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "swiglu",
       "name": "SwiGLU Gated Feed-Forward Network",
       "path": "modules/swiglu",
       "baseline_perf_seconds": 0.15,
-      "dependencies": ["linear", "silu"]
+      "dependencies": [
+        "linear",
+        "silu"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "attention",
       "name": "Scaled Dot-Product Attention",
       "path": "modules/attention",
       "baseline_perf_seconds": 0.18,
-      "dependencies": ["softmax"]
+      "dependencies": [
+        "softmax"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "rope",
       "name": "RoPE (Rotary Position Embeddings)",
       "path": "modules/rope",
       "baseline_perf_seconds": 0.14,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "multihead_attention",
       "name": "Multi-Head Self-Attention with RoPE",
       "path": "modules/multihead_attention",
       "baseline_perf_seconds": 0.22,
-      "dependencies": ["attention", "rope", "linear"]
+      "dependencies": [
+        "attention",
+        "rope",
+        "linear"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "transformer_block",
       "name": "Transformer Block (Complete Integration)",
       "path": "modules/transformer_block",
       "baseline_perf_seconds": 0.25,
-      "dependencies": ["multihead_attention", "swiglu", "rmsnorm"]
+      "dependencies": [
+        "multihead_attention",
+        "swiglu",
+        "rmsnorm"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "transformer_lm",
       "name": "Transformer Language Model Assembly",
       "path": "modules/transformer_lm",
-      "baseline_perf_seconds": 0.30,
-      "dependencies": ["transformer_block", "embedding", "rmsnorm", "linear"]
+      "baseline_perf_seconds": 0.3,
+      "dependencies": [
+        "transformer_block",
+        "embedding",
+        "rmsnorm",
+        "linear"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/layers.py"
+      }
     },
     {
       "id": "adamw",
       "name": "AdamW Optimizer",
       "path": "modules/adamw",
       "baseline_perf_seconds": 0.15,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/optimizer.py"
+      }
     },
     {
       "id": "cosine_schedule",
       "name": "Cosine Learning Rate Schedule with Warmup",
       "path": "modules/cosine_schedule",
       "baseline_perf_seconds": 0.08,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "data_loader",
       "name": "Language Model Data Loader (get_batch)",
       "path": "modules/data_loader",
       "baseline_perf_seconds": 0.12,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "checkpointing",
       "name": "Model Checkpointing (Save/Load)",
       "path": "modules/checkpointing",
       "baseline_perf_seconds": 0.15,
-      "dependencies": []
+      "dependencies": [],
+      "metadata": {
+        "source_file": "cs336_basics/utils.py"
+      }
     },
     {
       "id": "training_loop",
       "name": "Training Loop (Complete Integration)",
       "path": "modules/training_loop",
-      "baseline_perf_seconds": 0.20,
-      "dependencies": ["transformer_lm", "adamw", "cosine_schedule", "data_loader", "checkpointing", "cross_entropy", "gradient_clipping"]
+      "baseline_perf_seconds": 0.2,
+      "dependencies": [
+        "transformer_lm",
+        "adamw",
+        "cosine_schedule",
+        "data_loader",
+        "checkpointing",
+        "cross_entropy",
+        "gradient_clipping"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/training.py"
+      }
     },
     {
       "id": "unicode",
@@ -143,21 +225,37 @@
       "name": "BPE Tokenizer Training",
       "path": "modules/bpe_tokenizer",
       "baseline_perf_seconds": 0.18,
-      "dependencies": ["unicode"]
+      "dependencies": [
+        "unicode"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/bpe.py"
+      }
     },
     {
       "id": "tokenizer_class",
       "name": "Tokenizer Class (Encode/Decode)",
       "path": "modules/tokenizer_class",
       "baseline_perf_seconds": 0.12,
-      "dependencies": ["bpe_tokenizer"]
+      "dependencies": [
+        "bpe_tokenizer"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/tokenizer.py"
+      }
     },
     {
       "id": "text_generation",
       "name": "Text Generation with Sampling Strategies",
       "path": "modules/text_generation",
       "baseline_perf_seconds": 0.25,
-      "dependencies": ["transformer_lm", "tokenizer_class"]
+      "dependencies": [
+        "transformer_lm",
+        "tokenizer_class"
+      ],
+      "metadata": {
+        "source_file": "cs336_basics/generation.py"
+      }
     }
   ]
 }

@@ -20,12 +20,12 @@ start_time=$(python3 -c 'import time; print(time.time())')
 
 if [ -n "$MASTERY_PYTHON" ]; then
     export PYTHONPATH="$(pwd):$PYTHONPATH"
-    "$MASTERY_PYTHON" -m pytest tests/test_training.py::test_get_batch -v --tb=short --import-mode=importlib
+    "$MASTERY_PYTHON" -m pytest tests/test_data.py::test_get_batch -v --tb=short --import-mode=importlib
 elif [ -n "$VIRTUAL_ENV" ]; then
     export PYTHONPATH="$(pwd):$PYTHONPATH"
-    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_training.py::test_get_batch -v --tb=short --import-mode=importlib
+    "$VIRTUAL_ENV/bin/python" -m pytest tests/test_data.py::test_get_batch -v --tb=short --import-mode=importlib
 else
-    uv run pytest tests/test_training.py::test_get_batch -v --tb=short --import-mode=importlib
+    uv run pytest tests/test_data.py::test_get_batch -v --tb=short --import-mode=importlib
 fi
 
 end_time=$(python3 -c 'import time; print(time.time())')

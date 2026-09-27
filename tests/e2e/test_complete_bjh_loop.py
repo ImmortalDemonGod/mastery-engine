@@ -132,6 +132,12 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
     
     # Create initial commit (required for git worktree to work)
     subprocess.run(["git", "add", "-A"], cwd=test_repo, check=True, capture_output=True)
+    # The copied .gitignore ignores the unanchored name `cs336_basics`, which also
+    # matches modes/{student,developer}/cs336_basics. In a fresh repo those dirs are
+    # untracked-and-ignored, so `git add -A` skips them — leaving the shadow
+    # worktree's cs336_basics symlink dangling. Force-add modes so the reference and
+    # student implementations are committed and present in the worktree.
+    subprocess.run(["git", "add", "-f", "modes"], cwd=test_repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit"],
         cwd=test_repo, check=True, capture_output=True
@@ -167,21 +173,40 @@ def isolated_repo(tmp_path: Path) -> Generator[Path, None, None]:
     # Alternative: Add test_repo to PYTHONPATH for the subprocess
     # This works even if pip install fails
     import os
+    saved_env = {k: os.environ.get(k) for k in ("PYTHONPATH", "HOME", "COLUMNS")}
     os.environ['PYTHONPATH'] = f"{test_repo}:{os.environ.get('PYTHONPATH', '')}"
-    
-    yield test_repo
-    
-    # Cleanup: Remove any shadow worktrees before cleaning up directory
-    shadow_worktree = test_repo / ".mastery_engine_worktree"
-    if shadow_worktree.exists():
-        try:
-            subprocess.run(
-                ["git", "worktree", "remove", str(shadow_worktree), "--force"],
-                cwd=test_repo,
-                capture_output=True
-            )
-        except subprocess.CalledProcessError:
-            pass
+
+    # ISOLATION: redirect HOME into the temp repo so the engine's state file
+    # (~/.mastery_progress.json) and evidence ledger never touch the real home.
+    # Path.home() honors $HOME on POSIX, so both the subprocess AND this test's
+    # in-process get_state() read the isolated copy.
+    fake_home = test_repo / ".home"
+    fake_home.mkdir(exist_ok=True)
+    os.environ['HOME'] = str(fake_home)
+    # Force a wide console so Rich panels don't wrap (paths split across lines
+    # would otherwise break substring assertions on stdout).
+    os.environ['COLUMNS'] = "200"
+
+    try:
+        yield test_repo
+    finally:
+        # Cleanup: Remove any shadow worktrees before cleaning up directory
+        shadow_worktree = test_repo / ".mastery_engine_worktree"
+        if shadow_worktree.exists():
+            try:
+                subprocess.run(
+                    ["git", "worktree", "remove", str(shadow_worktree), "--force"],
+                    cwd=test_repo,
+                    capture_output=True
+                )
+            except subprocess.CalledProcessError:
+                pass
+        # Restore environment we mutated.
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 def run_engine_command(repo_path: Path, *args: str) -> subprocess.CompletedProcess:
@@ -410,8 +435,8 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     assert state["current_module_index"] == 1, f"Expected module index 1, got {state['current_module_index']}"
     assert state["current_stage"] == "build", f"Expected build stage, got {state['current_stage']}"
     assert len(state["completed_modules"]) == 1, "Should have exactly 1 completed module"
-    # State stores module indices, not IDs (module_0, module_1, etc.)
-    assert state["completed_modules"][0] == "module_0", "Completed module should be module_0 (softmax)"
+    # State stores real module IDs (e.g., "softmax", "cross_entropy")
+    assert state["completed_modules"][0] == "softmax", "Completed module should be softmax"
     
     # Verify the next module prompt is accessible
     result = run_engine_command(isolated_repo, "show")
@@ -443,7 +468,7 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     # Skip harden stage (same file as softmax creates conflict)
     # Directly mark module complete to test advancement logic
     state = get_state(isolated_repo)
-    module_id = f"module_{state['current_module_index']}"
+    module_id = "cross_entropy"
     if module_id not in state["completed_modules"]:
         state["completed_modules"].append(module_id)
     state["current_module_index"] += 1
@@ -456,8 +481,8 @@ def test_complete_softmax_bjh_loop(isolated_repo: Path, mocker):
     assert state["current_module_index"] == 2, f"Expected module index 2, got {state['current_module_index']}"
     assert state["current_stage"] == "build", f"Expected build stage, got {state['current_stage']}"
     assert len(state["completed_modules"]) == 2, "Should have exactly 2 completed modules"
-    assert "module_0" in state["completed_modules"], "Module_0 (softmax) should be in completed modules"
-    assert "module_1" in state["completed_modules"], "Module_1 (cross_entropy) should be in completed modules"
+    assert "softmax" in state["completed_modules"], "softmax should be in completed modules"
+    assert "cross_entropy" in state["completed_modules"], "cross_entropy should be in completed modules"
     
     # Verify state file integrity after two complete module cycles
     result = run_engine_command(isolated_repo, "status")

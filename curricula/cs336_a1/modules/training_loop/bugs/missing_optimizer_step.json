@@ -1,0 +1,21 @@
+{
+  "id": "training-loop-missing-optimizer-step",
+  "description": "Omits optimizer.step(), so gradients are computed but never applied — the parameters never update and the loss never decreases.",
+  "injection_type": "ast",
+  "engine_version": "2.1",
+  "target_function": "train_loop",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Expr",
+        "value": {
+          "node_type": "Call",
+          "func": { "node_type": "Attribute", "attr": "step" }
+        }
+      },
+      "replacement": { "type": "delete_statement" }
+    }
+  ]
+}

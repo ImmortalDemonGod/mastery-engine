@@ -1,0 +1,15 @@
+# Bug Symptom: Text Generation — text-generation-wrong-next-position
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `generate` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+Next-token logits are taken from the FIRST sequence position instead of the LAST, so
+the model keeps conditioning on the same token and ignores everything it just generated.
+
+## Your Challenge
+A single line in `cs336_basics/generation.py` no longer matches your correct implementation.
+Read the autoregressive loop, form a hypothesis from the symptom above, and locate the
+divergence. Which position's logits predict the NEXT token? Restore the correct behavior.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

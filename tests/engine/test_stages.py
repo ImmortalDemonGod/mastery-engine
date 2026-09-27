@@ -315,14 +315,41 @@ class TestJustifyRunner:
         )
         
         user_answer = "I don't know why we use softmax"
-        
+
         # Execute
         matched, feedback = runner.check_fast_filter(question, user_answer)
-        
+
         # Verify
         assert matched is True
         assert feedback == "Let's dig deeper..."
-    
+
+    def test_check_fast_filter_skips_substantive_answer(self):
+        """A long, substantive answer must bypass the keyword filter even when it
+        legitimately uses a failure-mode keyword — depth is the LLM grader's job."""
+        runner = JustifyRunner(MagicMock())
+        question = JustifyQuestion(
+            id="q1",
+            question="Why subtract the max in softmax?",
+            model_answer="Prevents overflow; mathematically identical.",
+            failure_modes=[
+                FailureMode(category="Incomplete", keywords=["overflow", "stability"],
+                            feedback="Be more specific."),
+            ],
+            required_concepts=["overflow prevention"],
+        )
+        # ~40 words, correct, and it does contain "overflow"/"stability".
+        answer = (
+            "Subtracting the max shifts every logit so the largest becomes zero, which "
+            "prevents exp from overflowing to infinity. The result is mathematically "
+            "identical because the shared exp(c) factor cancels in the numerator and "
+            "denominator, so numerical stability is improved without changing the "
+            "probability distribution at all."
+        )
+        matched, feedback = runner.check_fast_filter(question, answer)
+        assert matched is False, "substantive correct answer must not be fast-filter-rejected"
+        assert feedback is None
+
+
     @patch.dict('os.environ', {'MASTERY_DISABLE_FAST_FILTER': ''}, clear=False)
     def test_check_fast_filter_no_match(self):
         """Should not match when no keywords present."""

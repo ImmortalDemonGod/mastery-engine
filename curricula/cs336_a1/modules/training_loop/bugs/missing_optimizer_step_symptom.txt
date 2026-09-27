@@ -1,0 +1,14 @@
+# Bug Symptom: Training Loop — training-loop-missing-optimizer-step
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `train_loop` implementation. Your code
+runs without raising a syntax error, but training does not work: the loss stays flat
+across every step and the module's correctness test fails.
+
+## Your Challenge
+The forward pass, loss, and backward pass all run — gradients ARE computed — yet the
+model's parameters never change. Which call actually APPLIES the gradients to update
+the parameters? A single statement is missing from `cs336_basics/training.py`. Restore it.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

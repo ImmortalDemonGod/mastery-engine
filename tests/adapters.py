@@ -645,3 +645,17 @@ def run_train_bpe(
         special_tokens=special_tokens,
         **kwargs,
     )
+
+
+def run_generate(model, tokenizer, prompt: str, **kwargs):
+    """Adapter: autoregressive text generation (text_generation module)."""
+    from cs336_basics.generation import generate
+
+    return generate(model, tokenizer, prompt, **kwargs)
+
+
+def run_train_loop(model, train_dataloader, optimizer, num_epochs: int, **kwargs):
+    """Adapter: language-model training loop (training_loop module)."""
+    from cs336_basics.training import train_loop
+
+    return train_loop(model, train_dataloader, optimizer, num_epochs, **kwargs)

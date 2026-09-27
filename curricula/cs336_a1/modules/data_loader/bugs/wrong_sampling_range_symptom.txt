@@ -1,0 +1,14 @@
+# Bug Symptom: Data Loader — data-loader-wrong-sampling-range
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `get_batch` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+Wrong high bound in randint causing out-of-bounds
+
+## Your Challenge
+A single line in `cs336_basics/utils.py` no longer matches your correct implementation. Read the
+function, form a hypothesis from the symptom above, and locate the divergence.
+Restore the correct behavior — do not rewrite the whole function.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

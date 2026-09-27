@@ -1,25 +1,32 @@
 {
-  "id": "multihead-attention-missing-transpose",
-  "description": "Missing transpose before concatenating heads",
+  "id": "multihead-attention-missing-transpose-back",
+  "description": "Head merge skips the transpose back to (batch, seq, heads, dim), so head and position axes are interleaved incorrectly before the output projection.",
   "injection_type": "ast",
   "engine_version": "2.1",
-  "target_function": "forward",
+  "target_function": "multihead_self_attention_with_rope",
   "logic": [
     {
       "pass": 1,
       "type": "find_and_replace",
       "pattern": {
-        "node_type": "Expr",
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "context"
+          }
+        ],
         "value": {
           "node_type": "Call",
           "func": {
             "node_type": "Attribute",
-            "attr": "transpose"
+            "attr": "view"
           }
         }
       },
       "replacement": {
-        "type": "delete_statement"
+        "type": "replace_value_with",
+        "source": "context.contiguous().view(context.shape[0], seq_len, d_model)"
       }
     }
   ]

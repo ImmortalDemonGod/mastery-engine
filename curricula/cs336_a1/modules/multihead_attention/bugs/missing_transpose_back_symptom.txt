@@ -1,0 +1,14 @@
+# Bug Symptom: Multihead Attention — multihead-attention-missing-transpose-back
+
+## Observed Behavior
+A subtle semantic bug has been injected into your `multihead_self_attention_with_rope` implementation. Your code
+runs without raising a syntax error, but the module's correctness test now fails:
+The head merge skips the transpose back to (batch, seq, heads, dim), so head and position axes are interleaved incorrectly before the output projection.
+
+## Your Challenge
+A single line in `cs336_basics/layers.py` no longer matches your correct implementation. Read the
+function, form a hypothesis from the symptom above, and locate the divergence.
+Restore the correct behavior — do not rewrite the whole function.
+
+## Verify
+Run `mastery submit` to re-run the validator once you believe the bug is fixed.

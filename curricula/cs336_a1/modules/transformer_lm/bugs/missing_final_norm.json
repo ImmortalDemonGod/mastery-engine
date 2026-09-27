@@ -1,20 +1,33 @@
 {
   "id": "transformer-lm-missing-final-norm",
-  "description": "Missing final layer normalization before LM head",
+  "description": "Skip the final RMSNorm before the LM head (x = x instead of ln_final(x)).",
   "injection_type": "ast",
   "engine_version": "2.1",
-  "target_function": "forward",
-  "logic": [{
-    "pass": 1,
-    "type": "find_and_replace",
-    "pattern": {
-      "node_type": "Assign",
-      "targets": [{"node_type": "Name", "id": "x"}],
-      "value": {
-        "node_type": "Call",
-        "func": {"node_type": "Attribute", "attr": "ln_final"}
+  "target_function": "transformer_lm",
+  "logic": [
+    {
+      "pass": 1,
+      "type": "find_and_replace",
+      "pattern": {
+        "node_type": "Assign",
+        "targets": [
+          {
+            "node_type": "Name",
+            "id": "x"
+          }
+        ],
+        "value": {
+          "node_type": "Call",
+          "func": {
+            "node_type": "Name",
+            "id": "ln_final"
+          }
+        }
+      },
+      "replacement": {
+        "type": "replace_value_with",
+        "source": "x"
       }
-    },
-    "replacement": {"type": "delete_statement"}
-  }]
+    }
+  ]
 }
