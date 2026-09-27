@@ -1,0 +1,38 @@
+=== LIVE-FIRE E2E: HEAD validator.sh — developer mode ===
+head_sha: d4970aa82ba5392c23f199169ad15c73ccabf902
+branch: fix/mastery-cosine-validator
+validator: curricula/cs336_a1/modules/cosine_schedule/validator.sh
+cwd: modes/developer/ (developer reference: modes/developer/cs336_basics/utils.py has correct get_lr_cosine_schedule)
+SHADOW_WORKTREE: /tmp/tmp.vmPjsBwDtv (stale sentinel in utils.py; other cs336_basics files from developer)
+MASTERY_PYTHON: /home/user/mastery-engine-mastery-cosine-validator/.venv/bin/python3
+Before: shadow cs336_basics/utils.py = '# STALE — validator must overwrite'
+run_date: 2026-06-21T03:47:12Z
+
+Fix exhibited:
+  (1) validator.sh:19 ran: cp cs336_basics/utils.py "$SHADOW_WORKTREE/cs336_basics/utils.py"
+      → developer's utils.py propagated to shadow (STALE sentinel overwritten)
+  (2) pytest node ID used: test_get_lr_cosine_schedule (correct function name, tests/test_optimizer.py:52)
+      → 1 item collected and PASSED
+
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-8.4.1, pluggy-1.6.0
+cachedir: .pytest_cache
+rootdir: /tmp/tmp.vmPjsBwDtv
+configfile: pyproject.toml
+plugins: anyio-4.11.0, jaxtyping-0.3.2, cov-7.0.0, mock-3.15.1
+collecting ... collected 1 item
+
+tests/test_optimizer.py::test_get_lr_cosine_schedule PASSED
+
+=============================== warnings summary ===============================
+tests/adapters.py:314
+  DeprecationWarning: invalid escape sequence '\T'
+=========================== short test summary info ============================
+1 passed, 1 warning in 0.04s
+PERFORMANCE_SECONDS: 2.080345869064331
+
+exit_code: 0
+
+After: developer utils.py propagated to shadow worktree — PROPAGATION CONFIRMED
+Both bugs fixed: utils.py copied (B1 fixed), correct test node (B2 fixed)
+Cosine-schedule validation now works for developer reference implementation.
